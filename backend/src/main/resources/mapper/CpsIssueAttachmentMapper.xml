@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsIssueAttachmentMapper">
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsIssueAttachment" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_issue_attachment (
+            issue_id,
+            stage,
+            file_url,
+            file_name,
+            file_type,
+            sort_no,
+            created_by,
+            created_name
+        ) VALUES (
+            #{issueId},
+            #{stage},
+            #{fileUrl},
+            #{fileName},
+            #{fileType},
+            #{sortNo},
+            #{createdBy},
+            #{createdName}
+        )
+    </insert>
+
+    <update id="attachToIssue">
+        UPDATE cps_issue_attachment
+        SET issue_id = #{issueId},
+            stage = #{stage},
+            sort_no = #{sortNo},
+            created_by = #{createdBy},
+            created_name = #{createdName}
+        WHERE id = #{attachmentId}
+          AND (issue_id IS NULL OR issue_id = #{issueId})
+    </update>
+
+    <select id="findByIssueAndStage" resultType="com.company.cps.domain.CpsIssueAttachment">
+        SELECT *
+        FROM cps_issue_attachment
+        WHERE issue_id = #{issueId}
+          AND stage = #{stage}
+        ORDER BY sort_no
+    </select>
+
+    <select id="findById" resultType="com.company.cps.domain.CpsIssueAttachment">
+        SELECT *
+        FROM cps_issue_attachment
+        WHERE id = #{id}
+    </select>
+
+</mapper>

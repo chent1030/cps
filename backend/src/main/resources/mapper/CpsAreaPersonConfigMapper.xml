@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsAreaPersonConfigMapper">
+
+    <sql id="BaseColumns">
+        id, factory, area, line, process,
+        emp_no, emp_name,
+        enabled, created_by, updated_by, created_at, updated_at
+    </sql>
+
+    <select id="findFeedbackCandidates" resultType="com.company.cps.domain.CpsAreaPersonConfig">
+        SELECT <include refid="BaseColumns" />,
+               (
+                 CASE WHEN line = #{line} THEN 1 ELSE 0 END
+                 + CASE WHEN process = #{process} THEN 1 ELSE 0 END
+               ) AS match_level
+        FROM cps_area_person_config
+        WHERE enabled = 1
+          AND factory = #{factory}
+          AND area = #{area}
+          AND emp_no IS NOT NULL
+          AND emp_no != ''
+          AND (line = #{line} OR line = '')
+          AND (process = #{process} OR process = '')
+        ORDER BY match_level DESC, id ASC
+    </select>
+
+    <select id="findReviewerCandidates" resultType="com.company.cps.domain.CpsAreaPersonConfig">
+        SELECT <include refid="BaseColumns" />,
+               (
+                 CASE WHEN line = '' THEN 0 ELSE 1 END
+                 + CASE WHEN process = '' THEN 0 ELSE 1 END
+               ) AS match_level
+        FROM cps_area_person_config
+        WHERE enabled = 1
+          AND factory = #{factory}
+          AND area = #{area}
+          AND emp_no IS NOT NULL
+          AND emp_no != ''
+        ORDER BY match_level ASC, id ASC
+    </select>
+
+    <select id="findAll" resultType="com.company.cps.domain.CpsAreaPersonConfig">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_area_person_config
+        WHERE 1 = 1
+        <if test="factory != null and factory != ''">
+          AND factory = #{factory}
+        </if>
+        <if test="area != null and area != ''">
+          AND area = #{area}
+        </if>
+        <if test="enabled != null">
+          AND enabled = #{enabled}
+        </if>
+        ORDER BY factory ASC, area ASC, line ASC, process ASC, id ASC
+    </select>
+
+    <select id="findById" resultType="com.company.cps.domain.CpsAreaPersonConfig">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_area_person_config
+        WHERE id = #{id}
+    </select>
+
+    <insert id="upsert" parameterType="com.company.cps.domain.CpsAreaPersonConfig" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_area_person_config (
+          id, factory, area, line, process,
+          emp_no, emp_name,
+          enabled, created_by, updated_by
+        ) VALUES (
+          #{id}, #{factory}, #{area}, #{line}, #{process},
+          #{empNo}, #{empName},
+          #{enabled}, #{createdBy}, #{updatedBy}
+        )
+        ON DUPLICATE KEY UPDATE
+          emp_no = VALUES(emp_no),
+          emp_name = VALUES(emp_name),
+          enabled = VALUES(enabled),
+          updated_by = VALUES(updated_by)
+    </insert>
+
+    <update id="setEnabled">
+        UPDATE cps_area_person_config
+        SET enabled = #{enabled},
+            updated_by = #{updatedBy}
+        WHERE id = #{id}
+    </update>
+
+    <select id="findFactoryOptions" resultType="com.company.cps.dto.CpsOptionResponse">
+        SELECT factory AS value,
+               factory AS label
+        FROM cps_area_person_config
+        WHERE enabled = 1
+        GROUP BY factory
+        ORDER BY factory ASC
+    </select>
+
+    <select id="findAreaOptions" resultType="com.company.cps.dto.CpsOptionResponse">
+        SELECT area AS value,
+               area AS label
+        FROM cps_area_person_config
+        WHERE enabled = 1
+          AND factory = #{factory}
+        GROUP BY factory, area
+        ORDER BY area ASC
+    </select>
+
+    <select id="findLineOptions" resultType="com.company.cps.dto.CpsOptionResponse">
+        SELECT line AS value,
+               line AS label
+        FROM cps_area_person_config
+        WHERE enabled = 1
+          AND line != ''
+          AND factory = #{factory}
+          AND area = #{area}
+        GROUP BY factory, area, line
+        ORDER BY line ASC
+    </select>
+
+    <select id="findProcessOptions" resultType="com.company.cps.dto.CpsOptionResponse">
+        SELECT process AS value,
+               process AS label
+        FROM cps_area_person_config
+        WHERE enabled = 1
+          AND process != ''
+          AND factory = #{factory}
+          AND area = #{area}
+        <if test="line != null and line != ''">
+          AND line = #{line}
+        </if>
+        GROUP BY factory, area, line, process
+        ORDER BY process ASC
+    </select>
+
+</mapper>

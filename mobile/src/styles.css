@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+}
+
+:root {
+  --van-primary-color: #14b8a6;
+  --van-success-color: #22c55e;
+  --van-warning-color: #f97316;
+  --van-danger-color: #ef4444;
+  --van-blue: #2563eb;
+  --van-button-border-radius: 999rpx;
+  --van-button-default-height: 104rpx;
+  --van-button-normal-font-size: 34rpx;
+  --van-cell-font-size: 34rpx;
+  --van-cell-line-height: 52rpx;
+  --van-cell-vertical-padding: 28rpx;
+  --van-cell-horizontal-padding: 32rpx;
+  --van-cell-border-color: #ccfbf1;
+  --van-cell-group-title-font-size: 32rpx;
+  --van-cell-group-title-line-height: 48rpx;
+  --van-field-label-width: 176rpx;
+  --van-field-input-text-color: #0f172a;
+  --van-field-input-error-text-color: #ef4444;
+  --van-field-label-color: #0f172a;
+  --van-tab-font-size: 32rpx;
+  --van-tabs-bottom-bar-height: 6rpx;
+  --van-tag-font-size: 28rpx;
+  --van-tag-line-height: 40rpx;
+  --van-text-color: #0f172a;
+  --van-background: #f8fafc;
+  --van-background-2: #ffffff;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(20, 184, 166, 0.18), transparent 1024rpx),
+    linear-gradient(180deg, #f0fdfa 0%, #f8fafc 42%, #eef2ff 100%);
+  color: #0f172a;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 34rpx;
+  touch-action: pan-y;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.van-cell-group--inset {
+  margin: 0;
+  overflow: hidden;
+  border: 2rpx solid rgba(20, 184, 166, 0.18);
+  border-radius: 18rpx;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18rpx 54rpx rgba(15, 23, 42, 0.08);
+}
+
+.van-cell-group__title {
+  padding: 0 4rpx 12rpx;
+  color: #0f172a;
+  font-weight: 800;
+}

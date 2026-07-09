@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsKnowledgeCaseMapper">
+
+    <select id="findEnabledById" resultType="com.company.cps.domain.CpsKnowledgeCase">
+        SELECT *
+        FROM cps_knowledge_case
+        WHERE id = #{id}
+          AND enabled = 1
+    </select>
+
+    <select id="findById" resultType="com.company.cps.domain.CpsKnowledgeCase">
+        SELECT *
+        FROM cps_knowledge_case
+        WHERE id = #{id}
+    </select>
+
+    <select id="findEnabledByIds" resultType="com.company.cps.domain.CpsKnowledgeCase">
+        SELECT *
+        FROM cps_knowledge_case
+        WHERE enabled = 1
+          AND id IN
+          <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+          </foreach>
+    </select>
+
+    <select id="findAll" resultType="com.company.cps.domain.CpsKnowledgeCase">
+        SELECT *
+        FROM cps_knowledge_case
+        <where>
+            <if test="enabled != null">
+                enabled = #{enabled}
+            </if>
+        </where>
+        ORDER BY id DESC
+    </select>
+
+    <insert id="upsert" parameterType="com.company.cps.domain.CpsKnowledgeCase" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_knowledge_case (
+            id,
+            case_code,
+            case_title,
+            category_l1_id,
+            category_l2_id,
+            category_l1_name,
+            category_l2_name,
+            scope_remark,
+            enabled,
+            created_by
+        ) VALUES (
+            #{id},
+            #{caseCode},
+            #{caseTitle},
+            #{categoryL1Id},
+            #{categoryL2Id},
+            #{categoryL1Name},
+            #{categoryL2Name},
+            #{scopeRemark},
+            #{enabled},
+            #{createdBy}
+        )
+        ON DUPLICATE KEY UPDATE
+            case_title = VALUES(case_title),
+            category_l1_id = VALUES(category_l1_id),
+            category_l2_id = VALUES(category_l2_id),
+            category_l1_name = VALUES(category_l1_name),
+            category_l2_name = VALUES(category_l2_name),
+            scope_remark = VALUES(scope_remark),
+            enabled = VALUES(enabled),
+            updated_at = NOW()
+    </insert>
+
+    <update id="setEnabled">
+        UPDATE cps_knowledge_case
+        SET enabled = #{enabled},
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+</mapper>

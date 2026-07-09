@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsIssueMapper">
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsIssue" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_issue (
+          issue_no, status, factory, area, line, process,
+          ai_category_l1_id, ai_category_l2_id, category_l1_id, category_l2_id,
+          category_modified_flag, description, creator_emp_no, feedback_emp_no,
+          responsible_emp_no, proof_emp_no, reviewer_emp_no, current_handler_emp_no,
+          creator_emp_name, feedback_emp_name, responsible_emp_name, proof_emp_name,
+          reviewer_emp_name, current_handler_emp_name,
+          reason_analysis, corrective_measure, rectify_remark, review_opinion,
+          submit_time, close_time, created_at, updated_at
+        ) VALUES (
+          #{issueNo}, #{status}, #{factory}, #{area}, #{line}, #{process},
+          #{aiCategoryL1Id}, #{aiCategoryL2Id}, #{categoryL1Id}, #{categoryL2Id},
+          #{categoryModifiedFlag}, #{description}, #{creatorEmpNo}, #{feedbackEmpNo},
+          #{responsibleEmpNo}, #{proofEmpNo}, #{reviewerEmpNo}, #{currentHandlerEmpNo},
+          #{creatorEmpName}, #{feedbackEmpName}, #{responsibleEmpName}, #{proofEmpName},
+          #{reviewerEmpName}, #{currentHandlerEmpName},
+          #{reasonAnalysis}, #{correctiveMeasure}, #{rectifyRemark}, #{reviewOpinion},
+          #{submitTime}, #{closeTime}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="findById" resultType="com.company.cps.domain.CpsIssue">
+        SELECT *
+        FROM cps_issue
+        WHERE id = #{id}
+    </select>
+
+    <update id="updateWorkflowFields" parameterType="com.company.cps.domain.CpsIssue">
+        UPDATE cps_issue
+        SET status = #{status},
+            responsible_emp_no = #{responsibleEmpNo},
+            proof_emp_no = #{proofEmpNo},
+            reviewer_emp_no = #{reviewerEmpNo},
+            current_handler_emp_no = #{currentHandlerEmpNo},
+            responsible_emp_name = #{responsibleEmpName},
+            proof_emp_name = #{proofEmpName},
+            reviewer_emp_name = #{reviewerEmpName},
+            current_handler_emp_name = #{currentHandlerEmpName},
+            reason_analysis = #{reasonAnalysis},
+            corrective_measure = #{correctiveMeasure},
+            rectify_remark = #{rectifyRemark},
+            review_opinion = #{reviewOpinion},
+            close_time = #{closeTime},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <select id="listByTab" resultType="com.company.cps.dto.CpsIssueListItemResponse">
+        SELECT id,
+               issue_no,
+               status,
+               factory,
+               area,
+               line,
+               process,
+               category_l1_id,
+               category_l2_id,
+               description,
+               current_handler_emp_no,
+               current_handler_emp_name,
+               submit_time,
+               CASE
+                 WHEN status &lt;&gt; 'CLOSED' AND submit_time &lt; DATE_SUB(NOW(), INTERVAL 3 DAY) THEN 1
+                 ELSE 0
+               END AS overdue
+        FROM cps_issue
+        WHERE (#{tab} != 'todo' OR (current_handler_emp_no = #{empNo} AND status &lt;&gt; 'CLOSED'))
+          AND (#{tab} != 'created' OR creator_emp_no = #{empNo})
+          AND (#{tab} != 'related' OR (
+                creator_emp_no = #{empNo}
+                OR current_handler_emp_no = #{empNo}
+                OR feedback_emp_no = #{empNo}
+                OR responsible_emp_no = #{empNo}
+                OR proof_emp_no = #{empNo}
+                OR reviewer_emp_no = #{empNo}
+                OR EXISTS (
+                  SELECT 1
+                  FROM cps_issue_flow_log
+                  WHERE cps_issue_flow_log.issue_id = cps_issue.id
+                    AND cps_issue_flow_log.operator_emp_no = #{empNo}
+                )
+              ))
+          AND (#{tab} != 'closed' OR (status = 'CLOSED' AND (
+                creator_emp_no = #{empNo}
+                OR current_handler_emp_no = #{empNo}
+                OR feedback_emp_no = #{empNo}
+                OR responsible_emp_no = #{empNo}
+                OR proof_emp_no = #{empNo}
+                OR reviewer_emp_no = #{empNo}
+                OR EXISTS (
+                  SELECT 1
+                  FROM cps_issue_flow_log
+                  WHERE cps_issue_flow_log.issue_id = cps_issue.id
+                    AND cps_issue_flow_log.operator_emp_no = #{empNo}
+                )
+              )))
+        ORDER BY submit_time DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+</mapper>

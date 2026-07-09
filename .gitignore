@@ -1,0 +1,5 @@
+.pnpm-store/
+backend/target/
+mobile/node_modules/
+mobile/dist/
+mobile/*.tsbuildinfo

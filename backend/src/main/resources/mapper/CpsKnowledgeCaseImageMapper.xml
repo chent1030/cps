@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsKnowledgeCaseImageMapper">
+
+    <select id="findById" resultType="com.company.cps.domain.CpsKnowledgeCaseImage">
+        SELECT *
+        FROM cps_knowledge_case_image
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByCaseId" resultType="com.company.cps.domain.CpsKnowledgeCaseImage">
+        SELECT *
+        FROM cps_knowledge_case_image
+        WHERE case_id = #{caseId}
+        ORDER BY sort_no, id
+    </select>
+
+    <select id="findEnabledByIds" resultType="com.company.cps.domain.CpsKnowledgeCaseImage">
+        SELECT ki.*
+        FROM cps_knowledge_case_image ki
+        JOIN cps_knowledge_case kc ON kc.id = ki.case_id
+        WHERE kc.enabled = 1
+          AND ki.id IN
+          <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+          </foreach>
+    </select>
+
+    <select id="findSyncCandidates" resultType="com.company.cps.domain.CpsKnowledgeCaseImage">
+        SELECT ki.*
+        FROM cps_knowledge_case_image ki
+        JOIN cps_knowledge_case kc ON kc.id = ki.case_id
+        WHERE kc.enabled = 1
+          AND (
+            ki.vector_status != 'SUCCESS'
+            OR ki.embedding_dim IS NULL OR ki.embedding_dim != #{dimension}
+          )
+        ORDER BY ki.id
+        LIMIT #{limit}
+    </select>
+
+    <insert id="upsert" parameterType="com.company.cps.domain.CpsKnowledgeCaseImage" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_knowledge_case_image (
+            id,
+            case_id,
+            file_url,
+            file_name,
+            file_hash,
+            sort_no,
+            reason,
+            measure,
+            vector_status
+        ) VALUES (
+            #{id},
+            #{caseId},
+            #{fileUrl},
+            #{fileName},
+            #{fileHash},
+            #{sortNo},
+            #{reason},
+            #{measure},
+            'PENDING'
+        )
+        ON DUPLICATE KEY UPDATE
+            case_id = VALUES(case_id),
+            file_url = VALUES(file_url),
+            file_name = VALUES(file_name),
+            file_hash = VALUES(file_hash),
+            sort_no = VALUES(sort_no),
+            reason = VALUES(reason),
+            measure = VALUES(measure),
+            vector_status = 'PENDING',
+            vector_error_msg = NULL,
+            vector_retry_count = 0,
+            vector_updated_at = NULL,
+            updated_at = NOW()
+    </insert>
+
+    <update id="markVectorPending">
+        UPDATE cps_knowledge_case_image
+        SET vector_status = 'PENDING',
+            vector_error_msg = NULL,
+            vector_retry_count = 0,
+            vector_updated_at = NULL,
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="markVectorProcessing">
+        UPDATE cps_knowledge_case_image
+        SET vector_status = 'PROCESSING',
+            vector_error_msg = NULL,
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="markVectorSuccess">
+        UPDATE cps_knowledge_case_image
+        SET vector_status = 'SUCCESS',
+            vector_error_msg = NULL,
+            milvus_vector_id = #{vectorId},
+            embedding_dim = #{dimension},
+            vector_updated_at = NOW(),
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="markVectorFailed">
+        UPDATE cps_knowledge_case_image
+        SET vector_status = 'FAILED',
+            vector_error_msg = #{errorMsg},
+            vector_retry_count = vector_retry_count + 1,
+            vector_updated_at = NOW(),
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+</mapper>

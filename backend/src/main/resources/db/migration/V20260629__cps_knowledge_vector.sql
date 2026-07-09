@@ -1,0 +1,61 @@
+CREATE TABLE cps_knowledge_case (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+  case_code VARCHAR(64) NOT NULL UNIQUE COMMENT '知识案例编号',
+  case_title VARCHAR(200) NULL COMMENT '知识案例标题',
+  category_l1_id BIGINT NOT NULL COMMENT '一级分类ID',
+  category_l2_id BIGINT NOT NULL COMMENT '二级分类ID',
+  category_l1_name VARCHAR(100) NOT NULL COMMENT '一级分类名称',
+  category_l2_name VARCHAR(100) NOT NULL COMMENT '二级分类名称',
+  scope_remark VARCHAR(500) NULL COMMENT '适用区域说明，仅展示不参与过滤',
+  enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否启用：1启用，0停用',
+  created_by VARCHAR(64) NULL COMMENT '创建人工号',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  INDEX idx_cps_knowledge_enabled_category (enabled, category_l1_id, category_l2_id)
+) COMMENT='CPS知识案例主表';
+
+CREATE TABLE cps_knowledge_case_image (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+  case_id BIGINT NOT NULL COMMENT '知识案例ID',
+  file_url VARCHAR(500) NOT NULL COMMENT '素材图片访问地址或存储路径',
+  file_name VARCHAR(200) NULL COMMENT '素材图片文件名',
+  file_hash VARCHAR(128) NULL COMMENT '当前素材文件哈希',
+  milvus_vector_id VARCHAR(100) NULL COMMENT 'Milvus向量主键，默认使用本表ID',
+  embedding_dim INT NULL COMMENT '向量维度',
+  vector_status VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT '向量同步状态：PENDING待同步，PROCESSING同步中，SUCCESS成功，FAILED失败',
+  vector_error_msg VARCHAR(1000) NULL COMMENT '向量同步失败原因',
+  vector_retry_count INT NOT NULL DEFAULT 0 COMMENT '向量同步失败重试次数',
+  vector_updated_at DATETIME NULL COMMENT '最近一次向量同步时间',
+  sort_no INT NOT NULL DEFAULT 1 COMMENT '图片排序号',
+  reason VARCHAR(1000) NOT NULL COMMENT '标准原因',
+  measure VARCHAR(1000) NOT NULL COMMENT '标准措施',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  INDEX idx_cps_knowledge_image_case (case_id),
+  INDEX idx_cps_knowledge_image_sync (vector_status, embedding_dim)
+) COMMENT='CPS知识案例素材图片表';
+
+CREATE TABLE cps_issue_ai_match (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+  issue_id BIGINT NULL COMMENT '问题ID，问题创建前可为空',
+  source_attachment_id BIGINT NOT NULL COMMENT '用于AI识别的来源附件ID，通常为第一张问题照片',
+  matched_case_id BIGINT NULL COMMENT '命中的知识案例ID',
+  confidence DECIMAL(10, 4) NULL COMMENT 'AI匹配置信度或相似度分数',
+  ai_category_l1_id BIGINT NULL COMMENT 'AI建议一级分类ID',
+  ai_category_l2_id BIGINT NULL COMMENT 'AI建议二级分类ID',
+  ai_category_l1_name VARCHAR(100) NULL COMMENT 'AI建议一级分类名称',
+  ai_category_l2_name VARCHAR(100) NULL COMMENT 'AI建议二级分类名称',
+  reason_suggestion VARCHAR(1000) NULL COMMENT 'AI建议原因',
+  measure_suggestion VARCHAR(1000) NULL COMMENT 'AI建议措施',
+  topk_json JSON NULL COMMENT 'Milvus TopK候选结果JSON',
+  raw_request JSON NULL COMMENT 'AI原始请求JSON',
+  raw_response JSON NULL COMMENT 'AI原始响应JSON',
+  confirmed_category_l1_id BIGINT NULL COMMENT '员工最终确认一级分类ID',
+  confirmed_category_l2_id BIGINT NULL COMMENT '员工最终确认二级分类ID',
+  confirmed_reason VARCHAR(1000) NULL COMMENT '员工最终确认原因',
+  confirmed_measure VARCHAR(1000) NULL COMMENT '员工最终确认措施',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  INDEX idx_cps_ai_match_issue (issue_id),
+  INDEX idx_cps_ai_match_attachment (source_attachment_id),
+  INDEX idx_cps_ai_match_case (matched_case_id)
+) COMMENT='CPS问题AI知识库匹配记录表';

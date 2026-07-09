@@ -1,0 +1,13 @@
+{
+  "name": "CPS巡检",
+  "appid": "__UNI__CPS_INSPECTION",
+  "description": "CPS移动端巡检",
+  "versionName": "0.1.0",
+  "versionCode": "100",
+  "h5": {
+    "router": {
+      "mode": "hash",
+      "base": "./"
+    }
+  }
+}

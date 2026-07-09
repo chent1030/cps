@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsIssueAiSuggestionMapper">
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsIssueAiSuggestion" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_issue_ai_suggestion (
+          issue_id, source_attachment_id, ai_category_l1_id, ai_category_l1_name,
+          ai_category_l2_id, ai_category_l2_name, reason_suggestion, measure_suggestion,
+          raw_request, raw_response, confidence, created_at
+        ) VALUES (
+          #{issueId}, #{sourceAttachmentId}, #{aiCategoryL1Id}, #{aiCategoryL1Name},
+          #{aiCategoryL2Id}, #{aiCategoryL2Name}, #{reasonSuggestion}, #{measureSuggestion},
+          #{rawRequest}, #{rawResponse}, #{confidence}, #{createdAt}
+        )
+    </insert>
+
+    <select id="findLatestByIssueId" resultType="com.company.cps.domain.CpsIssueAiSuggestion">
+        SELECT *
+        FROM cps_issue_ai_suggestion
+        WHERE issue_id = #{issueId}
+        ORDER BY created_at DESC
+        LIMIT 1
+    </select>
+
+</mapper>

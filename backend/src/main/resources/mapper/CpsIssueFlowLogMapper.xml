@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsIssueFlowLogMapper">
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsIssueFlowLog" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_issue_flow_log (
+          issue_id, from_status, to_status, action, operator_emp_no,
+          from_handler_emp_no, to_handler_emp_no, operator_emp_name,
+          from_handler_emp_name, to_handler_emp_name, comment, snapshot_json, created_at
+        ) VALUES (
+          #{issueId}, #{fromStatus}, #{toStatus}, #{action}, #{operatorEmpNo},
+          #{fromHandlerEmpNo}, #{toHandlerEmpNo}, #{operatorEmpName},
+          #{fromHandlerEmpName}, #{toHandlerEmpName}, #{comment}, #{snapshotJson}, #{createdAt}
+        )
+    </insert>
+
+    <select id="findByIssueId" resultType="com.company.cps.domain.CpsIssueFlowLog">
+        SELECT *
+        FROM cps_issue_flow_log
+        WHERE issue_id = #{issueId}
+        ORDER BY created_at
+    </select>
+
+</mapper>
