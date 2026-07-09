@@ -188,3 +188,38 @@ sudo systemctl enable embedding-service
 sudo systemctl start embedding-service
 journalctl -u embedding-service -f
 ```
+
+## 9. Vector API for Java backend
+
+This service also owns Milvus access so Java does not need `milvus-sdk-java`, gRPC, or protobuf dependencies.
+
+Required `.env` values:
+
+```env
+API_KEY=change-me
+MILVUS_HOST=127.0.0.1
+MILVUS_PORT=19530
+MILVUS_COLLECTION=cps_knowledge_image_vector_siglip2_v1
+MILVUS_METRIC_TYPE=COSINE
+MILVUS_INDEX_TYPE=HNSW
+MILVUS_SEARCH_EF=128
+```
+
+Java backend values:
+
+```env
+CPS_MILVUS_ENABLED=true
+CPS_VECTOR_SERVICE_BASE_URL=http://127.0.0.1:8008
+CPS_VECTOR_SERVICE_API_KEY=change-me
+CPS_MILVUS_COLLECTION=cps_knowledge_image_vector_siglip2_v1
+```
+
+Vector endpoints:
+
+```text
+POST /v1/vector/ensure
+POST /v1/vector/load
+POST /v1/vector/upsert
+POST /v1/vector/search
+POST /v1/vector/delete
+```

@@ -27,6 +27,12 @@ class Settings:
     normalize_embeddings: bool = os.getenv("NORMALIZE_EMBEDDINGS", "true").lower() == "true"
     max_batch_size: int = int(os.getenv("MAX_BATCH_SIZE", "8"))
     enable_zero_shot: bool = os.getenv("ENABLE_ZERO_SHOT", "true").lower() == "true"
+    milvus_host: str = os.getenv("MILVUS_HOST", "127.0.0.1")
+    milvus_port: int = int(os.getenv("MILVUS_PORT", "19530"))
+    milvus_collection: str = os.getenv("MILVUS_COLLECTION", "cps_knowledge_image_vector_siglip2_v1")
+    milvus_metric_type: str = os.getenv("MILVUS_METRIC_TYPE", "COSINE")
+    milvus_index_type: str = os.getenv("MILVUS_INDEX_TYPE", "HNSW")
+    milvus_search_ef: int = int(os.getenv("MILVUS_SEARCH_EF", "128"))
     cors_origins: list[str] = [
         item.strip()
         for item in os.getenv("CORS_ORIGINS", "").split(",")
@@ -51,6 +57,38 @@ class ZeroShotRequest(BaseModel):
     model: Optional[str] = None
     image_base64: str
     candidate_labels: list[str] = Field(default_factory=list)
+
+
+class VectorEnsureRequest(BaseModel):
+    collection: Optional[str] = None
+    dimension: int
+    metricType: Optional[str] = None
+    indexType: Optional[str] = None
+
+
+class VectorCollectionRequest(BaseModel):
+    collection: Optional[str] = None
+
+
+class VectorUpsertRequest(BaseModel):
+    collection: Optional[str] = None
+    id: int
+    caseId: int
+    categoryL1Id: Optional[int] = None
+    categoryL2Id: Optional[int] = None
+    enabled: bool = True
+    vector: list[float] = Field(default_factory=list)
+
+
+class VectorSearchRequest(BaseModel):
+    collection: Optional[str] = None
+    vector: list[float] = Field(default_factory=list)
+    topK: int = 10
+
+
+class VectorDeleteRequest(BaseModel):
+    collection: Optional[str] = None
+    ids: list[int] = Field(default_factory=list)
 
 
 def resolve_device() -> str:
@@ -146,6 +184,72 @@ def normalize_labels(candidate_labels: list[str]) -> list[str]:
     return labels
 
 
+def vector_collection_name(value: Optional[str]) -> str:
+    collection = (value or settings.milvus_collection).strip()
+    if not collection:
+        raise HTTPException(status_code=400, detail="collection is required")
+    return collection
+
+
+def milvus_modules():
+    try:
+        from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, connections, utility
+        return Collection, CollectionSchema, DataType, FieldSchema, connections, utility
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"PyMilvus is not available: {exc}") from exc
+
+
+def connect_milvus() -> None:
+    _, _, _, _, connections, _ = milvus_modules()
+    connections.connect(alias="default", host=settings.milvus_host, port=settings.milvus_port)
+
+
+def ensure_vector_collection(collection_name: str, dimension: int, metric_type: str, index_type: str):
+    if dimension <= 0:
+        raise HTTPException(status_code=400, detail="dimension must be greater than 0")
+    Collection, CollectionSchema, DataType, FieldSchema, _, utility = milvus_modules()
+    connect_milvus()
+    if utility.has_collection(collection_name):
+        return Collection(collection_name)
+
+    schema = CollectionSchema(
+        fields=[
+            FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=False),
+            FieldSchema(name="case_id", dtype=DataType.INT64),
+            FieldSchema(name="category_l1_id", dtype=DataType.INT64),
+            FieldSchema(name="category_l2_id", dtype=DataType.INT64),
+            FieldSchema(name="enabled", dtype=DataType.BOOL),
+            FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=dimension),
+        ],
+        description="CPS knowledge image vector collection",
+    )
+    collection = Collection(name=collection_name, schema=schema)
+    collection.create_index(
+        field_name="embedding",
+        index_params={
+            "index_type": index_type,
+            "metric_type": metric_type,
+            "params": {"M": 16, "efConstruction": 200},
+        },
+    )
+    return collection
+
+
+def load_vector_collection(collection_name: str):
+    Collection, _, _, _, _, utility = milvus_modules()
+    connect_milvus()
+    if not utility.has_collection(collection_name):
+        raise HTTPException(status_code=404, detail=f"collection not found: {collection_name}")
+    collection = Collection(collection_name)
+    collection.load()
+    return collection
+
+
+def validate_vector(vector: list[float]) -> None:
+    if not vector:
+        raise HTTPException(status_code=400, detail="vector must contain at least one value")
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     device = resolve_device()
@@ -190,6 +294,9 @@ def health():
         "maxBatchSize": settings.max_batch_size,
         "zeroShotAvailable": runtime.get("zero_shot_available", False),
         "zeroShotError": runtime.get("zero_shot_error"),
+        "milvusHost": settings.milvus_host,
+        "milvusPort": settings.milvus_port,
+        "milvusCollection": settings.milvus_collection,
     }
 
 
@@ -261,6 +368,95 @@ async def zero_shot_classification_file(
     raw = await file.read()
     outputs = classify_image(image_from_bytes(raw), normalize_labels(candidate_labels))
     return classification_response(model or settings.model_name, outputs)
+
+
+@app.post("/v1/vector/ensure")
+def ensure_vector(req: VectorEnsureRequest, authorization: Optional[str] = Header(default=None)):
+    check_auth(authorization)
+    collection = ensure_vector_collection(
+        vector_collection_name(req.collection),
+        req.dimension,
+        req.metricType or settings.milvus_metric_type,
+        req.indexType or settings.milvus_index_type,
+    )
+    return {"status": "ok", "collection": collection.name}
+
+
+@app.post("/v1/vector/load")
+def load_vector(req: VectorCollectionRequest, authorization: Optional[str] = Header(default=None)):
+    check_auth(authorization)
+    collection = load_vector_collection(vector_collection_name(req.collection))
+    return {"status": "ok", "collection": collection.name}
+
+
+@app.post("/v1/vector/upsert")
+def upsert_vector(req: VectorUpsertRequest, authorization: Optional[str] = Header(default=None)):
+    check_auth(authorization)
+    validate_vector(req.vector)
+    collection_name = vector_collection_name(req.collection)
+    collection = ensure_vector_collection(
+        collection_name,
+        len(req.vector),
+        settings.milvus_metric_type,
+        settings.milvus_index_type,
+    )
+    data = [
+        [req.id],
+        [req.caseId],
+        [req.categoryL1Id or 0],
+        [req.categoryL2Id or 0],
+        [req.enabled],
+        [req.vector],
+    ]
+    if hasattr(collection, "upsert"):
+        collection.upsert(data)
+    else:
+        collection.delete(f"id in [{req.id}]")
+        collection.insert(data)
+    collection.flush()
+    return {"status": "ok", "collection": collection_name, "id": req.id}
+
+
+@app.post("/v1/vector/search")
+def search_vector(req: VectorSearchRequest, authorization: Optional[str] = Header(default=None)):
+    check_auth(authorization)
+    validate_vector(req.vector)
+    collection = load_vector_collection(vector_collection_name(req.collection))
+    result = collection.search(
+        data=[req.vector],
+        anns_field="embedding",
+        param={
+            "metric_type": settings.milvus_metric_type,
+            "params": {"ef": settings.milvus_search_ef},
+        },
+        limit=req.topK,
+        expr="enabled == true",
+        output_fields=["case_id", "category_l1_id", "category_l2_id"],
+    )
+    hits: list[dict[str, Any]] = []
+    for item in result[0]:
+        entity = item.entity
+        hits.append(
+            {
+                "imageId": int(item.id),
+                "caseId": int(entity.get("case_id")),
+                "categoryL1Id": int(entity.get("category_l1_id")),
+                "categoryL2Id": int(entity.get("category_l2_id")),
+                "score": float(item.score),
+            }
+        )
+    return {"hits": hits}
+
+
+@app.post("/v1/vector/delete")
+def delete_vector(req: VectorDeleteRequest, authorization: Optional[str] = Header(default=None)):
+    check_auth(authorization)
+    if not req.ids:
+        raise HTTPException(status_code=400, detail="ids must contain at least one value")
+    collection = load_vector_collection(vector_collection_name(req.collection))
+    collection.delete("id in [" + ",".join(str(item) for item in req.ids) + "]")
+    collection.flush()
+    return {"status": "ok", "deleted": len(req.ids)}
 
 
 def embedding_response(model_name: str, vectors: list[list[float]]) -> dict[str, Any]:

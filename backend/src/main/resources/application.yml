@@ -26,6 +26,8 @@ cps:
       timeout-ms: ${CPS_EMBEDDING_TIMEOUT_MS:30000}
   milvus:
     enabled: ${CPS_MILVUS_ENABLED:false}
+    base-url: ${CPS_VECTOR_SERVICE_BASE_URL:http://localhost:8008}
+    api-key: ${CPS_VECTOR_SERVICE_API_KEY:}
     host: ${CPS_MILVUS_HOST:127.0.0.1}
     port: ${CPS_MILVUS_PORT:19530}
     collection: ${CPS_MILVUS_COLLECTION:cps_knowledge_image_vector_siglip2_v1}

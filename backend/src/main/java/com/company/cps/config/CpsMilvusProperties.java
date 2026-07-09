@@ -7,6 +7,8 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "cps.milvus")
 public class CpsMilvusProperties {
     private Boolean enabled = false;
+    private String baseUrl = "http://localhost:8008";
+    private String apiKey = "";
     private String host = "127.0.0.1";
     private Integer port = 19530;
     private String collection = "cps_knowledge_image_vector_siglip2_v1";
@@ -20,6 +22,22 @@ public class CpsMilvusProperties {
 
     public void setEnabled(Boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public String getBaseUrl() {
+        return baseUrl;
+    }
+
+    public void setBaseUrl(String baseUrl) {
+        this.baseUrl = baseUrl;
+    }
+
+    public String getApiKey() {
+        return apiKey;
+    }
+
+    public void setApiKey(String apiKey) {
+        this.apiKey = apiKey;
     }
 
     public String getHost() {
