@@ -551,7 +551,7 @@ defineExpose({
   height: 100vh;
   min-height: 100dvh;
   margin: 0;
-  padding: 28rpx 24rpx 152rpx;
+  padding: 28rpx 24rpx 220rpx;
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -573,11 +573,12 @@ defineExpose({
 
 .cps-create-hero {
   position: relative;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: flex-start;
   justify-content: space-between;
   gap: 22rpx;
+  min-height: 236rpx;
   overflow: hidden;
   border: 2rpx solid rgba(20, 184, 166, 0.22);
   border-radius: 22rpx;
@@ -602,7 +603,7 @@ defineExpose({
 
 .cps-create-hero__main {
   display: grid;
-  gap: 12rpx;
+  gap: 14rpx;
   min-width: 0;
   max-width: 100%;
 }
@@ -630,6 +631,7 @@ defineExpose({
   gap: 10rpx;
   min-width: 0;
   max-width: 100%;
+  padding-top: 4rpx;
 }
 
 .cps-create-progress span,
@@ -637,6 +639,7 @@ defineExpose({
 .cps-count-badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-height: 48rpx;
   border-radius: 999rpx;
   padding: 0 16rpx;
@@ -650,6 +653,13 @@ defineExpose({
 .cps-create-hero__badge {
   background: rgba(255, 255, 255, 0.16);
   color: #ffffff;
+}
+
+.cps-create-hero__badge {
+  align-self: start;
+  max-width: 180rpx;
+  white-space: normal;
+  text-align: center;
 }
 
 .cps-create-progress span.is-done {
@@ -808,11 +818,11 @@ defineExpose({
 
 .cps-selector-row {
   display: grid;
-  grid-template-columns: 150rpx minmax(0, 1fr);
-  gap: 20rpx;
+  grid-template-columns: 126rpx minmax(0, 1fr);
+  gap: 16rpx;
   width: 100%;
   min-width: 0;
-  padding: 28rpx 30rpx;
+  padding: 22rpx 28rpx;
   border-bottom: 2rpx solid #f1f5f9;
 }
 
@@ -821,33 +831,37 @@ defineExpose({
 }
 
 .cps-selector-label {
-  padding-top: 20rpx;
+  padding-top: 10rpx;
   color: #0f172a;
-  font-size: 30rpx;
+  font-size: 28rpx;
   font-weight: 900;
-  line-height: 42rpx;
+  line-height: 38rpx;
 }
 
 .cps-choice-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12rpx;
   overflow: hidden;
 }
 
 .cps-choice-button {
-  display: flex;
+  display: inline-flex;
+  flex: 0 1 auto;
   align-items: center;
   justify-content: center;
-  min-width: 0;
+  min-width: 136rpx;
   max-width: 100%;
-  min-height: 96rpx;
+  min-height: 68rpx;
   border: 2rpx solid #cbd5e1;
-  border-radius: 18rpx;
-  padding: 16rpx 18rpx;
+  border-radius: 999rpx;
+  padding: 10rpx 20rpx;
   background: #ffffff;
   color: #334155;
-  font-size: 32rpx;
+  font-size: 28rpx;
   font-weight: 800;
-  line-height: 42rpx;
+  line-height: 36rpx;
   text-align: center;
   overflow-wrap: anywhere;
 }
@@ -941,12 +955,14 @@ defineExpose({
 }
 
 .cps-sticky-submit {
-  position: sticky;
+  position: fixed;
+  right: 0;
   bottom: 0;
-  z-index: 10;
-  width: 100%;
-  max-width: 100%;
-  padding: 28rpx 24rpx max(24rpx, env(safe-area-inset-bottom));
+  left: 0;
+  z-index: 99;
+  width: 100vw;
+  max-width: 100vw;
+  padding: 24rpx 24rpx max(24rpx, env(safe-area-inset-bottom));
   background: linear-gradient(180deg, rgba(248, 250, 252, 0), #f8fafc 34%, #f8fafc 100%);
   overflow: hidden;
 }
