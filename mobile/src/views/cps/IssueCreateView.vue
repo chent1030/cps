@@ -1,46 +1,46 @@
 <template>
-  <view class="cps-page cps-create-page">
-    <view class="cps-create-hero">
-      <view class="cps-create-hero__main">
-        <text class="cps-create-hero__eyebrow">CPS 现场巡检</text>
-        <text class="cps-create-hero__title">新建问题</text>
-        <view class="cps-create-progress" aria-label="填报进度">
-          <text v-for="item in progressItems" :key="item.label" :class="{ 'is-done': item.done }">
+  <main class="cps-page cps-create-page">
+    <header class="cps-create-hero">
+      <div class="cps-create-hero__main">
+        <p class="cps-create-hero__eyebrow">CPS 现场巡检</p>
+        <h1>新建问题</h1>
+        <div class="cps-create-progress" aria-label="填报进度">
+          <span v-for="item in progressItems" :key="item.label" :class="{ 'is-done': item.done }">
             {{ item.label }}
-          </text>
-        </view>
-      </view>
-      <text class="cps-create-hero__badge">AI 辅助</text>
-    </view>
+          </span>
+        </div>
+      </div>
+      <span class="cps-create-hero__badge">AI 辅助</span>
+    </header>
 
     <van-form class="cps-create-form" @submit="submit">
-      <view class="cps-detail-card cps-create-card">
-        <view class="cps-card-title">
-          <view>
-            <text class="cps-card-title__eyebrow">现场证据</text>
-            <text class="cps-card-title__heading">问题照片</text>
-          </view>
-          <text class="cps-count-badge">{{ images.length }}/5</text>
-        </view>
-        <text class="cps-create-card__hint">最多上传 5 张，仅第 1 张参与 AI 识别</text>
+      <section class="cps-detail-card">
+        <div class="cps-card-title">
+          <div>
+            <p>现场证据</p>
+            <h2>问题照片</h2>
+          </div>
+          <span class="cps-count-badge">{{ images.length }}/5</span>
+        </div>
+        <p class="cps-create-card__hint">最多上传 5 张，仅第 1 张参与 AI 识别</p>
 
-        <view class="cps-uploader">
-          <view
+        <div class="cps-uploader">
+          <button
             v-for="(image, index) in images"
             :key="image.id"
+            type="button"
             class="cps-uploader__preview"
             @tap="previewImage(index)"
           >
-            <image class="cps-uploader__image" :src="image.url" mode="aspectFill" />
-            <button
+            <img class="cps-uploader__image" :src="image.url" :alt="image.name" />
+            <span
               v-if="!uploadingImage"
-              type="button"
               class="cps-uploader__delete"
               @tap.stop="removeImage(index)"
             >
               ×
-            </button>
-          </view>
+            </span>
+          </button>
 
           <button
             v-if="images.length < 5"
@@ -49,24 +49,24 @@
             :disabled="uploadingImage"
             @tap="chooseAndUploadImages"
           >
-            <text class="cps-uploader__plus">+</text>
-            <text class="cps-uploader__text">{{ uploadingImage ? '上传中' : '上传图片' }}</text>
+            <span class="cps-uploader__plus">+</span>
+            <span class="cps-uploader__text">{{ uploadingImage ? '上传中' : '上传图片' }}</span>
           </button>
-        </view>
-      </view>
+        </div>
+      </section>
 
-      <view class="cps-detail-card cps-selector-card">
-        <view class="cps-card-title">
-          <view>
-            <text class="cps-card-title__eyebrow">位置选择</text>
-            <text class="cps-card-title__heading">工厂 / 区域 / 拉线 / 工序</text>
-          </view>
-        </view>
+      <section class="cps-detail-card cps-selector-card">
+        <div class="cps-card-title">
+          <div>
+            <p>位置选择</p>
+            <h2>工厂 / 区域 / 拉线 / 工序</h2>
+          </div>
+        </div>
 
-        <view class="cps-selector-list">
-          <view class="cps-selector-row">
-            <text class="cps-selector-label">工厂</text>
-            <view class="cps-choice-grid">
+        <div class="cps-selector-list">
+          <div class="cps-selector-row">
+            <span class="cps-selector-label">工厂</span>
+            <div class="cps-choice-grid">
               <button
                 v-for="item in factories"
                 :key="item.value"
@@ -77,13 +77,13 @@
               >
                 {{ item.label }}
               </button>
-              <text v-if="!factories.length" class="cps-muted-text">暂无工厂数据</text>
-            </view>
-          </view>
+              <span v-if="!factories.length" class="cps-muted-text">暂无工厂数据</span>
+            </div>
+          </div>
 
-          <view class="cps-selector-row">
-            <text class="cps-selector-label">区域</text>
-            <view class="cps-choice-grid">
+          <div class="cps-selector-row">
+            <span class="cps-selector-label">区域</span>
+            <div class="cps-choice-grid">
               <button
                 v-for="item in areas"
                 :key="item.value"
@@ -94,13 +94,13 @@
               >
                 {{ item.label }}
               </button>
-              <text v-if="!areas.length" class="cps-muted-text">先选择工厂</text>
-            </view>
-          </view>
+              <span v-if="!areas.length" class="cps-muted-text">先选择工厂</span>
+            </div>
+          </div>
 
-          <view v-if="location.area" class="cps-selector-row">
-            <text class="cps-selector-label">拉线</text>
-            <view class="cps-choice-grid">
+          <div v-if="location.area" class="cps-selector-row">
+            <span class="cps-selector-label">拉线</span>
+            <div class="cps-choice-grid">
               <button
                 v-for="item in lines"
                 :key="item.value"
@@ -111,13 +111,13 @@
               >
                 {{ item.label }}
               </button>
-              <text v-if="!lines.length" class="cps-muted-text">暂无拉线数据</text>
-            </view>
-          </view>
+              <span v-if="!lines.length" class="cps-muted-text">暂无拉线数据</span>
+            </div>
+          </div>
 
-          <view v-if="location.area" class="cps-selector-row">
-            <text class="cps-selector-label">工序</text>
-            <view class="cps-choice-grid">
+          <div v-if="location.area" class="cps-selector-row">
+            <span class="cps-selector-label">工序</span>
+            <div class="cps-choice-grid">
               <button
                 v-for="item in processes"
                 :key="item.value"
@@ -128,24 +128,24 @@
               >
                 {{ item.label }}
               </button>
-              <text v-if="!processes.length" class="cps-muted-text">暂无工序数据</text>
-            </view>
-          </view>
-        </view>
-      </view>
+              <span v-if="!processes.length" class="cps-muted-text">暂无工序数据</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      <view class="cps-detail-card cps-selector-card">
-        <view class="cps-card-title">
-          <view>
-            <text class="cps-card-title__eyebrow">问题分类</text>
-            <text class="cps-card-title__heading">一级 / 二级</text>
-          </view>
-        </view>
+      <section class="cps-detail-card cps-selector-card">
+        <div class="cps-card-title">
+          <div>
+            <p>问题分类</p>
+            <h2>一级 / 二级</h2>
+          </div>
+        </div>
 
-        <view class="cps-selector-list">
-          <view class="cps-selector-row">
-            <text class="cps-selector-label">一级</text>
-            <view class="cps-choice-grid">
+        <div class="cps-selector-list">
+          <div class="cps-selector-row">
+            <span class="cps-selector-label">一级</span>
+            <div class="cps-choice-grid">
               <button
                 v-for="item in level1Categories"
                 :key="item.value"
@@ -156,13 +156,13 @@
               >
                 {{ item.label }}
               </button>
-              <text v-if="!level1Categories.length" class="cps-muted-text">暂无一级分类</text>
-            </view>
-          </view>
+              <span v-if="!level1Categories.length" class="cps-muted-text">暂无一级分类</span>
+            </div>
+          </div>
 
-          <view class="cps-selector-row">
-            <text class="cps-selector-label">二级</text>
-            <view class="cps-choice-grid">
+          <div class="cps-selector-row">
+            <span class="cps-selector-label">二级</span>
+            <div class="cps-choice-grid">
               <button
                 v-for="item in level2Categories"
                 :key="item.value"
@@ -173,24 +173,24 @@
               >
                 {{ item.label }}
               </button>
-              <text v-if="!level2Categories.length" class="cps-muted-text">先选择一级分类</text>
-            </view>
-          </view>
-        </view>
-      </view>
+              <span v-if="!level2Categories.length" class="cps-muted-text">先选择一级分类</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <van-notice-bar v-if="inspecting" color="#0F766E" background="#CCFBF1" text="AI 正在识别首张图片，请稍候" />
 
-      <view v-if="aiSuggestionSummary" class="cps-detail-card cps-create-card cps-create-ai">
-        <view class="cps-card-title">
-          <view>
-            <text class="cps-card-title__eyebrow">AI 建议</text>
-            <text class="cps-card-title__heading">原因措施</text>
-          </view>
-          <text class="cps-count-badge">可修改</text>
-        </view>
-        <text class="cps-ai-text">{{ aiSuggestionSummary }}</text>
-      </view>
+      <section v-if="aiSuggestionSummary" class="cps-detail-card cps-create-ai">
+        <div class="cps-card-title">
+          <div>
+            <p>AI 建议</p>
+            <h2>原因措施</h2>
+          </div>
+          <span class="cps-count-badge">可修改</span>
+        </div>
+        <pre>{{ aiSuggestionSummary }}</pre>
+      </section>
 
       <van-cell-group inset title="问题描述" class="cps-create-cell-group">
         <van-field
@@ -229,7 +229,7 @@
         />
       </van-cell-group>
 
-      <view class="cps-sticky-submit">
+      <div class="cps-sticky-submit">
         <van-button
           data-test="submit"
           native-type="submit"
@@ -242,9 +242,9 @@
         >
           提交并派发
         </van-button>
-      </view>
+      </div>
     </van-form>
-  </view>
+  </main>
 </template>
 
 <script setup lang="ts">
@@ -347,62 +347,52 @@ watch(
   },
 )
 
-const chooseAndUploadImages = async () => {
+const chooseAndUploadImages = () => {
   const remaining = Math.max(5 - images.value.length, 0)
   if (remaining <= 0 || uploadingImage.value) return
 
-  const result = await chooseImages(remaining)
-  if (!result) return
+  uni.chooseImage({
+    count: remaining,
+    sizeType: ['compressed', 'original'],
+    sourceType: ['album', 'camera'],
+    success: async (result) => {
+      const paths = normalizeArray(result.tempFilePaths)
+      const tempFiles = normalizeArray(result.tempFiles) as TempFileCandidate[]
+      const sources = paths
+        .map((path, index) => {
+          const tempFile = tempFiles[index]
+          if (typeof File !== 'undefined' && tempFile instanceof File) return tempFile
+          const localFile = tempFile as UniTempFileLike | undefined
+          if (typeof File !== 'undefined' && localFile?.file instanceof File) return localFile.file
+          return localFile?.path || path
+        })
+        .filter(Boolean) as CpsAttachmentUploadSource[]
+      if (!sources.length) return
 
-  const sources = resolveUploadSources(result).slice(0, remaining)
-  if (!sources.length) return
-
-  uploadingImage.value = true
-  try {
-    const next = [...images.value]
-    for (const source of sources) {
-      const uploaded = await uploadCpsAttachment(source)
-      next.push(uploaded)
-    }
-    images.value = next
-    if (next.length > 0 && images.value.length === next.length && next.length === sources.length) {
-      await onFirstImageReady(next[0].id)
-    }
-  } finally {
-    uploadingImage.value = false
-  }
-}
-
-const chooseImages = (count: number) => {
-  return new Promise((resolve: (value: UniApp.ChooseImageSuccessCallbackResult | null) => void, reject) => {
-    uni.chooseImage({
-      count,
-      sizeType: ['compressed', 'original'],
-      sourceType: ['album', 'camera'],
-      success: resolve,
-      fail(error) {
-        if ((error.errMsg || '').toLowerCase().includes('cancel')) {
-          resolve(null)
-          return
+      const shouldInspectFirstImage = images.value.length === 0
+      uploadingImage.value = true
+      try {
+        const next = [...images.value]
+        for (const source of sources) {
+          const uploaded = await uploadCpsAttachment(source)
+          next.push(uploaded)
         }
-        reject(new Error(error.errMsg || 'chooseImage failed'))
-      },
-    })
+        images.value = next
+        if (shouldInspectFirstImage && next.length > 0) {
+          await onFirstImageReady(next[0].id)
+        }
+      } finally {
+        uploadingImage.value = false
+      }
+    },
+    fail: (error) => {
+      if ((error.errMsg || '').toLowerCase().includes('cancel')) return
+      uni.showToast({
+        title: '图片选择失败',
+        icon: 'none',
+      })
+    },
   })
-}
-
-const resolveUploadSources = (result: UniApp.ChooseImageSuccessCallbackResult) => {
-  const paths = normalizeArray(result.tempFilePaths)
-  const tempFiles = normalizeArray(result.tempFiles) as TempFileCandidate[]
-  return paths
-    .map((path, index) => {
-      const tempFile = tempFiles[index]
-      if (typeof File !== 'undefined' && tempFile instanceof File) return tempFile
-      const localFile = tempFile as UniTempFileLike | undefined
-      if (typeof File !== 'undefined' && localFile?.file instanceof File) return localFile.file
-      return localFile?.path || path
-    })
-    .filter(Boolean) as CpsAttachmentUploadSource[]
 }
 
 const normalizeArray = <T,>(value: T | T[] | undefined) => {
@@ -618,13 +608,15 @@ defineExpose({
 }
 
 .cps-create-hero__eyebrow {
+  margin: 0;
   color: rgba(255, 255, 255, 0.82);
   font-size: 26rpx;
   font-weight: 900;
   line-height: 36rpx;
 }
 
-.cps-create-hero__title {
+.cps-create-hero h1 {
+  margin: 0;
   color: #ffffff;
   font-size: 46rpx;
   font-weight: 950;
@@ -640,7 +632,7 @@ defineExpose({
   max-width: 100%;
 }
 
-.cps-create-progress text,
+.cps-create-progress span,
 .cps-create-hero__badge,
 .cps-count-badge {
   display: inline-flex;
@@ -654,13 +646,13 @@ defineExpose({
   white-space: nowrap;
 }
 
-.cps-create-progress text,
+.cps-create-progress span,
 .cps-create-hero__badge {
   background: rgba(255, 255, 255, 0.16);
   color: #ffffff;
 }
 
-.cps-create-progress text.is-done {
+.cps-create-progress span.is-done {
   background: #ccfbf1;
   color: #0f766e;
 }
@@ -688,17 +680,16 @@ defineExpose({
   min-width: 0;
 }
 
-.cps-card-title__eyebrow {
-  display: block;
+.cps-card-title p {
+  margin: 0;
   color: #0f766e;
   font-size: 26rpx;
   font-weight: 900;
   line-height: 36rpx;
 }
 
-.cps-card-title__heading {
-  display: block;
-  margin-top: 4rpx;
+.cps-card-title h2 {
+  margin: 4rpx 0 0;
   color: #0f172a;
   font-size: 36rpx;
   font-weight: 950;
@@ -712,6 +703,7 @@ defineExpose({
 }
 
 .cps-create-card__hint {
+  margin: 0;
   color: #64748b;
   font-size: 28rpx;
   font-weight: 800;
@@ -743,6 +735,9 @@ defineExpose({
 }
 
 .cps-uploader__preview {
+  display: block;
+  border: 0;
+  padding: 0;
   background: #e2e8f0;
 }
 
@@ -750,6 +745,7 @@ defineExpose({
   display: block;
   width: 100%;
   height: 100%;
+  object-fit: cover;
 }
 
 .cps-uploader__delete {
@@ -762,9 +758,7 @@ defineExpose({
   width: 44rpx;
   height: 44rpx;
   min-width: 44rpx;
-  border: 0;
   border-radius: 999rpx;
-  padding: 0;
   background: rgba(15, 23, 42, 0.68);
   color: #ffffff;
   font-size: 32rpx;
@@ -885,12 +879,14 @@ defineExpose({
   border-left: 8rpx solid #2563eb;
 }
 
-.cps-ai-text {
+.cps-create-ai pre {
   min-width: 0;
+  margin: 0;
   border-radius: 16rpx;
   padding: 20rpx;
   background: #f0fdfa;
   color: #0f172a;
+  font-family: inherit;
   font-size: 30rpx;
   font-weight: 700;
   line-height: 46rpx;
