@@ -10,7 +10,7 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 const ENABLE_MOCK_FALLBACK = import.meta.env.VITE_ENABLE_MOCK_FALLBACK !== 'false'
 
-const buildUrl = (path: string, params?: Record<string, QueryValue>): string => {
+const buildUrl = (path: string, params?: Record<string, QueryValue>) => {
   const url = new URL(`${API_BASE}${path}`, window.location.origin)
   Object.entries(params ?? {}).forEach(([key, value]) => {
     if (value !== null && value !== undefined && value !== '') {
@@ -20,7 +20,7 @@ const buildUrl = (path: string, params?: Record<string, QueryValue>): string => 
   return url.toString()
 }
 
-const send = async <T>(path: string, options: RequestOptions = {}): Promise<T> => {
+const send = async <T>(path: string, options: RequestOptions = {}) => {
   const isFormData = options.body instanceof FormData
   const method = options.method ?? 'GET'
   const rawBody = options.body
@@ -35,7 +35,7 @@ const send = async <T>(path: string, options: RequestOptions = {}): Promise<T> =
   }
 }
 
-const sendWithFetch = async <T>(path: string, options: RequestOptions): Promise<T> => {
+const sendWithFetch = async <T>(path: string, options: RequestOptions) => {
   const isFormData = options.body instanceof FormData
   const method = options.method ?? 'GET'
   let body: BodyInit | undefined
@@ -62,9 +62,9 @@ const sendWithFetch = async <T>(path: string, options: RequestOptions): Promise<
   return (await response.json()) as T
 }
 
-const sendWithUni = <T>(path: string, options: RequestOptions): Promise<T> => {
+const sendWithUni = <T>(path: string, options: RequestOptions) => {
   const method = options.method ?? 'GET'
-  return new Promise<T>((resolve, reject) => {
+  return new Promise((resolve: (value: T) => void, reject) => {
     uni.request({
       url: buildUrl(path, options.params),
       method: method as UniApp.RequestOptions['method'],
@@ -96,7 +96,7 @@ const sendWithUni = <T>(path: string, options: RequestOptions): Promise<T> => {
   })
 }
 
-const canUseUniRequest = (): boolean => {
+const canUseUniRequest = () => {
   return typeof uni !== 'undefined' && typeof uni.request === 'function'
 }
 
@@ -106,7 +106,7 @@ const fallbackOrThrow = <T>(
   params: Record<string, QueryValue> | undefined,
   body: unknown,
   message: string,
-): T => {
+) => {
   if (ENABLE_MOCK_FALLBACK) {
     const mock = getCpsMockResponse<T>({ method, path, params, body })
     if (mock !== undefined) {
@@ -117,10 +117,10 @@ const fallbackOrThrow = <T>(
 }
 
 export const request = {
-  get: <T>(path: string, options?: RequestOptions): Promise<T> => {
+  get: <T>(path: string, options?: RequestOptions) => {
     return send<T>(path, { ...options, method: 'GET' })
   },
-  post: <T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> => {
+  post: <T>(path: string, body?: unknown, options?: RequestOptions) => {
     return send<T>(path, { ...options, method: 'POST', body: body ?? {} })
   },
 }

@@ -5,7 +5,7 @@ export type CpsAttachmentUploadSource = File | string
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
-export const uploadCpsAttachment = (source: CpsAttachmentUploadSource): Promise<CpsUploadedImage> => {
+export const uploadCpsAttachment = (source: CpsAttachmentUploadSource) => {
   if (typeof source === 'string') {
     return uploadByTempPath(source)
   }
@@ -13,18 +13,18 @@ export const uploadCpsAttachment = (source: CpsAttachmentUploadSource): Promise<
   return uploadByFile(source)
 }
 
-const uploadByFile = (file: File): Promise<CpsUploadedImage> => {
+const uploadByFile = (file: File) => {
   const formData = new FormData()
   formData.append('file', file)
   return request.post<CpsUploadedImage>('/api/cps/attachments', formData)
 }
 
-const uploadByTempPath = (filePath: string): Promise<CpsUploadedImage> => {
+const uploadByTempPath = (filePath: string) => {
   if (typeof uni === 'undefined' || typeof uni.uploadFile !== 'function') {
     return uploadFallback()
   }
 
-  return new Promise<CpsUploadedImage>((resolve, reject) => {
+  return new Promise((resolve: (value: CpsUploadedImage) => void, reject) => {
     uni.uploadFile({
       url: buildUploadUrl('/api/cps/attachments'),
       filePath,
@@ -48,15 +48,15 @@ const uploadByTempPath = (filePath: string): Promise<CpsUploadedImage> => {
   })
 }
 
-const uploadFallback = (): Promise<CpsUploadedImage> => {
+const uploadFallback = () => {
   return request.post<CpsUploadedImage>('/api/cps/attachments')
 }
 
-const buildUploadUrl = (path: string): string => {
+const buildUploadUrl = (path: string) => {
   return new URL(`${API_BASE}${path}`, window.location.origin).toString()
 }
 
-const parseUploadResponse = (data: string | object | undefined): CpsUploadedImage => {
+const parseUploadResponse = (data: string | object | undefined) => {
   if (typeof data === 'string') {
     return JSON.parse(data) as CpsUploadedImage
   }

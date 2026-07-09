@@ -77,7 +77,7 @@ describe('IssueCreateView', () => {
       },
     })
 
-    await (wrapper.vm as unknown as { onFirstImageReady: (fileId: number) => Promise<void> }).onFirstImageReady(9)
+    await (wrapper.vm as unknown as { onFirstImageReady: (fileId: number) => unknown }).onFirstImageReady(9)
 
     const view = wrapper.vm as unknown as {
       category: { categoryL1Id: number | null; categoryL2Id: number | null }

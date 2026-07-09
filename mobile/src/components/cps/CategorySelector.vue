@@ -77,7 +77,7 @@ const level1 = ref<CpsOption[]>([])
 const level2 = ref<CpsOption[]>([])
 const modelValue = computed<CategoryModel>(() => props.modelValue)
 
-const selectCategoryL1 = (categoryId: CpsOption['value']): void => {
+const selectCategoryL1 = (categoryId: CpsOption['value']) => {
   emit('update:modelValue', {
     ...props.modelValue,
     categoryL1Id: Number(categoryId),
@@ -85,20 +85,20 @@ const selectCategoryL1 = (categoryId: CpsOption['value']): void => {
   })
 }
 
-const selectCategoryL2 = (categoryId: CpsOption['value']): void => {
+const selectCategoryL2 = (categoryId: CpsOption['value']) => {
   emit('update:modelValue', {
     ...props.modelValue,
     categoryL2Id: Number(categoryId),
   })
 }
 
-onMounted(async (): Promise<void> => {
+onMounted(async () => {
   level1.value = await getCategories()
 })
 
 watch(
   () => props.modelValue.categoryL1Id,
-  async (parentId): Promise<void> => {
+  async (parentId) => {
     level2.value = parentId ? await getCategories(parentId) : []
   },
 )

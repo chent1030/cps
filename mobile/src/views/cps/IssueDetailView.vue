@@ -242,7 +242,7 @@ const aiCategory = computed<string>(() =>
 )
 const hasIssueAttachments = computed<boolean>(() => Boolean(detail.value?.issueAttachments.length))
 
-const load = async (): Promise<void> => {
+const load = async () => {
   if (!issueId.value) return
   detail.value = await getCpsIssueDetail(issueId.value)
   proofImages.value = (detail.value.proofAttachments ?? []).map((item) => ({
@@ -252,7 +252,7 @@ const load = async (): Promise<void> => {
   }))
 }
 
-const buildActionPayload = (action: CpsIssueAction): CpsIssueActionRequest => {
+const buildActionPayload = (action: CpsIssueAction) => {
   return {
     action,
     reasonAnalysis: actionForm.value.reasonAnalysis || undefined,
@@ -268,12 +268,12 @@ const buildActionPayload = (action: CpsIssueAction): CpsIssueActionRequest => {
   }
 }
 
-const runAction = async (action: CpsIssueAction): Promise<void> => {
+const runAction = async (action: CpsIssueAction) => {
   await executeCpsIssueAction(issueId.value, buildActionPayload(action))
   await load()
 }
 
-const previewAttachments = (attachments: CpsAttachment[], startPosition: number): void => {
+const previewAttachments = (attachments: CpsAttachment[], startPosition: number) => {
   if (!attachments.length) return
   showImagePreview({
     images: attachments.map((image) => image.fileUrl),

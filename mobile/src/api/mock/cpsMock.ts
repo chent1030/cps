@@ -162,25 +162,25 @@ const detail: CpsIssueDetail = {
   ],
 }
 
-const num = (value: QueryValue): number => {
+const num = (value: QueryValue) => {
   return Number(value ?? 0)
 }
 
-const text = (value: QueryValue): string => {
+const text = (value: QueryValue) => {
   return String(value ?? '')
 }
 
-const issueTab = (tab: QueryValue): CpsIssueTab => {
+const issueTab = (tab: QueryValue) => {
   return tab === 'created' || tab === 'related' || tab === 'closed' ? tab : 'todo'
 }
 
-const filterIssues = (tab: CpsIssueTab): CpsIssueListItem[] => {
+const filterIssues = (tab: CpsIssueTab) => {
   if (tab === 'closed') return issues.filter((item) => item.status === 'CLOSED')
   if (tab === 'todo') return issues.filter((item) => item.status !== 'CLOSED')
   return issues
 }
 
-const jsonBody = (body: unknown): Record<string, unknown> => {
+const jsonBody = (body: unknown) => {
   if (typeof body !== 'string') {
     return body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
   }
@@ -192,11 +192,11 @@ const jsonBody = (body: unknown): Record<string, unknown> => {
   }
 }
 
-const isFormDataBody = (body: unknown): body is FormData => {
+const isFormDataBody = (body: unknown) => {
   return typeof FormData !== 'undefined' && body instanceof FormData
 }
 
-export const getCpsMockResponse = <T>({ method, path, params, body }: MockRequest): T | undefined => {
+export const getCpsMockResponse = <T>({ method, path, params, body }: MockRequest) => {
   if (method === 'GET' && path === '/api/cps/master/factories') return factories as T
   if (method === 'GET' && path === '/api/cps/master/areas') return (areas[text(params?.factory)] ?? []) as T
   if (method === 'GET' && path === '/api/cps/master/lines') return (lines[`${text(params?.factory)}|${text(params?.area)}`] ?? []) as T
@@ -220,7 +220,7 @@ export const getCpsMockResponse = <T>({ method, path, params, body }: MockReques
     return { issueId: Number(path.split('/')[4]), status: 'PENDING_RECTIFY' as CpsIssueStatus, currentHandlerEmpNo: 'E10023' } as T
   }
   if (method === 'POST' && path === '/api/cps/attachments') {
-    const file = isFormDataBody(body) ? (body.get('file') as File | null) : null
+    const file = isFormDataBody(body) ? ((body as FormData).get('file') as File | null) : null
     const image: CpsUploadedImage = {
       id: Date.now(),
       url: file && typeof URL.createObjectURL === 'function' ? URL.createObjectURL(file) : detail.issueAttachments[0].fileUrl,

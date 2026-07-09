@@ -115,25 +115,25 @@ const processes = ref<CpsOption[]>([])
 const modelValue = computed<LocationModel>(() => props.modelValue)
 const showLineProcess = computed<boolean>(() => Boolean(props.modelValue.area))
 
-const resetArea = (): void => {
+const resetArea = () => {
   areas.value = []
   lines.value = []
   processes.value = []
 }
 
-const resetLineAndProcess = (): void => {
+const resetLineAndProcess = () => {
   lines.value = []
   processes.value = []
 }
 
-const updateModel = (partial: Partial<LocationModel>): void => {
+const updateModel = (partial: Partial<LocationModel>) => {
   emit('update:modelValue', {
     ...props.modelValue,
     ...partial,
   })
 }
 
-const selectFactory = async (factoryValue: CpsOption['value']): Promise<void> => {
+const selectFactory = async (factoryValue: CpsOption['value']) => {
   resetArea()
   const factory = String(factoryValue)
   updateModel({
@@ -145,7 +145,7 @@ const selectFactory = async (factoryValue: CpsOption['value']): Promise<void> =>
   areas.value = await getAreas(factory)
 }
 
-const selectArea = async (value: CpsOption['value']): Promise<void> => {
+const selectArea = async (value: CpsOption['value']) => {
   resetLineAndProcess()
 
   const area = String(value)
@@ -159,7 +159,7 @@ const selectArea = async (value: CpsOption['value']): Promise<void> => {
   processes.value = await getProcesses(props.modelValue.factory, area)
 }
 
-const selectLine = async (value: CpsOption['value']): Promise<void> => {
+const selectLine = async (value: CpsOption['value']) => {
   const line = String(value)
   updateModel({
     line,
@@ -170,13 +170,13 @@ const selectLine = async (value: CpsOption['value']): Promise<void> => {
   processes.value = await getProcesses(props.modelValue.factory, props.modelValue.area, line || undefined)
 }
 
-const selectProcess = (value: CpsOption['value']): void => {
+const selectProcess = (value: CpsOption['value']) => {
   updateModel({
     process: String(value),
   })
 }
 
-onMounted(async (): Promise<void> => {
+onMounted(async () => {
   factories.value = await getFactories()
 })
 </script>

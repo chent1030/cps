@@ -126,29 +126,29 @@ const statusMeta: Record<CpsIssueStatus, StatusMeta> = {
 const todoCount = computed<number>(() => items.value.filter((item) => item.status !== 'CLOSED').length)
 const overdueCount = computed<number>(() => items.value.filter((item) => item.overdue).length)
 
-const issueStatus = (item: CpsIssueListItem): StatusMeta => {
+const issueStatus = (item: CpsIssueListItem) => {
   return statusMeta[item.status]
 }
 
-const issueLocation = (item: CpsIssueListItem): string => {
+const issueLocation = (item: CpsIssueListItem) => {
   return [item.factoryName ?? item.factory, item.areaName ?? item.area, item.lineName ?? item.line, item.processName ?? item.process]
     .filter(Boolean)
     .join(' / ') || '未填写位置'
 }
 
-const issueCategory = (item: CpsIssueListItem): string => {
+const issueCategory = (item: CpsIssueListItem) => {
   return [item.categoryL1Name, item.categoryL2Name].filter(Boolean).join(' / ') || '未分类'
 }
 
-const navigateToCreate = (): void => {
+const navigateToCreate = () => {
   uni.navigateTo({ url: '/views/cps/IssueCreateView' })
 }
 
-const navigateToDetail = (id: number): void => {
+const navigateToDetail = (id: number) => {
   uni.navigateTo({ url: `/views/cps/IssueDetailView?id=${id}` })
 }
 
-const load = async (): Promise<void> => {
+const load = async () => {
   loading.value = true
   try {
     items.value = await listCpsIssues({ tab: tab.value, page: 1, pageSize: 20 })

@@ -40,7 +40,7 @@ describe('ImageUploader', () => {
 
     await (
       wrapper.vm as unknown as {
-        chooseAndUpload: () => Promise<void>
+        chooseAndUpload: () => unknown
       }
     ).chooseAndUpload()
 

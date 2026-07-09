@@ -50,7 +50,7 @@ const props = withDefaults(
   defineProps<{
     modelValue: CpsUploadedImage[]
     max?: number
-    upload?: (source: CpsAttachmentUploadSource) => Promise<CpsUploadedImage>
+    upload?: typeof uploadCpsAttachment
   }>(),
   { max: 5 },
 )
@@ -62,14 +62,14 @@ const emit = defineEmits<{
 
 const uploading = ref<boolean>(false)
 
-const removeImage = (id: number): void => {
+const removeImage = (id: number) => {
   emit(
     'update:modelValue',
     props.modelValue.filter((item) => item.id !== id),
   )
 }
 
-const addUploadedImage = (file: CpsUploadedImage): void => {
+const addUploadedImage = (file: CpsUploadedImage) => {
   if (props.modelValue.length >= props.max) {
     throw new Error(`最多上传 ${props.max} 张图片`)
   }
@@ -82,12 +82,12 @@ const addUploadedImage = (file: CpsUploadedImage): void => {
   }
 }
 
-const removeByIndex = (index: number): void => {
+const removeByIndex = (index: number) => {
   const next = props.modelValue.filter((_, itemIndex) => itemIndex !== index)
   emit('update:modelValue', next)
 }
 
-const chooseAndUpload = async (): Promise<void> => {
+const chooseAndUpload = async () => {
   const remaining = Math.max(props.max - props.modelValue.length, 0)
   if (remaining <= 0 || uploading.value) return
 
@@ -114,8 +114,8 @@ const chooseAndUpload = async (): Promise<void> => {
   }
 }
 
-const chooseImages = (count: number): Promise<UniApp.ChooseImageSuccessCallbackResult | null> => {
-  return new Promise((resolve, reject) => {
+const chooseImages = (count: number) => {
+  return new Promise((resolve: (value: UniApp.ChooseImageSuccessCallbackResult | null) => void, reject) => {
     uni.chooseImage({
       count,
       sizeType: ['compressed', 'original'],
@@ -132,29 +132,26 @@ const chooseImages = (count: number): Promise<UniApp.ChooseImageSuccessCallbackR
   })
 }
 
-const resolveUploadSources = (result: UniApp.ChooseImageSuccessCallbackResult): CpsAttachmentUploadSource[] => {
+const resolveUploadSources = (result: UniApp.ChooseImageSuccessCallbackResult) => {
   const paths = normalizeArray(result.tempFilePaths)
   const tempFiles = normalizeArray(result.tempFiles) as TempFileCandidate[]
   return paths
     .map((path: string, index: number) => {
       const tempFile = tempFiles[index]
-      if (isFile(tempFile)) return tempFile
-      if (isFile(tempFile?.file)) return tempFile.file
-      return tempFile?.path || path
+      if (typeof File !== 'undefined' && tempFile instanceof File) return tempFile
+      const localFile = tempFile as UniTempFileLike | undefined
+      if (typeof File !== 'undefined' && localFile?.file instanceof File) return localFile.file
+      return localFile?.path || path
     })
-    .filter((source: CpsAttachmentUploadSource | undefined): source is CpsAttachmentUploadSource => Boolean(source))
+    .filter(Boolean) as CpsAttachmentUploadSource[]
 }
 
-const normalizeArray = <T>(value: T | T[] | undefined): T[] => {
+const normalizeArray = <T,>(value: T | T[] | undefined) => {
   if (value === undefined) return []
   return Array.isArray(value) ? value : [value]
 }
 
-const isFile = (value: unknown): value is File => {
-  return typeof File !== 'undefined' && value instanceof File
-}
-
-const previewImage = (index: number): void => {
+const previewImage = (index: number) => {
   const urls = props.modelValue.map((image) => image.url)
   if (!urls.length || typeof uni === 'undefined' || typeof uni.previewImage !== 'function') return
   uni.previewImage({

@@ -41,11 +41,11 @@ const statusLabels: Record<CpsIssueStatus, string> = {
   CLOSED: '已关闭',
 }
 
-const actionLabel = (action: string): string => {
+const actionLabel = (action: string) => {
   return actionLabels[action] ?? action
 }
 
-const statusLabel = (status: CpsIssueStatus | null): string => {
+const statusLabel = (status: CpsIssueStatus | null) => {
   return status ? statusLabels[status] : '开始'
 }
 </script>

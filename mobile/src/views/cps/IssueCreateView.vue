@@ -1,48 +1,196 @@
 <template>
-  <main class="cps-page cps-create-page">
-    <header class="cps-create-hero">
-      <div class="cps-create-hero__main">
-        <p class="cps-create-hero__eyebrow">CPS 现场巡检</p>
-        <h1>新建问题</h1>
-        <div class="cps-create-progress" aria-label="填报进度">
-          <span v-for="item in progressItems" :key="item.label" :class="{ 'is-done': item.done }">
+  <view class="cps-page cps-create-page">
+    <view class="cps-create-hero">
+      <view class="cps-create-hero__main">
+        <text class="cps-create-hero__eyebrow">CPS 现场巡检</text>
+        <text class="cps-create-hero__title">新建问题</text>
+        <view class="cps-create-progress" aria-label="填报进度">
+          <text v-for="item in progressItems" :key="item.label" :class="{ 'is-done': item.done }">
             {{ item.label }}
-          </span>
-        </div>
-      </div>
-      <span class="cps-create-hero__badge">AI 辅助</span>
-    </header>
+          </text>
+        </view>
+      </view>
+      <text class="cps-create-hero__badge">AI 辅助</text>
+    </view>
 
     <van-form class="cps-create-form" @submit="submit">
-      <section class="cps-detail-card cps-create-card">
-        <div class="cps-card-title">
-          <div>
-            <p>现场证据</p>
-            <h2>问题照片</h2>
-          </div>
-          <span class="cps-count-badge">{{ images.length }}/5</span>
-        </div>
-        <p class="cps-create-card__hint">最多上传 5 张，仅第 1 张参与 AI 识别</p>
-        <ImageUploader v-model="images" :max="5" @first-image-ready="onFirstImageReady" />
-      </section>
+      <view class="cps-detail-card cps-create-card">
+        <view class="cps-card-title">
+          <view>
+            <text class="cps-card-title__eyebrow">现场证据</text>
+            <text class="cps-card-title__heading">问题照片</text>
+          </view>
+          <text class="cps-count-badge">{{ images.length }}/5</text>
+        </view>
+        <text class="cps-create-card__hint">最多上传 5 张，仅第 1 张参与 AI 识别</text>
 
-      <section class="cps-create-card-stack">
-        <LocationSelector v-model="location" />
-        <CategorySelector v-model="category" />
-      </section>
+        <view class="cps-uploader">
+          <view
+            v-for="(image, index) in images"
+            :key="image.id"
+            class="cps-uploader__preview"
+            @tap="previewImage(index)"
+          >
+            <image class="cps-uploader__image" :src="image.url" mode="aspectFill" />
+            <button
+              v-if="!uploadingImage"
+              type="button"
+              class="cps-uploader__delete"
+              @tap.stop="removeImage(index)"
+            >
+              ×
+            </button>
+          </view>
+
+          <button
+            v-if="images.length < 5"
+            type="button"
+            class="cps-uploader__upload"
+            :disabled="uploadingImage"
+            @tap="chooseAndUploadImages"
+          >
+            <text class="cps-uploader__plus">+</text>
+            <text class="cps-uploader__text">{{ uploadingImage ? '上传中' : '上传图片' }}</text>
+          </button>
+        </view>
+      </view>
+
+      <view class="cps-detail-card cps-selector-card">
+        <view class="cps-card-title">
+          <view>
+            <text class="cps-card-title__eyebrow">位置选择</text>
+            <text class="cps-card-title__heading">工厂 / 区域 / 拉线 / 工序</text>
+          </view>
+        </view>
+
+        <view class="cps-selector-list">
+          <view class="cps-selector-row">
+            <text class="cps-selector-label">工厂</text>
+            <view class="cps-choice-grid">
+              <button
+                v-for="item in factories"
+                :key="item.value"
+                type="button"
+                class="cps-choice-button"
+                :class="{ 'is-selected': location.factory === String(item.value) }"
+                @tap="selectFactory(item.value)"
+              >
+                {{ item.label }}
+              </button>
+              <text v-if="!factories.length" class="cps-muted-text">暂无工厂数据</text>
+            </view>
+          </view>
+
+          <view class="cps-selector-row">
+            <text class="cps-selector-label">区域</text>
+            <view class="cps-choice-grid">
+              <button
+                v-for="item in areas"
+                :key="item.value"
+                type="button"
+                class="cps-choice-button"
+                :class="{ 'is-selected': location.area === String(item.value) }"
+                @tap="selectArea(item.value)"
+              >
+                {{ item.label }}
+              </button>
+              <text v-if="!areas.length" class="cps-muted-text">先选择工厂</text>
+            </view>
+          </view>
+
+          <view v-if="location.area" class="cps-selector-row">
+            <text class="cps-selector-label">拉线</text>
+            <view class="cps-choice-grid">
+              <button
+                v-for="item in lines"
+                :key="item.value"
+                type="button"
+                class="cps-choice-button"
+                :class="{ 'is-selected': location.line === String(item.value) }"
+                @tap="selectLine(item.value)"
+              >
+                {{ item.label }}
+              </button>
+              <text v-if="!lines.length" class="cps-muted-text">暂无拉线数据</text>
+            </view>
+          </view>
+
+          <view v-if="location.area" class="cps-selector-row">
+            <text class="cps-selector-label">工序</text>
+            <view class="cps-choice-grid">
+              <button
+                v-for="item in processes"
+                :key="item.value"
+                type="button"
+                class="cps-choice-button"
+                :class="{ 'is-selected': location.process === String(item.value) }"
+                @tap="selectProcess(item.value)"
+              >
+                {{ item.label }}
+              </button>
+              <text v-if="!processes.length" class="cps-muted-text">暂无工序数据</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="cps-detail-card cps-selector-card">
+        <view class="cps-card-title">
+          <view>
+            <text class="cps-card-title__eyebrow">问题分类</text>
+            <text class="cps-card-title__heading">一级 / 二级</text>
+          </view>
+        </view>
+
+        <view class="cps-selector-list">
+          <view class="cps-selector-row">
+            <text class="cps-selector-label">一级</text>
+            <view class="cps-choice-grid">
+              <button
+                v-for="item in level1Categories"
+                :key="item.value"
+                type="button"
+                class="cps-choice-button cps-choice-button--blue"
+                :class="{ 'is-selected': category.categoryL1Id === Number(item.value) }"
+                @tap="selectCategoryL1(item.value)"
+              >
+                {{ item.label }}
+              </button>
+              <text v-if="!level1Categories.length" class="cps-muted-text">暂无一级分类</text>
+            </view>
+          </view>
+
+          <view class="cps-selector-row">
+            <text class="cps-selector-label">二级</text>
+            <view class="cps-choice-grid">
+              <button
+                v-for="item in level2Categories"
+                :key="item.value"
+                type="button"
+                class="cps-choice-button"
+                :class="{ 'is-selected': category.categoryL2Id === Number(item.value) }"
+                @tap="selectCategoryL2(item.value)"
+              >
+                {{ item.label }}
+              </button>
+              <text v-if="!level2Categories.length" class="cps-muted-text">先选择一级分类</text>
+            </view>
+          </view>
+        </view>
+      </view>
 
       <van-notice-bar v-if="inspecting" color="#0F766E" background="#CCFBF1" text="AI 正在识别首张图片，请稍候" />
 
-      <section v-if="aiSuggestionSummary" class="cps-detail-card cps-create-card cps-create-ai">
-        <div class="cps-card-title">
-          <div>
-            <p>AI 建议</p>
-            <h2>原因措施</h2>
-          </div>
-          <span class="cps-count-badge">可修改</span>
-        </div>
-        <pre>{{ aiSuggestionSummary }}</pre>
-      </section>
+      <view v-if="aiSuggestionSummary" class="cps-detail-card cps-create-card cps-create-ai">
+        <view class="cps-card-title">
+          <view>
+            <text class="cps-card-title__eyebrow">AI 建议</text>
+            <text class="cps-card-title__heading">原因措施</text>
+          </view>
+          <text class="cps-count-badge">可修改</text>
+        </view>
+        <text class="cps-ai-text">{{ aiSuggestionSummary }}</text>
+      </view>
 
       <van-cell-group inset title="问题描述" class="cps-create-cell-group">
         <van-field
@@ -60,7 +208,7 @@
               class="cps-voice-button"
               aria-label="语音转文字"
               data-test="voice-transcribe"
-              @click.stop.prevent="appendVoiceText"
+              @tap.stop.prevent="appendVoiceText"
             >
               <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z" />
@@ -81,7 +229,7 @@
         />
       </van-cell-group>
 
-      <div class="cps-sticky-submit">
+      <view class="cps-sticky-submit">
         <van-button
           data-test="submit"
           native-type="submit"
@@ -94,26 +242,31 @@
         >
           提交并派发
         </van-button>
-      </div>
+      </view>
     </van-form>
-  </main>
+  </view>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 
 import { inspectCpsImage, transcribeIssueVoice } from '@/api/cps/ai'
+import { uploadCpsAttachment, type CpsAttachmentUploadSource } from '@/api/cps/attachment'
 import { createCpsIssue } from '@/api/cps/issue'
-import { getFeedbackHandler } from '@/api/cps/master'
-import CategorySelector from '@/components/cps/CategorySelector.vue'
-import ImageUploader from '@/components/cps/ImageUploader.vue'
-import LocationSelector from '@/components/cps/LocationSelector.vue'
+import { getAreas, getCategories, getFactories, getFeedbackHandler, getLines, getProcesses, type CpsOption } from '@/api/cps/master'
 import type { CpsAiSuggestionPayload, CpsUploadedImage } from '@/types/cps'
 
 interface ProgressItem {
   label: string
   done: boolean
 }
+
+interface UniTempFileLike {
+  path?: string
+  file?: File
+}
+
+type TempFileCandidate = File | UniTempFileLike
 
 const location = ref({
   factory: '',
@@ -127,14 +280,21 @@ const category = ref({
   categoryL2Id: null as number | null,
 })
 
+const factories = ref<CpsOption[]>([])
+const areas = ref<CpsOption[]>([])
+const lines = ref<CpsOption[]>([])
+const processes = ref<CpsOption[]>([])
+const level1Categories = ref<CpsOption[]>([])
+const level2Categories = ref<CpsOption[]>([])
 const images = ref<CpsUploadedImage[]>([])
-const description = ref<string>('')
-const feedbackEmpNo = ref<string>('')
-const submitting = ref<boolean>(false)
-const inspecting = ref<boolean>(false)
+const description = ref('')
+const feedbackEmpNo = ref('')
+const submitting = ref(false)
+const inspecting = ref(false)
+const uploadingImage = ref(false)
 const aiSuggestion = ref<CpsAiSuggestionPayload | null>(null)
 
-const aiSuggestionSummary = computed<string>(() => {
+const aiSuggestionSummary = computed(() => {
   if (!aiSuggestion.value) return ''
   return [
     aiSuggestion.value.reasonSuggestion ? `原因建议：${aiSuggestion.value.reasonSuggestion}` : '',
@@ -151,7 +311,7 @@ const progressItems = computed<ProgressItem[]>(() => [
   { label: '描述', done: Boolean(description.value.trim()) },
 ])
 
-const canSubmit = computed<boolean>(
+const canSubmit = computed(
   () =>
     images.value.length >= 1 &&
     images.value.length <= 5 &&
@@ -168,7 +328,7 @@ const canSubmit = computed<boolean>(
 
 watch(
   () => ({ ...location.value }),
-  async (value): Promise<void> => {
+  async (value) => {
     if (!value.factory || !value.area || !value.line || !value.process) return
     const handler = await getFeedbackHandler({
       factory: value.factory,
@@ -180,7 +340,146 @@ watch(
   },
 )
 
-const onFirstImageReady = async (fileId: number): Promise<void> => {
+watch(
+  () => category.value.categoryL1Id,
+  async (parentId) => {
+    level2Categories.value = parentId ? await getCategories(parentId) : []
+  },
+)
+
+const chooseAndUploadImages = async () => {
+  const remaining = Math.max(5 - images.value.length, 0)
+  if (remaining <= 0 || uploadingImage.value) return
+
+  const result = await chooseImages(remaining)
+  if (!result) return
+
+  const sources = resolveUploadSources(result).slice(0, remaining)
+  if (!sources.length) return
+
+  uploadingImage.value = true
+  try {
+    const next = [...images.value]
+    for (const source of sources) {
+      const uploaded = await uploadCpsAttachment(source)
+      next.push(uploaded)
+    }
+    images.value = next
+    if (next.length > 0 && images.value.length === next.length && next.length === sources.length) {
+      await onFirstImageReady(next[0].id)
+    }
+  } finally {
+    uploadingImage.value = false
+  }
+}
+
+const chooseImages = (count: number) => {
+  return new Promise((resolve: (value: UniApp.ChooseImageSuccessCallbackResult | null) => void, reject) => {
+    uni.chooseImage({
+      count,
+      sizeType: ['compressed', 'original'],
+      sourceType: ['album', 'camera'],
+      success: resolve,
+      fail(error) {
+        if ((error.errMsg || '').toLowerCase().includes('cancel')) {
+          resolve(null)
+          return
+        }
+        reject(new Error(error.errMsg || 'chooseImage failed'))
+      },
+    })
+  })
+}
+
+const resolveUploadSources = (result: UniApp.ChooseImageSuccessCallbackResult) => {
+  const paths = normalizeArray(result.tempFilePaths)
+  const tempFiles = normalizeArray(result.tempFiles) as TempFileCandidate[]
+  return paths
+    .map((path, index) => {
+      const tempFile = tempFiles[index]
+      if (typeof File !== 'undefined' && tempFile instanceof File) return tempFile
+      const localFile = tempFile as UniTempFileLike | undefined
+      if (typeof File !== 'undefined' && localFile?.file instanceof File) return localFile.file
+      return localFile?.path || path
+    })
+    .filter(Boolean) as CpsAttachmentUploadSource[]
+}
+
+const normalizeArray = <T,>(value: T | T[] | undefined) => {
+  if (value === undefined) return []
+  return Array.isArray(value) ? value : [value]
+}
+
+const removeImage = (index: number) => {
+  images.value = images.value.filter((_, itemIndex) => itemIndex !== index)
+}
+
+const previewImage = (index: number) => {
+  const urls = images.value.map((image) => image.url)
+  if (!urls.length || typeof uni === 'undefined' || typeof uni.previewImage !== 'function') return
+  uni.previewImage({
+    urls,
+    current: urls[index],
+  })
+}
+
+const selectFactory = async (factoryValue: CpsOption['value']) => {
+  const factory = String(factoryValue)
+  location.value = {
+    factory,
+    area: '',
+    line: '',
+    process: '',
+  }
+  areas.value = await getAreas(factory)
+  lines.value = []
+  processes.value = []
+}
+
+const selectArea = async (areaValue: CpsOption['value']) => {
+  const area = String(areaValue)
+  location.value = {
+    ...location.value,
+    area,
+    line: '',
+    process: '',
+  }
+  lines.value = await getLines(location.value.factory, area)
+  processes.value = await getProcesses(location.value.factory, area)
+}
+
+const selectLine = async (lineValue: CpsOption['value']) => {
+  const line = String(lineValue)
+  location.value = {
+    ...location.value,
+    line,
+    process: '',
+  }
+  processes.value = await getProcesses(location.value.factory, location.value.area, line || undefined)
+}
+
+const selectProcess = (processValue: CpsOption['value']) => {
+  location.value = {
+    ...location.value,
+    process: String(processValue),
+  }
+}
+
+const selectCategoryL1 = (categoryId: CpsOption['value']) => {
+  category.value = {
+    categoryL1Id: Number(categoryId),
+    categoryL2Id: null,
+  }
+}
+
+const selectCategoryL2 = (categoryId: CpsOption['value']) => {
+  category.value = {
+    ...category.value,
+    categoryL2Id: Number(categoryId),
+  }
+}
+
+const onFirstImageReady = async (fileId: number) => {
   inspecting.value = true
   try {
     const suggestion = await inspectCpsImage(fileId)
@@ -192,13 +491,13 @@ const onFirstImageReady = async (fileId: number): Promise<void> => {
   }
 }
 
-const appendVoiceText = async (): Promise<void> => {
+const appendVoiceText = async () => {
   const text = await transcribeIssueVoice()
   if (!text.trim()) return
   description.value = [description.value.trim(), text.trim()].filter(Boolean).join('\n')
 }
 
-const submit = async (): Promise<void> => {
+const submit = async () => {
   if (!canSubmit.value) return
   submitting.value = true
   try {
@@ -221,6 +520,11 @@ const submit = async (): Promise<void> => {
     submitting.value = false
   }
 }
+
+onMounted(async () => {
+  factories.value = await getFactories()
+  level1Categories.value = await getCategories()
+})
 
 defineExpose({
   images,
@@ -271,8 +575,7 @@ defineExpose({
 }
 
 .cps-create-page,
-.cps-create-form,
-.cps-create-card-stack {
+.cps-create-form {
   display: grid;
   align-content: start;
   gap: 26rpx;
@@ -315,15 +618,13 @@ defineExpose({
 }
 
 .cps-create-hero__eyebrow {
-  margin: 0;
   color: rgba(255, 255, 255, 0.82);
   font-size: 26rpx;
   font-weight: 900;
   line-height: 36rpx;
 }
 
-.cps-create-hero h1 {
-  margin: 0;
+.cps-create-hero__title {
   color: #ffffff;
   font-size: 46rpx;
   font-weight: 950;
@@ -339,7 +640,7 @@ defineExpose({
   max-width: 100%;
 }
 
-.cps-create-progress span,
+.cps-create-progress text,
 .cps-create-hero__badge,
 .cps-count-badge {
   display: inline-flex;
@@ -353,13 +654,13 @@ defineExpose({
   white-space: nowrap;
 }
 
-.cps-create-progress span,
+.cps-create-progress text,
 .cps-create-hero__badge {
   background: rgba(255, 255, 255, 0.16);
   color: #ffffff;
 }
 
-.cps-create-progress span.is-done {
+.cps-create-progress text.is-done {
   background: #ccfbf1;
   color: #0f766e;
 }
@@ -387,16 +688,17 @@ defineExpose({
   min-width: 0;
 }
 
-.cps-card-title p {
-  margin: 0;
+.cps-card-title__eyebrow {
+  display: block;
   color: #0f766e;
   font-size: 26rpx;
   font-weight: 900;
   line-height: 36rpx;
 }
 
-.cps-card-title h2 {
-  margin: 4rpx 0 0;
+.cps-card-title__heading {
+  display: block;
+  margin-top: 4rpx;
   color: #0f172a;
   font-size: 36rpx;
   font-weight: 950;
@@ -410,25 +712,185 @@ defineExpose({
 }
 
 .cps-create-card__hint {
-  margin: 0;
   color: #64748b;
   font-size: 28rpx;
   font-weight: 800;
   line-height: 40rpx;
 }
 
+.cps-uploader,
+.cps-choice-grid {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  gap: 16rpx;
+}
+
+.cps-uploader {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.cps-uploader__preview,
+.cps-uploader__upload {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  min-width: 0;
+  min-height: 168rpx;
+  overflow: hidden;
+  border-radius: 18rpx;
+}
+
+.cps-uploader__preview {
+  background: #e2e8f0;
+}
+
+.cps-uploader__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cps-uploader__delete {
+  position: absolute;
+  top: 8rpx;
+  right: 8rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44rpx;
+  height: 44rpx;
+  min-width: 44rpx;
+  border: 0;
+  border-radius: 999rpx;
+  padding: 0;
+  background: rgba(15, 23, 42, 0.68);
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 900;
+  line-height: 44rpx;
+}
+
+.cps-uploader__upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  border: 2rpx dashed #67e8f9;
+  padding: 18rpx;
+  background: #ecfeff;
+  color: #0f766e;
+}
+
+.cps-uploader__plus {
+  font-size: 58rpx;
+  font-weight: 400;
+  line-height: 58rpx;
+}
+
+.cps-uploader__text {
+  font-size: 28rpx;
+  font-weight: 800;
+  line-height: 36rpx;
+  text-align: center;
+}
+
+.cps-selector-card {
+  padding: 30rpx 0 0;
+}
+
+.cps-selector-card .cps-card-title {
+  padding: 0 30rpx;
+}
+
+.cps-selector-list {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  border-top: 2rpx solid #ccfbf1;
+}
+
+.cps-selector-row {
+  display: grid;
+  grid-template-columns: 150rpx minmax(0, 1fr);
+  gap: 20rpx;
+  width: 100%;
+  min-width: 0;
+  padding: 28rpx 30rpx;
+  border-bottom: 2rpx solid #f1f5f9;
+}
+
+.cps-selector-row:last-child {
+  border-bottom: 0;
+}
+
+.cps-selector-label {
+  padding-top: 20rpx;
+  color: #0f172a;
+  font-size: 30rpx;
+  font-weight: 900;
+  line-height: 42rpx;
+}
+
+.cps-choice-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+}
+
+.cps-choice-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 96rpx;
+  border: 2rpx solid #cbd5e1;
+  border-radius: 18rpx;
+  padding: 16rpx 18rpx;
+  background: #ffffff;
+  color: #334155;
+  font-size: 32rpx;
+  font-weight: 800;
+  line-height: 42rpx;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.cps-choice-button:active {
+  transform: scale(0.98);
+}
+
+.cps-choice-button.is-selected {
+  border-color: #14b8a6;
+  background: linear-gradient(135deg, #ccfbf1 0%, #dbeafe 100%);
+  color: #0f766e;
+  box-shadow: 0 10rpx 28rpx rgba(20, 184, 166, 0.18);
+}
+
+.cps-choice-button--blue.is-selected {
+  border-color: #2563eb;
+  color: #1d4ed8;
+}
+
+.cps-muted-text {
+  color: #64748b;
+  font-size: 30rpx;
+  font-weight: 800;
+  line-height: 44rpx;
+}
+
 .cps-create-ai {
   border-left: 8rpx solid #2563eb;
 }
 
-.cps-create-ai pre {
+.cps-ai-text {
   min-width: 0;
-  margin: 0;
   border-radius: 16rpx;
   padding: 20rpx;
   background: #f0fdfa;
   color: #0f172a;
-  font-family: inherit;
   font-size: 30rpx;
   font-weight: 700;
   line-height: 46rpx;
