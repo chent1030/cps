@@ -19,6 +19,7 @@ import io.milvus.param.dml.SearchParam;
 import io.milvus.param.dml.UpsertParam;
 import io.milvus.param.index.CreateIndexParam;
 import io.milvus.response.SearchResultsWrapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -42,6 +43,7 @@ public class MilvusSdkVectorService implements MilvusVectorService {
     private final CpsMilvusProperties milvusProperties;
     private final CpsAiProperties aiProperties;
 
+    @Autowired
     public MilvusSdkVectorService(CpsMilvusProperties milvusProperties, CpsAiProperties aiProperties) {
         this(
                 new MilvusServiceClient(ConnectParam.newBuilder()
