@@ -3,6 +3,10 @@ import type { CpsUploadedImage } from '@/types/cps'
 
 export type CpsAttachmentUploadSource = File | string
 
+interface CpsAttachmentBase64Response {
+  data: string
+}
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
 export const uploadCpsAttachment = (source: CpsAttachmentUploadSource) => {
@@ -11,6 +15,12 @@ export const uploadCpsAttachment = (source: CpsAttachmentUploadSource) => {
   }
 
   return uploadByFile(source)
+}
+
+// Backend contract: POST /api/cps/attachments/base64 with { url }, returning { data: 'data:image/...;base64,...' }.
+export const getCpsAttachmentBase64 = async (url: string) => {
+  const response = await request.post<CpsAttachmentBase64Response>('/api/cps/attachments/base64', { url })
+  return response.data
 }
 
 const uploadByFile = (file: File) => {

@@ -57,7 +57,7 @@
           :aria-label="`预览问题现场照片 ${index + 1}`"
           @click="previewAttachments(detail.issueAttachments, index)"
         >
-          <img :src="image.fileUrl" :alt="image.fileName" />
+          <img :src="attachmentImageSources[image.id] || ''" :alt="image.fileName" />
           <span>{{ index + 1 }}/{{ detail.issueAttachments.length }}</span>
         </button>
       </div>
@@ -81,7 +81,7 @@
           :aria-label="`预览整改凭证照片 ${index + 1}`"
           @click="previewAttachments(detail.proofAttachments, index)"
         >
-          <img :src="image.fileUrl" :alt="image.fileName" />
+          <img :src="attachmentImageSources[image.id] || ''" :alt="image.fileName" />
           <span>{{ index + 1 }}/{{ detail.proofAttachments.length }}</span>
         </button>
       </div>
@@ -136,7 +136,28 @@
         <template v-if="showProofFields">
           <div class="cps-proof-upload">
             <p>整改照片</p>
-            <ImageUploader v-model="proofImages" :max="5" />
+            <div class="cps-proof-uploader">
+              <button
+                v-for="(image, index) in proofImages"
+                :key="image.id"
+                type="button"
+                class="cps-proof-uploader__preview"
+                @click="previewProofImage(index)"
+              >
+                <img :src="attachmentImageSources[image.id] || ''" :alt="image.name" />
+                <span v-if="!proofUploading" class="cps-proof-uploader__delete" @click.stop="removeProofImage(index)">×</span>
+              </button>
+              <button
+                v-if="proofImages.length < 5"
+                type="button"
+                class="cps-proof-uploader__upload"
+                :disabled="proofUploading"
+                @click="chooseAndUploadProofImages"
+              >
+                <span class="cps-proof-uploader__plus">+</span>
+                <span>{{ proofUploading ? '上传中' : '上传整改图片' }}</span>
+              </button>
+            </div>
           </div>
         </template>
 
@@ -148,8 +169,20 @@
         <van-field v-model="actionForm.comment" rows="3" autosize type="textarea" label="流转备注" placeholder="填写备注" />
       </van-cell-group>
 
-      <div class="cps-action-panel-wrap">
-        <ActionPanel :status="detail.status" :available-actions="detail.availableActions" @action="runAction" />
+      <div class="cps-inline-action-panel" :aria-label="`当前状态 ${detailStatus.label}`">
+        <button
+          v-for="action in detail.availableActions"
+          :key="action"
+          type="button"
+          class="cps-inline-action-panel__button"
+          :class="{
+            'cps-inline-action-panel__button--danger': action === 'REVIEW_REJECT',
+            'cps-inline-action-panel__button--success': action === 'REVIEW_CLOSE',
+          }"
+          @click="runAction(action)"
+        >
+          {{ actionLabels[action] }}
+        </button>
       </div>
     </section>
 
@@ -160,7 +193,21 @@
           <h2>处理轨迹</h2>
         </div>
       </div>
-      <FlowTimeline :logs="detail.flowLogs" />
+      <div v-if="!detail.flowLogs.length" class="cps-flow-empty">暂无流转记录</div>
+      <ol v-else class="cps-flow-timeline">
+        <li v-for="(log, index) in detail.flowLogs" :key="`${log.action}-${log.createdAt}`" class="cps-flow-timeline__item">
+          <span class="cps-flow-timeline__dot" :class="{ 'is-last': index === detail.flowLogs.length - 1 }" />
+          <div class="cps-flow-timeline__content">
+            <div class="cps-flow-timeline__head">
+              <strong>{{ actionLabel(log.action) }}</strong>
+              <time>{{ log.createdAt }}</time>
+            </div>
+            <p>{{ flowStatusLabel(log.fromStatus) }} 至 {{ flowStatusLabel(log.toStatus) }}</p>
+            <p>操作人：{{ log.operatorEmpNo }}</p>
+            <p v-if="log.comment" class="cps-flow-timeline__comment">{{ log.comment }}</p>
+          </div>
+        </li>
+      </ol>
     </section>
   </main>
   <main v-else class="cps-page">
@@ -171,12 +218,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { showImagePreview } from 'vant'
 
+import { getCpsAttachmentBase64, uploadCpsAttachment, type CpsAttachmentUploadSource } from '@/api/cps/attachment'
 import { executeCpsIssueAction, getCpsIssueDetail } from '@/api/cps/issue'
-import ActionPanel from '@/components/cps/ActionPanel.vue'
-import FlowTimeline from '@/components/cps/FlowTimeline.vue'
-import ImageUploader from '@/components/cps/ImageUploader.vue'
 import type {
   CpsAttachment,
   CpsIssueAction,
@@ -191,9 +235,18 @@ interface DetailStatusMeta {
   tone: string
 }
 
+interface UniTempFileLike {
+  path?: string
+  file?: File
+}
+
+type TempFileCandidate = File | UniTempFileLike
+
 const detail = ref<CpsIssueDetail | null>(null)
 const issueId = ref<number>(0)
 const proofImages = ref<CpsUploadedImage[]>([])
+const proofUploading = ref(false)
+const attachmentImageSources = ref<Record<number, string>>({})
 const actionForm = ref({
   reasonAnalysis: '',
   correctiveMeasure: '',
@@ -217,6 +270,23 @@ const statusMeta: Record<CpsIssueStatus, DetailStatusMeta> = {
   PENDING_UPLOAD_PROOF: { label: '待传图', tone: 'cps-status-pill--orange' },
   PENDING_REVIEW: { label: '待审核', tone: 'cps-status-pill--teal' },
   CLOSED: { label: '已关闭', tone: 'cps-status-pill--green' },
+}
+
+const actionLabels: Record<CpsIssueAction, string> = {
+  REPLY_ASSIGN: '回复并指派',
+  RECTIFY: '完成整改',
+  UPLOAD_PROOF: '上传凭证',
+  REVIEW_CLOSE: '审核关闭',
+  REVIEW_REJECT: '审核退回',
+  TRANSFER: '转办',
+}
+
+const flowStatusLabels: Record<CpsIssueStatus, string> = {
+  PENDING_FEEDBACK: '待反馈',
+  PENDING_RECTIFY: '待整改',
+  PENDING_UPLOAD_PROOF: '待传图',
+  PENDING_REVIEW: '待审核',
+  CLOSED: '已关闭',
 }
 
 const detailStatus = computed<DetailStatusMeta>(() => (detail.value ? statusMeta[detail.value.status] : statusMeta.PENDING_FEEDBACK))
@@ -250,6 +320,8 @@ const load = async () => {
     url: item.fileUrl,
     name: item.fileName,
   }))
+  attachmentImageSources.value = {}
+  void loadAttachmentImageSources([...detail.value.issueAttachments, ...detail.value.proofAttachments])
 }
 
 const buildActionPayload = (action: CpsIssueAction) => {
@@ -274,13 +346,110 @@ const runAction = async (action: CpsIssueAction) => {
 }
 
 const previewAttachments = (attachments: CpsAttachment[], startPosition: number) => {
-  if (!attachments.length) return
-  showImagePreview({
-    images: attachments.map((image) => image.fileUrl),
-    startPosition,
-    closeable: true,
+  const target = attachments[startPosition]
+  if (!target) return
+  const current = attachmentImageSources.value[target.id]
+  const urls = attachments.map((image) => attachmentImageSources.value[image.id]).filter(Boolean)
+  if (!current || !urls.length || typeof uni === 'undefined' || typeof uni.previewImage !== 'function') return
+  uni.previewImage({
+    urls,
+    current,
   })
 }
+
+const loadAttachmentImageSources = async (attachments: CpsAttachment[]) => {
+  const resolved = await Promise.all(
+    attachments.map(async (attachment) => {
+      try {
+        return [attachment.id, await getCpsAttachmentBase64(attachment.fileUrl)] as const
+      } catch {
+        return null
+      }
+    }),
+  )
+  const sources = Object.fromEntries(resolved.filter((source): source is readonly [number, string] => source !== null))
+  attachmentImageSources.value = { ...attachmentImageSources.value, ...sources }
+}
+
+const normalizeArray = <T,>(value: T | T[] | undefined) => {
+  if (value === undefined) return []
+  return Array.isArray(value) ? value : [value]
+}
+
+const resolveUploadSources = (result: UniApp.ChooseImageSuccessCallbackResult) => {
+  const paths = normalizeArray(result.tempFilePaths)
+  const tempFiles = normalizeArray(result.tempFiles) as TempFileCandidate[]
+  return paths
+    .map((path, index) => {
+      const tempFile = tempFiles[index]
+      if (typeof File !== 'undefined' && tempFile instanceof File) return tempFile
+      const localFile = tempFile as UniTempFileLike | undefined
+      if (typeof File !== 'undefined' && localFile?.file instanceof File) return localFile.file
+      return localFile?.path || path
+    })
+    .filter(Boolean) as CpsAttachmentUploadSource[]
+}
+
+const chooseAndUploadProofImages = () => {
+  const remaining = Math.max(5 - proofImages.value.length, 0)
+  if (remaining <= 0 || proofUploading.value) return
+
+  uni.chooseImage({
+    count: remaining,
+    sizeType: ['compressed', 'original'],
+    sourceType: ['album', 'camera'],
+    success: async (result) => {
+      const sources = resolveUploadSources(result).slice(0, remaining)
+      if (!sources.length) return
+
+      proofUploading.value = true
+      try {
+        const next = [...proofImages.value]
+        for (const source of sources) {
+          const uploaded = await uploadCpsAttachment(source)
+          next.push(uploaded)
+          void loadAttachmentImageSources([
+            {
+              id: uploaded.id,
+              fileUrl: uploaded.url,
+              fileName: uploaded.name,
+            },
+          ])
+        }
+        proofImages.value = next
+      } finally {
+        proofUploading.value = false
+      }
+    },
+    fail: (error) => {
+      if ((error.errMsg || '').toLowerCase().includes('cancel')) return
+      uni.showToast({
+        title: '图片选择失败',
+        icon: 'none',
+      })
+    },
+  })
+}
+
+const removeProofImage = (index: number) => {
+  proofImages.value = proofImages.value.filter((_, itemIndex) => itemIndex !== index)
+}
+
+const previewProofImage = (index: number) => {
+  const target = proofImages.value[index]
+  if (!target) return
+  const current = attachmentImageSources.value[target.id]
+  const urls = proofImages.value.map((image) => attachmentImageSources.value[image.id]).filter(Boolean)
+  if (!current || !urls.length || typeof uni === 'undefined' || typeof uni.previewImage !== 'function') return
+  uni.previewImage({
+    urls,
+    current,
+  })
+}
+
+const actionLabel = (action: string) => actionLabels[action as CpsIssueAction] ?? action
+
+const flowStatusLabel = (status: CpsIssueStatus | null) => (status ? flowStatusLabels[status] : '开始')
 
 onLoad((query?: Record<string, string | string[] | undefined>) => {
   const rawId = Array.isArray(query?.id) ? query?.id[0] : query?.id
@@ -696,9 +865,215 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   line-height: 44rpx;
 }
 
-.cps-action-panel-wrap {
+.cps-proof-uploader {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16rpx;
   width: 100%;
   min-width: 0;
+}
+
+.cps-proof-uploader__preview,
+.cps-proof-uploader__upload {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  min-height: 168rpx;
+  border-radius: 18rpx;
+  aspect-ratio: 1;
+  overflow: hidden;
+}
+
+.cps-proof-uploader__preview {
+  display: block;
+  border: 0;
+  padding: 0;
+  background: #e2e8f0;
+}
+
+.cps-proof-uploader__preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cps-proof-uploader__delete {
+  position: absolute;
+  top: 8rpx;
+  right: 8rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44rpx;
+  height: 44rpx;
+  min-width: 44rpx;
+  border-radius: 999rpx;
+  background: rgba(15, 23, 42, 0.68);
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 900;
+  line-height: 44rpx;
+}
+
+.cps-proof-uploader__upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  border: 2rpx dashed #67e8f9;
+  padding: 18rpx;
+  background: #ecfeff;
+  color: #0f766e;
+  font-size: 28rpx;
+  font-weight: 800;
+  line-height: 36rpx;
+  text-align: center;
+}
+
+.cps-proof-uploader__upload:disabled {
+  opacity: 0.68;
+}
+
+.cps-proof-uploader__plus {
+  font-size: 58rpx;
+  font-weight: 400;
+  line-height: 58rpx;
+}
+
+.cps-inline-action-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+  width: 100%;
+  min-width: 0;
+}
+
+.cps-inline-action-panel__button {
+  min-width: 0;
+  min-height: 96rpx;
+  border: 0;
+  border-radius: 999rpx;
+  padding: 16rpx 20rpx;
+  background: #14b8a6;
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 900;
+  line-height: 42rpx;
+}
+
+.cps-inline-action-panel__button--danger {
+  background: #ef4444;
+}
+
+.cps-inline-action-panel__button--success {
+  background: #22c55e;
+}
+
+.cps-flow-empty {
+  padding: 30rpx 24rpx;
+  color: #64748b;
+  font-size: 30rpx;
+  font-weight: 800;
+  line-height: 44rpx;
+  text-align: center;
+}
+
+.cps-flow-timeline {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cps-flow-timeline__item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38rpx minmax(0, 1fr);
+  gap: 16rpx;
+  min-width: 0;
+  padding-bottom: 18rpx;
+}
+
+.cps-flow-timeline__item::before {
+  position: absolute;
+  top: 34rpx;
+  bottom: 0;
+  left: 17rpx;
+  width: 4rpx;
+  border-radius: 999rpx;
+  background: #ccfbf1;
+  content: "";
+}
+
+.cps-flow-timeline__item:last-child {
+  padding-bottom: 0;
+}
+
+.cps-flow-timeline__item:last-child::before {
+  display: none;
+}
+
+.cps-flow-timeline__dot {
+  position: relative;
+  z-index: 1;
+  width: 38rpx;
+  height: 38rpx;
+  border: 8rpx solid #ccfbf1;
+  border-radius: 999rpx;
+  background: #14b8a6;
+}
+
+.cps-flow-timeline__dot.is-last {
+  border-color: #dbeafe;
+  background: #2563eb;
+}
+
+.cps-flow-timeline__content {
+  display: grid;
+  gap: 10rpx;
+  min-width: 0;
+  border-radius: 16rpx;
+  padding: 20rpx;
+  background: linear-gradient(135deg, #f0fdfa 0%, #eff6ff 100%);
+}
+
+.cps-flow-timeline__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18rpx;
+  min-width: 0;
+}
+
+.cps-flow-timeline__head strong {
+  min-width: 0;
+  color: #0f172a;
+  font-size: 30rpx;
+  font-weight: 950;
+  line-height: 42rpx;
+  overflow-wrap: anywhere;
+}
+
+.cps-flow-timeline__head time,
+.cps-flow-timeline__content p {
+  margin: 0;
+  color: #64748b;
+  font-size: 26rpx;
+  font-weight: 700;
+  line-height: 38rpx;
+  overflow-wrap: anywhere;
+}
+
+.cps-flow-timeline__comment {
+  border-radius: 14rpx;
+  padding: 14rpx 16rpx;
+  background: #ffffff;
+  color: #0f172a;
 }
 
 .cps-page-loading {
