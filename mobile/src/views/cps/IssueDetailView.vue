@@ -475,10 +475,13 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 .cps-page {
   width: 100%;
   max-width: 100%;
+  height: 100vh;
   min-height: 100dvh;
   margin: 0;
   padding: 28rpx 24rpx 152rpx;
   overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
 }
 
