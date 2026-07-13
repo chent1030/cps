@@ -242,6 +242,17 @@ interface UniTempFileLike {
 
 type TempFileCandidate = File | UniTempFileLike
 
+type CpsIssueDetailCore = Omit<CpsIssueDetail, 'issueAttachments' | 'proofAttachments' | 'aiSuggestion' | 'availableActions' | 'flowLogs'>
+
+interface CpsIssueDetailApiResponse {
+  issue?: CpsIssueDetailCore
+  issueAttachments?: CpsAttachment[]
+  proofAttachments?: CpsAttachment[]
+  aiSuggestion?: CpsIssueDetail['aiSuggestion']
+  availableActions?: CpsIssueAction[]
+  flowLogs?: CpsIssueDetail['flowLogs']
+}
+
 const detail = ref<CpsIssueDetail | null>(null)
 const issueId = ref<number>(0)
 const proofImages = ref<CpsUploadedImage[]>([])
@@ -312,9 +323,32 @@ const aiCategory = computed<string>(() =>
 )
 const hasIssueAttachments = computed<boolean>(() => Boolean(detail.value?.issueAttachments.length))
 
+const normalizeIssueDetail = (response: CpsIssueDetailApiResponse & Partial<CpsIssueDetail>): CpsIssueDetail => {
+  if (!response.issue) {
+    return {
+      ...response,
+      issueAttachments: response.issueAttachments ?? [],
+      proofAttachments: response.proofAttachments ?? [],
+      aiSuggestion: response.aiSuggestion ?? null,
+      availableActions: response.availableActions ?? [],
+      flowLogs: response.flowLogs ?? [],
+    } as CpsIssueDetail
+  }
+
+  return {
+    ...response.issue,
+    issueAttachments: response.issueAttachments ?? [],
+    proofAttachments: response.proofAttachments ?? [],
+    aiSuggestion: response.aiSuggestion ?? null,
+    availableActions: response.availableActions ?? [],
+    flowLogs: response.flowLogs ?? [],
+  }
+}
+
 const load = async () => {
   if (!issueId.value) return
-  detail.value = await getCpsIssueDetail(issueId.value)
+  const response = (await getCpsIssueDetail(issueId.value)) as CpsIssueDetailApiResponse & Partial<CpsIssueDetail>
+  detail.value = normalizeIssueDetail(response)
   proofImages.value = (detail.value.proofAttachments ?? []).map((item) => ({
     id: item.id,
     url: item.fileUrl,
@@ -475,13 +509,10 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 .cps-page {
   width: 100%;
   max-width: 100%;
-  height: 100vh;
   min-height: 100dvh;
   margin: 0;
   padding: 28rpx 24rpx 152rpx;
   overflow-x: hidden;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
 }
 
@@ -492,9 +523,17 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 }
 
 .cps-detail-page {
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
   gap: 28rpx;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+.cps-detail-page > * {
+  flex: 0 0 auto;
 }
 
 .cps-detail-hero,
