@@ -391,11 +391,19 @@ const previewAttachments = (attachments: CpsAttachment[], startPosition: number)
   })
 }
 
+const toImageDataUrl = (value: string) => {
+  const data = value.trim()
+  if (data.startsWith('data:')) return data
+  if (data.includes(';base64,')) return `data:${data}`
+  return `data:image/jpeg;base64,${data.replace(/\s/g, '')}`
+}
+
 const loadAttachmentImageSources = async (attachments: CpsAttachment[]) => {
   const resolved = await Promise.all(
     attachments.map(async (attachment) => {
       try {
-        return [attachment.id, await getCpsAttachmentBase64(attachment.fileUrl)] as const
+        const base64 = await getCpsAttachmentBase64(attachment.fileUrl)
+        return [attachment.id, toImageDataUrl(base64)] as const
       } catch {
         return null
       }
@@ -509,10 +517,13 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 .cps-page {
   width: 100%;
   max-width: 100%;
+  height: 100vh;
   min-height: 100dvh;
   margin: 0;
   padding: 28rpx 24rpx 152rpx;
   overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
 }
 
@@ -525,11 +536,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 .cps-detail-page {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
   gap: 28rpx;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
 }
 
 .cps-detail-page > * {
@@ -987,30 +994,64 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 .cps-inline-action-panel {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16rpx;
+  gap: 18rpx;
   width: 100%;
   min-width: 0;
+  padding-top: 4rpx;
 }
 
 .cps-inline-action-panel__button {
+  position: relative;
   min-width: 0;
-  min-height: 96rpx;
-  border: 0;
-  border-radius: 999rpx;
-  padding: 16rpx 20rpx;
-  background: #14b8a6;
+  min-height: 104rpx;
+  border: 2rpx solid #0f766e;
+  border-radius: 14rpx;
+  padding: 16rpx 18rpx;
+  background: #0f766e;
   color: #ffffff;
-  font-size: 32rpx;
+  box-shadow: 0 10rpx 22rpx rgba(15, 118, 110, 0.2);
+  font-size: 30rpx;
   font-weight: 900;
   line-height: 42rpx;
+  text-align: center;
+  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.cps-inline-action-panel__button::before {
+  position: absolute;
+  top: 14rpx;
+  bottom: 14rpx;
+  left: 0;
+  width: 6rpx;
+  border-radius: 0 6rpx 6rpx 0;
+  background: #99f6e4;
+  content: "";
+}
+
+.cps-inline-action-panel__button:active {
+  transform: translateY(2rpx);
+  box-shadow: 0 4rpx 10rpx rgba(15, 118, 110, 0.18);
 }
 
 .cps-inline-action-panel__button--danger {
-  background: #ef4444;
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #be123c;
+  box-shadow: none;
+}
+
+.cps-inline-action-panel__button--danger::before {
+  background: #e11d48;
 }
 
 .cps-inline-action-panel__button--success {
-  background: #22c55e;
+  border-color: #15803d;
+  background: #15803d;
+  box-shadow: 0 10rpx 22rpx rgba(21, 128, 61, 0.2);
+}
+
+.cps-inline-action-panel__button--success::before {
+  background: #bbf7d0;
 }
 
 .cps-flow-empty {
