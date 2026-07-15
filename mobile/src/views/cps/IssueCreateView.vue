@@ -32,7 +32,7 @@
             class="cps-uploader__preview"
             @tap="previewImage(index)"
           >
-            <img class="cps-uploader__image" :src="image.url" :alt="image.name" />
+            <img class="cps-uploader__image" :src="imagePreviewSources[image.id] || ''" :alt="image.name" />
             <span
               v-if="!uploadingImage"
               class="cps-uploader__delete"
@@ -251,7 +251,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 
 import { inspectCpsImage, transcribeIssueVoice } from '@/api/cps/ai'
-import { uploadCpsAttachment, type CpsAttachmentUploadSource } from '@/api/cps/attachment'
+import { getCpsAttachmentBase64, uploadCpsAttachment, type CpsAttachmentUploadSource } from '@/api/cps/attachment'
 import { createCpsIssue } from '@/api/cps/issue'
 import { getAreas, getCategories, getFactories, getFeedbackHandler, getLines, getProcesses, type CpsOption } from '@/api/cps/master'
 import type { CpsAiSuggestionPayload, CpsUploadedImage } from '@/types/cps'
@@ -287,6 +287,7 @@ const processes = ref<CpsOption[]>([])
 const level1Categories = ref<CpsOption[]>([])
 const level2Categories = ref<CpsOption[]>([])
 const images = ref<CpsUploadedImage[]>([])
+const imagePreviewSources = ref<Record<number, string>>({})
 const description = ref('')
 const feedbackEmpNo = ref('')
 const submitting = ref(false)
@@ -376,6 +377,7 @@ const chooseAndUploadImages = () => {
         for (const source of sources) {
           const uploaded = await uploadCpsAttachment(source)
           next.push(uploaded)
+          void imageToBase64(uploaded)
         }
         images.value = next
         if (shouldInspectFirstImage && next.length > 0) {
@@ -401,16 +403,41 @@ const normalizeArray = <T,>(value: T | T[] | undefined) => {
 }
 
 const removeImage = (index: number) => {
+  const removed = images.value[index]
   images.value = images.value.filter((_, itemIndex) => itemIndex !== index)
+  if (!removed) return
+  const { [removed.id]: _, ...remainingSources } = imagePreviewSources.value
+  imagePreviewSources.value = remainingSources
 }
 
 const previewImage = (index: number) => {
-  const urls = images.value.map((image) => image.url)
-  if (!urls.length || typeof uni === 'undefined' || typeof uni.previewImage !== 'function') return
+  const target = images.value[index]
+  if (!target) return
+  const current = imagePreviewSources.value[target.id]
+  const urls = images.value.map((image) => imagePreviewSources.value[image.id]).filter(Boolean)
+  if (!current || !urls.length || typeof uni === 'undefined' || typeof uni.previewImage !== 'function') return
   uni.previewImage({
     urls,
-    current: urls[index],
+    current,
   })
+}
+
+const imageToBase64 = async (image: CpsUploadedImage) => {
+  try {
+    const base64 = await getCpsAttachmentBase64(image.url)
+    const data = base64.trim()
+    const source = data.startsWith('data:')
+      ? data
+      : data.includes(';base64,')
+        ? `data:${data}`
+        : `data:image/jpeg;base64,${data.replace(/\s/g, '')}`
+    imagePreviewSources.value = { ...imagePreviewSources.value, [image.id]: source }
+  } catch {
+    uni.showToast({
+      title: '图片预览加载失败',
+      icon: 'none',
+    })
+  }
 }
 
 const selectFactory = async (factoryValue: CpsOption['value']) => {
