@@ -69,12 +69,16 @@ export interface CpsIssueActionRequest {
   reasonAnalysis?: string
   correctiveMeasure?: string
   responsibleEmpNo?: string
+  responsibleEmpName?: string
   proofEmpNo?: string
+  proofEmpName?: string
   reviewerEmpNo?: string
+  reviewerEmpName?: string
   rectifyRemark?: string
   reviewOpinion?: string
   proofAttachmentIds?: number[]
   targetEmpNo?: string
+  targetEmpName?: string
   comment?: string
 }
 
@@ -112,8 +116,11 @@ export interface CpsIssueDetail extends CpsIssueListItem {
   creatorEmpNo: string
   feedbackEmpNo: string
   responsibleEmpNo: string | null
+  responsibleEmpName?: string | null
   proofEmpNo: string | null
+  proofEmpName?: string | null
   reviewerEmpNo: string | null
+  reviewerEmpName?: string | null
   reasonAnalysis: string | null
   correctiveMeasure: string | null
   rectifyRemark: string | null

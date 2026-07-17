@@ -380,9 +380,9 @@ const knownPeople = computed<CpsEmployeeOption[]>(() => {
   const people = [
     { empNo: detail.value.creatorEmpNo, empName: detail.value.creatorEmpNo },
     { empNo: detail.value.feedbackEmpNo, empName: detail.value.feedbackEmpNo },
-    { empNo: detail.value.responsibleEmpNo, empName: detail.value.responsibleEmpNo },
-    { empNo: detail.value.proofEmpNo, empName: detail.value.proofEmpNo },
-    { empNo: detail.value.reviewerEmpNo, empName: detail.value.reviewerEmpNo },
+    { empNo: detail.value.responsibleEmpNo, empName: detail.value.responsibleEmpName || detail.value.responsibleEmpNo },
+    { empNo: detail.value.proofEmpNo, empName: detail.value.proofEmpName || detail.value.proofEmpNo },
+    { empNo: detail.value.reviewerEmpNo, empName: detail.value.reviewerEmpName || detail.value.reviewerEmpNo },
     { empNo: detail.value.currentHandlerEmpNo, empName: detail.value.currentHandlerEmpName || detail.value.currentHandlerEmpNo },
   ].filter((person): person is CpsEmployeeOption => Boolean(person.empNo))
   return [...new Map(people.map((person) => [person.empNo, person])).values()]
@@ -430,12 +430,16 @@ const buildActionPayload = (action: CpsIssueAction) => {
     reasonAnalysis: actionForm.value.reasonAnalysis || undefined,
     correctiveMeasure: actionForm.value.correctiveMeasure || undefined,
     responsibleEmpNo: actionForm.value.responsibleEmpNo || undefined,
+    responsibleEmpName: personName(actionForm.value.responsibleEmpNo),
     proofEmpNo: actionForm.value.proofEmpNo || undefined,
+    proofEmpName: personName(actionForm.value.proofEmpNo),
     reviewerEmpNo: actionForm.value.reviewerEmpNo || undefined,
+    reviewerEmpName: personName(actionForm.value.reviewerEmpNo),
     rectifyRemark: actionForm.value.rectifyRemark || undefined,
     reviewOpinion: actionForm.value.reviewOpinion || undefined,
     proofAttachmentIds: action === 'UPLOAD_PROOF' ? proofImages.value.map((image) => image.id) : undefined,
     targetEmpNo: actionForm.value.targetEmpNo || undefined,
+    targetEmpName: personName(actionForm.value.targetEmpNo),
     comment: actionForm.value.comment || undefined,
   }
 }
@@ -444,6 +448,11 @@ const personLabel = (empNo: string) => {
   if (!empNo) return ''
   const person = selectedPeople.value[empNo] ?? knownPeople.value.find((item) => item.empNo === empNo)
   return person && person.empName !== person.empNo ? `${person.empName} (${empNo})` : empNo
+}
+
+const personName = (empNo: string) => {
+  if (!empNo) return undefined
+  return selectedPeople.value[empNo]?.empName ?? knownPeople.value.find((item) => item.empNo === empNo)?.empName
 }
 
 const openPersonPicker = (field: PersonField, title: string) => {
