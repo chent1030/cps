@@ -223,9 +223,12 @@
 
       <van-cell-group inset title="派发信息" class="cps-create-cell-group">
         <van-field
-          v-model="feedbackEmpNo"
+          :model-value="feedbackPersonLabel"
           label="反馈人"
-          placeholder="按工厂、区域、拉线、工序自动匹配，可手动修改"
+          placeholder="选择反馈人"
+          readonly
+          is-link
+          @click="openFeedbackPicker"
         />
       </van-cell-group>
 
@@ -245,6 +248,33 @@
       </div>
     </van-form>
   </main>
+
+  <div v-if="feedbackPicker.visible" class="cps-person-picker-mask" @click.self="closeFeedbackPicker">
+    <section class="cps-person-picker" role="dialog" aria-label="选择反馈人">
+      <div class="cps-person-picker__head">
+        <strong>选择反馈人</strong>
+        <button type="button" class="cps-person-picker__close" aria-label="关闭" @tap="closeFeedbackPicker">×</button>
+      </div>
+      <div class="cps-person-picker__search">
+        <input v-model.trim="feedbackPicker.keyword" type="search" placeholder="输入姓名或工号搜索" @keyup.enter="searchFeedbackPeople" />
+        <button type="button" :disabled="feedbackPicker.loading" @tap="searchFeedbackPeople">搜索</button>
+      </div>
+      <div v-if="feedbackPicker.loading" class="cps-person-picker__state">搜索中...</div>
+      <div v-else class="cps-person-picker__list">
+        <button
+          v-for="person in feedbackPickerPeople"
+          :key="person.empNo"
+          type="button"
+          class="cps-person-picker__option"
+          @tap="selectFeedbackPerson(person)"
+        >
+          <strong>{{ person.empName || person.empNo }}</strong>
+          <span>{{ person.empNo }}</span>
+        </button>
+        <p v-if="!feedbackPickerPeople.length" class="cps-person-picker__state">未找到人员，请调整关键词后搜索</p>
+      </div>
+    </section>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -253,7 +283,17 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { inspectCpsImage, transcribeIssueVoice } from '@/api/cps/ai'
 import { getCpsAttachmentBase64, uploadCpsAttachment, type CpsAttachmentUploadSource } from '@/api/cps/attachment'
 import { createCpsIssue } from '@/api/cps/issue'
-import { getAreas, getCategories, getFactories, getFeedbackHandler, getLines, getProcesses, type CpsOption } from '@/api/cps/master'
+import {
+  getAreas,
+  getCategories,
+  getFactories,
+  getFeedbackHandler,
+  getLines,
+  getProcesses,
+  searchCpsEmployees,
+  type CpsEmployeeOption,
+  type CpsOption,
+} from '@/api/cps/master'
 import type { CpsAiSuggestionPayload, CpsUploadedImage } from '@/types/cps'
 
 interface ProgressItem {
@@ -290,6 +330,14 @@ const images = ref<CpsUploadedImage[]>([])
 const imagePreviewSources = ref<Record<number, string>>({})
 const description = ref('')
 const feedbackEmpNo = ref('')
+const feedbackPerson = ref<CpsEmployeeOption | null>(null)
+const feedbackPicker = ref({
+  visible: false,
+  keyword: '',
+  loading: false,
+  searched: false,
+  results: [] as CpsEmployeeOption[],
+})
 const submitting = ref(false)
 const inspecting = ref(false)
 const uploadingImage = ref(false)
@@ -303,6 +351,16 @@ const aiSuggestionSummary = computed(() => {
   ]
     .filter(Boolean)
     .join('\n')
+})
+
+const feedbackPersonLabel = computed(() => {
+  if (!feedbackEmpNo.value) return ''
+  const name = feedbackPerson.value?.empName
+  return name && name !== feedbackEmpNo.value ? `${name} (${feedbackEmpNo.value})` : feedbackEmpNo.value
+})
+const feedbackPickerPeople = computed(() => {
+  if (feedbackPicker.value.searched) return feedbackPicker.value.results
+  return feedbackPerson.value ? [feedbackPerson.value] : []
 })
 
 const progressItems = computed<ProgressItem[]>(() => [
@@ -338,8 +396,41 @@ watch(
       process: value.process,
     })
     feedbackEmpNo.value = handler.empNo
+    feedbackPerson.value = handler
   },
 )
+
+const openFeedbackPicker = () => {
+  feedbackPicker.value = {
+    visible: true,
+    keyword: '',
+    loading: false,
+    searched: false,
+    results: [],
+  }
+}
+
+const closeFeedbackPicker = () => {
+  feedbackPicker.value.visible = false
+}
+
+const searchFeedbackPeople = async () => {
+  const keyword = feedbackPicker.value.keyword.trim()
+  if (!keyword || feedbackPicker.value.loading) return
+  feedbackPicker.value.loading = true
+  try {
+    feedbackPicker.value.results = await searchCpsEmployees(keyword)
+    feedbackPicker.value.searched = true
+  } finally {
+    feedbackPicker.value.loading = false
+  }
+}
+
+const selectFeedbackPerson = (person: CpsEmployeeOption) => {
+  feedbackEmpNo.value = person.empNo
+  feedbackPerson.value = person
+  closeFeedbackPicker()
+}
 
 watch(
   () => category.value.categoryL1Id,
@@ -529,6 +620,7 @@ const submit = async () => {
       categoryL2Id: category.value.categoryL2Id!,
       description: description.value.trim(),
       feedbackEmpNo: feedbackEmpNo.value.trim(),
+      feedbackEmpName: feedbackPerson.value?.empName,
       issueAttachmentIds: images.value.map((image) => image.id),
       aiSuggestion: aiSuggestion.value ?? undefined,
     })
@@ -959,6 +1051,150 @@ defineExpose({
 .cps-create-cell-group :deep(.van-field__control) {
   min-width: 0;
   max-width: 100%;
+}
+
+.cps-person-picker-mask {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(15, 23, 42, 0.48);
+}
+
+.cps-person-picker {
+  width: 100%;
+  max-height: 78dvh;
+  border-radius: 28rpx 28rpx 0 0;
+  padding: 28rpx 24rpx calc(28rpx + env(safe-area-inset-bottom));
+  background: #ffffff;
+  box-shadow: 0 -16rpx 48rpx rgba(15, 23, 42, 0.16);
+}
+
+.cps-person-picker__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  margin-bottom: 24rpx;
+}
+
+.cps-person-picker__head strong {
+  min-width: 0;
+  color: #0f172a;
+  font-size: 34rpx;
+  font-weight: 900;
+  line-height: 46rpx;
+  overflow-wrap: anywhere;
+}
+
+.cps-person-picker__close {
+  display: inline-flex;
+  flex: 0 0 56rpx;
+  align-items: center;
+  justify-content: center;
+  width: 56rpx;
+  height: 56rpx;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 42rpx;
+  font-weight: 400;
+  line-height: 56rpx;
+}
+
+.cps-person-picker__search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.cps-person-picker__search input {
+  min-width: 0;
+  height: 76rpx;
+  border: 2rpx solid #cbd5e1;
+  border-radius: 12rpx;
+  padding: 0 20rpx;
+  outline: none;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 28rpx;
+  line-height: 76rpx;
+}
+
+.cps-person-picker__search input:focus {
+  border-color: #14b8a6;
+  background: #ffffff;
+}
+
+.cps-person-picker__search button {
+  min-width: 112rpx;
+  height: 76rpx;
+  border: 0;
+  border-radius: 12rpx;
+  padding: 0 22rpx;
+  background: #0f766e;
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 800;
+  line-height: 76rpx;
+}
+
+.cps-person-picker__search button:disabled {
+  opacity: 0.6;
+}
+
+.cps-person-picker__list {
+  max-height: calc(78dvh - 214rpx - env(safe-area-inset-bottom));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cps-person-picker__option {
+  display: grid;
+  gap: 6rpx;
+  width: 100%;
+  min-height: 112rpx;
+  border: 0;
+  border-bottom: 2rpx solid #e2e8f0;
+  padding: 20rpx 12rpx;
+  background: #ffffff;
+  color: #0f172a;
+  text-align: left;
+}
+
+.cps-person-picker__option:active {
+  background: #f0fdfa;
+}
+
+.cps-person-picker__option strong,
+.cps-person-picker__option span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cps-person-picker__option strong {
+  font-size: 30rpx;
+  font-weight: 850;
+  line-height: 40rpx;
+}
+
+.cps-person-picker__option span {
+  color: #64748b;
+  font-size: 26rpx;
+  line-height: 36rpx;
+}
+
+.cps-person-picker__state {
+  margin: 0;
+  padding: 44rpx 20rpx;
+  color: #64748b;
+  font-size: 28rpx;
+  line-height: 40rpx;
+  text-align: center;
 }
 
 .cps-voice-button {

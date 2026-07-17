@@ -60,6 +60,7 @@ export interface CpsIssueCreateRequest {
   categoryL2Id: number
   description: string
   feedbackEmpNo: string
+  feedbackEmpName?: string
   issueAttachmentIds: number[]
   aiSuggestion?: CpsAiSuggestionPayload
 }
