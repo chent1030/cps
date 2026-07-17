@@ -124,16 +124,17 @@
         <template v-if="showFeedbackFields">
           <van-field v-model="actionForm.reasonAnalysis" rows="3" autosize type="textarea" label="原因分析" placeholder="填写原因分析" />
           <van-field v-model="actionForm.correctiveMeasure" rows="3" autosize type="textarea" label="整改措施" placeholder="填写整改措施" />
-          <van-field v-model="actionForm.responsibleEmpNo" label="责任员工" placeholder="责任员工工号" />
-          <van-field v-model="actionForm.proofEmpNo" label="上传人" placeholder="上传节点操作人工号" />
+          <van-field :model-value="personLabel(actionForm.responsibleEmpNo)" label="责任员工" placeholder="选择责任员工" readonly is-link @click="openPersonPicker('responsibleEmpNo', '选择责任员工')" />
+          <van-field :model-value="personLabel(actionForm.proofEmpNo)" label="上传人" placeholder="选择上传人" readonly is-link @click="openPersonPicker('proofEmpNo', '选择上传人')" />
         </template>
 
         <template v-if="showRectifyFields">
           <van-field v-model="actionForm.rectifyRemark" rows="3" autosize type="textarea" label="整改说明" placeholder="填写整改说明" />
-          <van-field v-model="actionForm.proofEmpNo" label="上传人" placeholder="上传节点操作人工号" />
+          <van-field :model-value="personLabel(actionForm.proofEmpNo)" label="上传人" placeholder="选择上传人" readonly is-link @click="openPersonPicker('proofEmpNo', '选择上传人')" />
         </template>
 
         <template v-if="showProofFields">
+          <van-field :model-value="personLabel(actionForm.reviewerEmpNo)" label="审核人" placeholder="选择审核人" readonly is-link @click="openPersonPicker('reviewerEmpNo', '选择审核人')" />
           <div class="cps-proof-upload">
             <p>整改照片</p>
             <div class="cps-proof-uploader">
@@ -165,7 +166,7 @@
           <van-field v-model="actionForm.reviewOpinion" rows="3" autosize type="textarea" label="审核意见" placeholder="填写审核意见" />
         </template>
 
-        <van-field v-model="actionForm.targetEmpNo" label="转办目标" placeholder="转办目标工号" />
+        <van-field :model-value="personLabel(actionForm.targetEmpNo)" label="转办目标" placeholder="选择转办目标" readonly is-link @click="openPersonPicker('targetEmpNo', '选择转办目标')" />
         <van-field v-model="actionForm.comment" rows="3" autosize type="textarea" label="流转备注" placeholder="填写备注" />
       </van-cell-group>
 
@@ -213,6 +214,33 @@
   <main v-else class="cps-page">
     <van-loading class="cps-page-loading" color="#14B8A6">加载中...</van-loading>
   </main>
+
+  <div v-if="personPicker.visible" class="cps-person-picker-mask" @click.self="closePersonPicker">
+    <section class="cps-person-picker" role="dialog" :aria-label="personPicker.title">
+      <div class="cps-person-picker__head">
+        <strong>{{ personPicker.title }}</strong>
+        <button type="button" class="cps-person-picker__close" aria-label="关闭" @click="closePersonPicker">×</button>
+      </div>
+      <div class="cps-person-picker__search">
+        <input v-model.trim="personPicker.keyword" type="search" placeholder="输入姓名或工号搜索" @keyup.enter="searchPeople" />
+        <button type="button" :disabled="personPicker.loading" @click="searchPeople">搜索</button>
+      </div>
+      <div v-if="personPicker.loading" class="cps-person-picker__state">搜索中...</div>
+      <div v-else class="cps-person-picker__list">
+        <button
+          v-for="person in pickerPeople"
+          :key="person.empNo"
+          type="button"
+          class="cps-person-picker__option"
+          @click="selectPerson(person)"
+        >
+          <strong>{{ person.empName || person.empNo }}</strong>
+          <span>{{ person.empNo }}</span>
+        </button>
+        <p v-if="!pickerPeople.length" class="cps-person-picker__state">未找到人员，请调整关键词后搜索</p>
+      </div>
+    </section>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -221,6 +249,7 @@ import { onLoad } from '@dcloudio/uni-app'
 
 import { getCpsAttachmentBase64, uploadCpsAttachment, type CpsAttachmentUploadSource } from '@/api/cps/attachment'
 import { executeCpsIssueAction, getCpsIssueDetail } from '@/api/cps/issue'
+import { searchCpsEmployees, type CpsEmployeeOption } from '@/api/cps/master'
 import type {
   CpsAttachment,
   CpsIssueAction,
@@ -241,6 +270,7 @@ interface UniTempFileLike {
 }
 
 type TempFileCandidate = File | UniTempFileLike
+type PersonField = 'responsibleEmpNo' | 'proofEmpNo' | 'reviewerEmpNo' | 'targetEmpNo'
 
 type CpsIssueDetailCore = Omit<CpsIssueDetail, 'issueAttachments' | 'proofAttachments' | 'aiSuggestion' | 'availableActions' | 'flowLogs'>
 
@@ -258,6 +288,16 @@ const issueId = ref<number>(0)
 const proofImages = ref<CpsUploadedImage[]>([])
 const proofUploading = ref(false)
 const attachmentImageSources = ref<Record<number, string>>({})
+const selectedPeople = ref<Record<string, CpsEmployeeOption>>({})
+const personPicker = ref({
+  visible: false,
+  title: '',
+  field: 'responsibleEmpNo' as PersonField,
+  keyword: '',
+  loading: false,
+  searched: false,
+  results: [] as CpsEmployeeOption[],
+})
 const actionForm = ref({
   reasonAnalysis: '',
   correctiveMeasure: '',
@@ -322,6 +362,19 @@ const aiCategory = computed<string>(() =>
     : '-',
 )
 const hasIssueAttachments = computed<boolean>(() => Boolean(detail.value?.issueAttachments.length))
+const knownPeople = computed<CpsEmployeeOption[]>(() => {
+  if (!detail.value) return []
+  const people = [
+    { empNo: detail.value.creatorEmpNo, empName: detail.value.creatorEmpNo },
+    { empNo: detail.value.feedbackEmpNo, empName: detail.value.feedbackEmpNo },
+    { empNo: detail.value.responsibleEmpNo, empName: detail.value.responsibleEmpNo },
+    { empNo: detail.value.proofEmpNo, empName: detail.value.proofEmpNo },
+    { empNo: detail.value.reviewerEmpNo, empName: detail.value.reviewerEmpNo },
+    { empNo: detail.value.currentHandlerEmpNo, empName: detail.value.currentHandlerEmpName || detail.value.currentHandlerEmpNo },
+  ].filter((person): person is CpsEmployeeOption => Boolean(person.empNo))
+  return [...new Map(people.map((person) => [person.empNo, person])).values()]
+})
+const pickerPeople = computed(() => (personPicker.value.searched ? personPicker.value.results : knownPeople.value))
 
 const normalizeIssueDetail = (response: CpsIssueDetailApiResponse & Partial<CpsIssueDetail>): CpsIssueDetail => {
   if (!response.issue) {
@@ -372,6 +425,46 @@ const buildActionPayload = (action: CpsIssueAction) => {
     targetEmpNo: actionForm.value.targetEmpNo || undefined,
     comment: actionForm.value.comment || undefined,
   }
+}
+
+const personLabel = (empNo: string) => {
+  if (!empNo) return ''
+  const person = selectedPeople.value[empNo] ?? knownPeople.value.find((item) => item.empNo === empNo)
+  return person && person.empName !== person.empNo ? `${person.empName} (${empNo})` : empNo
+}
+
+const openPersonPicker = (field: PersonField, title: string) => {
+  personPicker.value = {
+    visible: true,
+    title,
+    field,
+    keyword: '',
+    loading: false,
+    searched: false,
+    results: [],
+  }
+}
+
+const closePersonPicker = () => {
+  personPicker.value.visible = false
+}
+
+const searchPeople = async () => {
+  const keyword = personPicker.value.keyword.trim()
+  if (!keyword || personPicker.value.loading) return
+  personPicker.value.loading = true
+  try {
+    personPicker.value.results = await searchCpsEmployees(keyword)
+    personPicker.value.searched = true
+  } finally {
+    personPicker.value.loading = false
+  }
+}
+
+const selectPerson = (person: CpsEmployeeOption) => {
+  actionForm.value[personPicker.value.field] = person.empNo
+  selectedPeople.value = { ...selectedPeople.value, [person.empNo]: person }
+  closePersonPicker()
 }
 
 const runAction = async (action: CpsIssueAction) => {
@@ -1163,5 +1256,149 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   display: flex;
   justify-content: center;
   margin-top: 64rpx;
+}
+
+.cps-person-picker-mask {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(15, 23, 42, 0.48);
+}
+
+.cps-person-picker {
+  width: 100%;
+  max-height: 78dvh;
+  border-radius: 28rpx 28rpx 0 0;
+  padding: 28rpx 24rpx calc(28rpx + env(safe-area-inset-bottom));
+  background: #ffffff;
+  box-shadow: 0 -16rpx 48rpx rgba(15, 23, 42, 0.16);
+}
+
+.cps-person-picker__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  margin-bottom: 24rpx;
+}
+
+.cps-person-picker__head strong {
+  min-width: 0;
+  color: #0f172a;
+  font-size: 34rpx;
+  font-weight: 900;
+  line-height: 46rpx;
+  overflow-wrap: anywhere;
+}
+
+.cps-person-picker__close {
+  display: inline-flex;
+  flex: 0 0 56rpx;
+  align-items: center;
+  justify-content: center;
+  width: 56rpx;
+  height: 56rpx;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 42rpx;
+  font-weight: 400;
+  line-height: 56rpx;
+}
+
+.cps-person-picker__search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.cps-person-picker__search input {
+  min-width: 0;
+  height: 76rpx;
+  border: 2rpx solid #cbd5e1;
+  border-radius: 12rpx;
+  padding: 0 20rpx;
+  outline: none;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 28rpx;
+  line-height: 76rpx;
+}
+
+.cps-person-picker__search input:focus {
+  border-color: #14b8a6;
+  background: #ffffff;
+}
+
+.cps-person-picker__search button {
+  min-width: 112rpx;
+  height: 76rpx;
+  border: 0;
+  border-radius: 12rpx;
+  padding: 0 22rpx;
+  background: #0f766e;
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 800;
+  line-height: 76rpx;
+}
+
+.cps-person-picker__search button:disabled {
+  opacity: 0.6;
+}
+
+.cps-person-picker__list {
+  max-height: calc(78dvh - 214rpx - env(safe-area-inset-bottom));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cps-person-picker__option {
+  display: grid;
+  gap: 6rpx;
+  width: 100%;
+  min-height: 112rpx;
+  border: 0;
+  border-bottom: 2rpx solid #e2e8f0;
+  padding: 20rpx 12rpx;
+  background: #ffffff;
+  color: #0f172a;
+  text-align: left;
+}
+
+.cps-person-picker__option:active {
+  background: #f0fdfa;
+}
+
+.cps-person-picker__option strong,
+.cps-person-picker__option span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cps-person-picker__option strong {
+  font-size: 30rpx;
+  font-weight: 850;
+  line-height: 40rpx;
+}
+
+.cps-person-picker__option span {
+  color: #64748b;
+  font-size: 26rpx;
+  line-height: 36rpx;
+}
+
+.cps-person-picker__state {
+  margin: 0;
+  padding: 44rpx 20rpx;
+  color: #64748b;
+  font-size: 28rpx;
+  line-height: 40rpx;
+  text-align: center;
 }
 </style>

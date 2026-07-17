@@ -3,6 +3,11 @@ import type { CpsOption } from '@/types/cps'
 
 export type { CpsOption }
 
+export interface CpsEmployeeOption {
+  empNo: string
+  empName: string
+}
+
 export const getFactories = () => {
   return request.get<CpsOption[]>('/api/cps/master/factories')
 }
@@ -34,4 +39,8 @@ export const getFeedbackHandler = (params: {
 
 export const getReviewer = (params: { factory: string; area: string }) => {
   return request.get<{ empNo: string; empName: string }>('/api/cps/assignment/reviewer', { params })
+}
+
+export const searchCpsEmployees = (keyword: string) => {
+  return request.get<CpsEmployeeOption[]>('/api/cps/master/employees', { params: { keyword } })
 }
