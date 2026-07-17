@@ -259,7 +259,7 @@
         <input v-model.trim="feedbackPicker.keyword" type="search" placeholder="输入姓名或工号搜索" @keyup.enter="searchFeedbackPeople" />
         <button type="button" :disabled="feedbackPicker.loading" @tap="searchFeedbackPeople">搜索</button>
       </div>
-      <div v-if="feedbackPicker.loading || feedbackMatching" class="cps-person-picker__state">{{ feedbackPicker.loading ? '搜索中...' : '正在获取匹配反馈人...' }}</div>
+      <div v-if="feedbackPicker.loading" class="cps-person-picker__state">搜索中...</div>
       <div v-else class="cps-person-picker__list">
         <button
           v-for="person in feedbackPickerPeople"
@@ -331,16 +331,12 @@ const imagePreviewSources = ref<Record<number, string>>({})
 const description = ref('')
 const feedbackEmpNo = ref('')
 const feedbackPerson = ref<CpsEmployeeOption | null>(null)
-const feedbackCandidates = ref<CpsEmployeeOption[]>([])
-const feedbackMatching = ref(false)
 const feedbackPicker = ref({
   visible: false,
   keyword: '',
   loading: false,
-  searched: false,
   results: [] as CpsEmployeeOption[],
 })
-let feedbackRequestVersion = 0
 const submitting = ref(false)
 const inspecting = ref(false)
 const uploadingImage = ref(false)
@@ -361,10 +357,7 @@ const feedbackPersonLabel = computed(() => {
   const name = feedbackPerson.value?.empName
   return name && name !== feedbackEmpNo.value ? `${name} (${feedbackEmpNo.value})` : feedbackEmpNo.value
 })
-const feedbackPickerPeople = computed(() => {
-  if (feedbackPicker.value.searched) return feedbackPicker.value.results
-  return feedbackCandidates.value
-})
+const feedbackPickerPeople = computed(() => feedbackPicker.value.results)
 
 const progressItems = computed<ProgressItem[]>(() => [
   { label: '照片', done: images.value.length >= 1 && images.value.length <= 5 },
@@ -391,28 +384,21 @@ const canSubmit = computed(
 watch(
   () => ({ ...location.value }),
   async (value) => {
-    const requestVersion = ++feedbackRequestVersion
     if (!value.factory || !value.area || !value.line || !value.process) {
       feedbackEmpNo.value = ''
       feedbackPerson.value = null
-      feedbackCandidates.value = []
+      feedbackPicker.value.results = []
       return
     }
-    feedbackMatching.value = true
-    try {
-      const handler = await getFeedbackHandler({
-        factory: value.factory,
-        area: value.area,
-        line: value.line,
-        process: value.process,
-      })
-      if (requestVersion !== feedbackRequestVersion) return
-      feedbackEmpNo.value = handler.empNo
-      feedbackPerson.value = handler
-      feedbackCandidates.value = [handler]
-    } finally {
-      if (requestVersion === feedbackRequestVersion) feedbackMatching.value = false
-    }
+    const handler = await getFeedbackHandler({
+      factory: value.factory,
+      area: value.area,
+      line: value.line,
+      process: value.process,
+    })
+    feedbackEmpNo.value = handler.empNo
+    feedbackPerson.value = handler
+    feedbackPicker.value.results = [handler]
   },
 )
 
@@ -421,8 +407,7 @@ const openFeedbackPicker = () => {
     visible: true,
     keyword: '',
     loading: false,
-    searched: false,
-    results: [],
+    results: feedbackPicker.value.results,
   }
 }
 
@@ -435,8 +420,9 @@ const searchFeedbackPeople = async () => {
   if (!keyword || feedbackPicker.value.loading) return
   feedbackPicker.value.loading = true
   try {
-    feedbackPicker.value.results = await searchCpsEmployees(keyword)
-    feedbackPicker.value.searched = true
+    const matched = feedbackPerson.value ? [feedbackPerson.value] : []
+    const results = await searchCpsEmployees(keyword)
+    feedbackPicker.value.results = [...new Map([...matched, ...results].map((person) => [person.empNo, person])).values()]
   } finally {
     feedbackPicker.value.loading = false
   }
