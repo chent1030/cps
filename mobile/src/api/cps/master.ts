@@ -34,7 +34,7 @@ export const getFeedbackHandler = (params: {
   line: string
   process: string
 }) => {
-  return request.get<{ empNo: string; empName: string }>('/api/cps/assignment/feedback-handler', { params })
+  return request.get<CpsEmployeeOption[]>('/api/cps/assignment/feedback-handler', { params })
 }
 
 export const getReviewer = (params: { factory: string; area: string }) => {

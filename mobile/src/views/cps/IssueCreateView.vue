@@ -390,15 +390,15 @@ watch(
       feedbackPicker.value.results = []
       return
     }
-    const handler = await getFeedbackHandler({
+    const handlers = await getFeedbackHandler({
       factory: value.factory,
       area: value.area,
       line: value.line,
       process: value.process,
     })
-    feedbackEmpNo.value = handler.empNo
-    feedbackPerson.value = handler
-    feedbackPicker.value.results = [handler]
+    feedbackEmpNo.value = ''
+    feedbackPerson.value = null
+    feedbackPicker.value.results = handlers
   },
 )
 
@@ -420,9 +420,8 @@ const searchFeedbackPeople = async () => {
   if (!keyword || feedbackPicker.value.loading) return
   feedbackPicker.value.loading = true
   try {
-    const matched = feedbackPerson.value ? [feedbackPerson.value] : []
     const results = await searchCpsEmployees(keyword)
-    feedbackPicker.value.results = [...new Map([...matched, ...results].map((person) => [person.empNo, person])).values()]
+    feedbackPicker.value.results = [...new Map([...feedbackPicker.value.results, ...results].map((person) => [person.empNo, person])).values()]
   } finally {
     feedbackPicker.value.loading = false
   }

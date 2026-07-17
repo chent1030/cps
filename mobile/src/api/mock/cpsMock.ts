@@ -208,7 +208,10 @@ export const getCpsMockResponse = <T>({ method, path, params, body }: MockReques
   }
   if (method === 'GET' && path === '/api/cps/master/categories') return (categories[num(params?.parentId)] ?? categories[0]) as T
   if (method === 'GET' && path === '/api/cps/assignment/feedback-handler') {
-    return { empNo: 'E10001', empName: 'E10001' } as T
+    return [
+      { empNo: 'E10001', empName: 'E10001' },
+      { empNo: 'E10002', empName: 'E10002' },
+    ] as T
   }
   if (method === 'GET' && path === '/api/cps/assignment/reviewer') {
     return { empNo: 'E90001', empName: 'E90001' } as T
