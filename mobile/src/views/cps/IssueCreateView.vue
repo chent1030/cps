@@ -259,7 +259,7 @@
         <input v-model.trim="feedbackPicker.keyword" type="search" placeholder="输入姓名或工号搜索" @keyup.enter="searchFeedbackPeople" />
         <button type="button" :disabled="feedbackPicker.loading" @tap="searchFeedbackPeople">搜索</button>
       </div>
-      <div v-if="feedbackPicker.loading" class="cps-person-picker__state">搜索中...</div>
+      <div v-if="feedbackPicker.loading || feedbackMatching" class="cps-person-picker__state">{{ feedbackPicker.loading ? '搜索中...' : '正在获取匹配反馈人...' }}</div>
       <div v-else class="cps-person-picker__list">
         <button
           v-for="person in feedbackPickerPeople"
@@ -331,6 +331,8 @@ const imagePreviewSources = ref<Record<number, string>>({})
 const description = ref('')
 const feedbackEmpNo = ref('')
 const feedbackPerson = ref<CpsEmployeeOption | null>(null)
+const feedbackCandidates = ref<CpsEmployeeOption[]>([])
+const feedbackMatching = ref(false)
 const feedbackPicker = ref({
   visible: false,
   keyword: '',
@@ -338,6 +340,7 @@ const feedbackPicker = ref({
   searched: false,
   results: [] as CpsEmployeeOption[],
 })
+let feedbackRequestVersion = 0
 const submitting = ref(false)
 const inspecting = ref(false)
 const uploadingImage = ref(false)
@@ -360,7 +363,7 @@ const feedbackPersonLabel = computed(() => {
 })
 const feedbackPickerPeople = computed(() => {
   if (feedbackPicker.value.searched) return feedbackPicker.value.results
-  return feedbackPerson.value ? [feedbackPerson.value] : []
+  return feedbackCandidates.value
 })
 
 const progressItems = computed<ProgressItem[]>(() => [
@@ -388,15 +391,28 @@ const canSubmit = computed(
 watch(
   () => ({ ...location.value }),
   async (value) => {
-    if (!value.factory || !value.area || !value.line || !value.process) return
-    const handler = await getFeedbackHandler({
-      factory: value.factory,
-      area: value.area,
-      line: value.line,
-      process: value.process,
-    })
-    feedbackEmpNo.value = handler.empNo
-    feedbackPerson.value = handler
+    const requestVersion = ++feedbackRequestVersion
+    if (!value.factory || !value.area || !value.line || !value.process) {
+      feedbackEmpNo.value = ''
+      feedbackPerson.value = null
+      feedbackCandidates.value = []
+      return
+    }
+    feedbackMatching.value = true
+    try {
+      const handler = await getFeedbackHandler({
+        factory: value.factory,
+        area: value.area,
+        line: value.line,
+        process: value.process,
+      })
+      if (requestVersion !== feedbackRequestVersion) return
+      feedbackEmpNo.value = handler.empNo
+      feedbackPerson.value = handler
+      feedbackCandidates.value = [handler]
+    } finally {
+      if (requestVersion === feedbackRequestVersion) feedbackMatching.value = false
+    }
   },
 )
 
