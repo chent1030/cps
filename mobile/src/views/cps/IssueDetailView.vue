@@ -124,17 +124,16 @@
         <template v-if="showFeedbackFields">
           <van-field v-model="actionForm.reasonAnalysis" rows="3" autosize type="textarea" label="原因分析" placeholder="填写原因分析" />
           <van-field v-model="actionForm.correctiveMeasure" rows="3" autosize type="textarea" label="整改措施" placeholder="填写整改措施" />
-          <van-field :model-value="personLabel(actionForm.responsibleEmpNo)" label="责任员工" placeholder="选择责任员工" readonly is-link @click="openPersonPicker('responsibleEmpNo', '选择责任员工')" />
-          <van-field :model-value="personLabel(actionForm.proofEmpNo)" label="上传人" placeholder="选择上传人" readonly is-link @click="openPersonPicker('proofEmpNo', '选择上传人')" />
+          <van-field data-testid="responsible-employee-field" :model-value="personLabel(actionForm.responsibleEmpNo)" label="责任员工" placeholder="选择责任员工" readonly is-link @click="openPersonPicker('responsibleEmpNo', '选择责任员工')" />
         </template>
 
         <template v-if="showRectifyFields">
           <van-field v-model="actionForm.rectifyRemark" rows="3" autosize type="textarea" label="整改说明" placeholder="填写整改说明" />
-          <van-field :model-value="personLabel(actionForm.proofEmpNo)" label="上传人" placeholder="选择上传人" readonly is-link @click="openPersonPicker('proofEmpNo', '选择上传人')" />
+          <van-field data-testid="proof-employee-field" :model-value="personLabel(actionForm.proofEmpNo)" label="上传人" placeholder="选择上传人" readonly is-link @click="openPersonPicker('proofEmpNo', '选择上传人')" />
         </template>
 
         <template v-if="showProofFields">
-          <van-field :model-value="personLabel(actionForm.reviewerEmpNo)" label="审核人" placeholder="选择审核人" readonly is-link @click="openPersonPicker('reviewerEmpNo', '选择审核人')" />
+          <van-field data-testid="reviewer-employee-field" :model-value="personLabel(actionForm.reviewerEmpNo)" label="审核人" placeholder="选择审核人" readonly is-link @click="openPersonPicker('reviewerEmpNo', '选择审核人')" />
           <div class="cps-proof-upload">
             <p>整改照片</p>
             <div class="cps-proof-uploader">
@@ -166,15 +165,16 @@
           <van-field v-model="actionForm.reviewOpinion" rows="3" autosize type="textarea" label="审核意见" placeholder="填写审核意见" />
         </template>
 
-        <van-field :model-value="personLabel(actionForm.targetEmpNo)" label="转办目标" placeholder="选择转办目标" readonly is-link @click="openPersonPicker('targetEmpNo', '选择转办目标')" />
+        <van-field v-if="showTransferField" :model-value="personLabel(actionForm.targetEmpNo)" label="转办目标" placeholder="选择转办目标" readonly is-link @click="openPersonPicker('targetEmpNo', '选择转办目标')" />
         <van-field v-model="actionForm.comment" rows="3" autosize type="textarea" label="流转备注" placeholder="填写备注" />
       </van-cell-group>
 
       <div class="cps-inline-action-panel" :aria-label="`当前状态 ${detailStatus.label}`">
         <button
-          v-for="action in detail.availableActions"
+          v-for="action in workflowActions"
           :key="action"
           type="button"
+          data-testid="workflow-action"
           class="cps-inline-action-panel__button"
           :class="{
             'cps-inline-action-panel__button--danger': action === 'REVIEW_REJECT',
@@ -314,6 +314,11 @@ const showFeedbackFields = computed<boolean>(() => detail.value?.status === 'PEN
 const showRectifyFields = computed<boolean>(() => detail.value?.status === 'PENDING_RECTIFY')
 const showProofFields = computed<boolean>(() => detail.value?.status === 'PENDING_UPLOAD_PROOF')
 const showReviewFields = computed<boolean>(() => detail.value?.status === 'PENDING_REVIEW')
+const workflowActions = computed<CpsIssueAction[]>(() => {
+  if (!detail.value) return []
+  return detail.value.availableActions.length ? detail.value.availableActions : statusDefaultActions[detail.value.status]
+})
+const showTransferField = computed<boolean>(() => workflowActions.value.includes('TRANSFER'))
 
 const statusMeta: Record<CpsIssueStatus, DetailStatusMeta> = {
   PENDING_FEEDBACK: { label: '待反馈', tone: 'cps-status-pill--blue' },
@@ -327,9 +332,17 @@ const actionLabels: Record<CpsIssueAction, string> = {
   REPLY_ASSIGN: '回复并指派',
   RECTIFY: '完成整改',
   UPLOAD_PROOF: '上传凭证',
-  REVIEW_CLOSE: '审核关闭',
+  REVIEW_CLOSE: '审核通过',
   REVIEW_REJECT: '审核退回',
   TRANSFER: '转办',
+}
+
+const statusDefaultActions: Record<CpsIssueStatus, CpsIssueAction[]> = {
+  PENDING_FEEDBACK: ['REPLY_ASSIGN', 'TRANSFER'],
+  PENDING_RECTIFY: ['RECTIFY', 'TRANSFER'],
+  PENDING_UPLOAD_PROOF: ['UPLOAD_PROOF', 'TRANSFER'],
+  PENDING_REVIEW: ['REVIEW_CLOSE', 'REVIEW_REJECT', 'TRANSFER'],
+  CLOSED: [],
 }
 
 const flowStatusLabels: Record<CpsIssueStatus, string> = {

@@ -145,4 +145,33 @@ describe('IssueDetailView', () => {
       closeable: true,
     })
   })
+
+  it('renders person selection fields in their own workflow stages', async () => {
+    mocks.getCpsIssueDetail.mockResolvedValue({
+      ...detail,
+      status: 'PENDING_FEEDBACK',
+      availableActions: ['REPLY_ASSIGN'],
+    })
+    const wrapper = mount(IssueDetailView)
+
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="responsible-employee-field"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="proof-employee-field"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="reviewer-employee-field"]').exists()).toBe(false)
+  })
+
+  it('provides both review decisions when the review action list is unavailable', async () => {
+    mocks.getCpsIssueDetail.mockResolvedValue({
+      ...detail,
+      availableActions: [],
+    })
+    const wrapper = mount(IssueDetailView)
+
+    await flushPromises()
+
+    const actionLabels = wrapper.findAll('[data-testid="workflow-action"]').map((button) => button.text())
+    expect(actionLabels).toContain('审核通过')
+    expect(actionLabels).toContain('审核退回')
+  })
 })
