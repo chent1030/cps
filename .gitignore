@@ -3,3 +3,12 @@ backend/target/
 mobile/node_modules/
 mobile/dist/
 mobile/*.tsbuildinfo
+
+# android (uni-app)
+android/node_modules/
+android/dist/
+android/unpackage/
+android/*.tsbuildinfo
+
+# tooling
+.zcode/

@@ -1,0 +1,28 @@
+{
+  "pages": [
+    {
+      "path": "views/cps/IssueListView",
+      "style": {
+        "navigationBarTitleText": "我的问题"
+      }
+    },
+    {
+      "path": "views/cps/IssueCreateView",
+      "style": {
+        "navigationBarTitleText": "新建问题"
+      }
+    },
+    {
+      "path": "views/cps/IssueDetailView",
+      "style": {
+        "navigationBarTitleText": "问题详情"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "CPS巡检",
+    "navigationBarBackgroundColor": "#F8FAFC",
+    "backgroundColor": "#F8FAFC"
+  }
+}

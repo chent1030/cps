@@ -1,0 +1,49 @@
+{
+  "name": "CPS巡检",
+  "appid": "__UNI__CPS_TABLET",
+  "description": "CPS 巡检安卓平板端",
+  "versionName": "0.1.0",
+  "versionCode": "100",
+  "vueVersion": "3",
+  "app-plus": {
+    "usingComponents": true,
+    "compilerVersion": 3,
+    "nvueStyleCompiler": "uni-app",
+    "splashscreen": {
+      "alwaysShowBeforeRender": true,
+      "waiting": true,
+      "autoclose": true,
+      "delay": 0
+    },
+    "modules": {},
+    "distribute": {
+      "android": {
+        "permissions": [
+          "<uses-permission android:name=\"android.permission.CAMERA\"/>",
+          "<uses-permission android:name=\"android.permission.FLASHLIGHT\"/>",
+          "<uses-permission android:name=\"android.permission.RECORD_AUDIO\"/>",
+          "<uses-permission android:name=\"android.permission.MODIFY_AUDIO_SETTINGS\"/>",
+          "<uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\"/>",
+          "<uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\"/>",
+          "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\"/>",
+          "<uses-permission android:name=\"android.permission.ACCESS_WIFI_STATE\"/>",
+          "<uses-permission android:name=\"android.permission.CHANGE_NETWORK_STATE\"/>",
+          "<uses-permission android:name=\"android.permission.VIBRATE\"/>"
+        ],
+        "features": [
+          "<uses-feature android:name=\"android.hardware.camera\"/>",
+          "<uses-feature android:name=\"android.hardware.camera.autofocus\"/>",
+          "<uses-feature android:name=\"android.hardware.microphone\"/>"
+        ]
+      },
+      "ios": {},
+      "sdkConfigs": {}
+    }
+  },
+  "h5": {
+    "router": {
+      "mode": "hash",
+      "base": "./"
+    }
+  }
+}

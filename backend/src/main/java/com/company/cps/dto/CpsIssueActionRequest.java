@@ -16,6 +16,8 @@ public class CpsIssueActionRequest {
     private String reviewOpinion;
     private List<Long> proofAttachmentIds;
     private String comment;
+    private Long categoryL1Id;
+    private Long categoryL2Id;
 
     public CpsIssueAction getAction() { return action; }
     public void setAction(CpsIssueAction action) { this.action = action; }
@@ -39,4 +41,8 @@ public class CpsIssueActionRequest {
     public void setProofAttachmentIds(List<Long> proofAttachmentIds) { this.proofAttachmentIds = proofAttachmentIds; }
     public String getComment() { return comment; }
     public void setComment(String comment) { this.comment = comment; }
+    public Long getCategoryL1Id() { return categoryL1Id; }
+    public void setCategoryL1Id(Long categoryL1Id) { this.categoryL1Id = categoryL1Id; }
+    public Long getCategoryL2Id() { return categoryL2Id; }
+    public void setCategoryL2Id(Long categoryL2Id) { this.categoryL2Id = categoryL2Id; }
 }

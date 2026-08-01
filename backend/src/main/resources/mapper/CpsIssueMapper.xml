@@ -47,6 +47,9 @@
             corrective_measure = #{correctiveMeasure},
             rectify_remark = #{rectifyRemark},
             review_opinion = #{reviewOpinion},
+            category_l1_id = #{categoryL1Id},
+            category_l2_id = #{categoryL2Id},
+            category_modified_flag = #{categoryModifiedFlag},
             close_time = #{closeTime},
             updated_at = #{updatedAt}
         WHERE id = #{id}

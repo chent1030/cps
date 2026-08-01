@@ -202,6 +202,15 @@ public class CpsIssueService {
             issue.setResponsibleEmpName(empName(issue.getResponsibleEmpNo()));
             issue.setCurrentHandlerEmpNo(issue.getResponsibleEmpNo());
             issue.setCurrentHandlerEmpName(issue.getResponsibleEmpName());
+            // 第二流程：反馈人员确认/修正问题分类（未传则保留创建时的分类）
+            if (request.getCategoryL1Id() != null && request.getCategoryL2Id() != null) {
+                issue.setCategoryL1Id(request.getCategoryL1Id());
+                issue.setCategoryL2Id(request.getCategoryL2Id());
+                issue.setCategoryModifiedFlag(
+                        !Objects.equals(issue.getAiCategoryL1Id(), request.getCategoryL1Id())
+                                || !Objects.equals(issue.getAiCategoryL2Id(), request.getCategoryL2Id())
+                );
+            }
         } else if (request.getAction() == CpsIssueAction.RECTIFY) {
             issue.setRectifyRemark(trimToNull(request.getRectifyRemark()));
             issue.setProofEmpNo(request.getProofEmpNo().trim());
