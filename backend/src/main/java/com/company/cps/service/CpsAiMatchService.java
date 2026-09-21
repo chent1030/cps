@@ -24,6 +24,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Base64;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -39,6 +40,7 @@ public class CpsAiMatchService {
     private final CpsIssueAiMatchMapper matchMapper;
     private final ImageEmbeddingClient embeddingClient;
     private final MilvusVectorService milvusVectorService;
+    private final RustFsStorageService storage;
 
     public CpsAiMatchService(
             CpsIssueAttachmentMapper attachmentMapper,
@@ -46,7 +48,8 @@ public class CpsAiMatchService {
             CpsKnowledgeCaseMapper caseMapper,
             CpsIssueAiMatchMapper matchMapper,
             ImageEmbeddingClient embeddingClient,
-            MilvusVectorService milvusVectorService
+            MilvusVectorService milvusVectorService,
+            RustFsStorageService storage
     ) {
         this.attachmentMapper = attachmentMapper;
         this.imageMapper = imageMapper;
@@ -54,7 +57,9 @@ public class CpsAiMatchService {
         this.matchMapper = matchMapper;
         this.embeddingClient = embeddingClient;
         this.milvusVectorService = milvusVectorService;
+        this.storage = storage;
     }
+
 
     public CpsKnowledgeMatchResponse matchKnowledge(CpsKnowledgeMatchRequest request) {
         if (request.getAttachmentId() == null) {
@@ -62,7 +67,17 @@ public class CpsAiMatchService {
         }
         CpsIssueAttachment attachment = attachmentMapper.findById(request.getAttachmentId())
                 .orElseThrow(() -> new IllegalArgumentException("Attachment not found: " + request.getAttachmentId()));
-        ImageEmbeddingResult embedding = embeddingClient.embedImage(attachment.getFileUrl());
+        byte[] content;
+        try {
+            content = storage.read(attachment.getFileUrl());
+        } catch (Exception error) {
+            throw new IllegalStateException("Attachment content is unavailable in RustFS", error);
+        }
+        if (content == null || content.length == 0) {
+            throw new IllegalStateException("Attachment content is unavailable for image analysis");
+        }
+        String dataUrl = "data:" + attachment.getFileType() + ";base64," + Base64.getEncoder().encodeToString(content);
+        ImageEmbeddingResult embedding = embeddingClient.embedImage(dataUrl);
         List<MilvusSearchHit> hits = milvusVectorService.searchSimilarImages(embedding.getVector(), TOP_K);
         List<ImageScore> scores = aggregateScores(hits);
         List<Long> imageIds = scores.stream().map(ImageScore::getImageId).collect(Collectors.toList());

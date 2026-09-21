@@ -19,6 +19,24 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 class NewApiImageEmbeddingClientTest {
 
     @Test
+    void embedImageCallsLocalSiglip2WithImageField() {
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        CpsAiProperties properties = properties(3);
+        properties.getEmbedding().setProvider("siglip2");
+        properties.getEmbedding().setEndpoint("/image-embeddings");
+        properties.getEmbedding().setApiKey("");
+        NewApiImageEmbeddingClient client = new NewApiImageEmbeddingClient(restTemplate, properties);
+
+        server.expect(requestTo("http://newapi.test/image-embeddings"))
+                .andExpect(jsonPath("$.image").value("data:image/jpeg;base64,AQID"))
+                .andRespond(withSuccess("{\"embedding\":[0.1,0.2,0.3]}", MediaType.APPLICATION_JSON));
+
+        assertEquals(Arrays.asList(0.1f, 0.2f, 0.3f), client.embedImage("data:image/jpeg;base64,AQID").getVector());
+        server.verify();
+    }
+
+    @Test
     void embedImageCallsNewApiAndParsesVector() {
         RestTemplate restTemplate = new RestTemplate();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();

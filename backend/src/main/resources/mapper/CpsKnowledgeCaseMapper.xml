@@ -16,6 +16,9 @@
         FROM cps_knowledge_case
         WHERE id = #{id}
     </select>
+    <select id="findByCategoryL2Id" resultType="com.company.cps.domain.CpsKnowledgeCase">
+        SELECT * FROM cps_knowledge_case WHERE category_l2_id = #{categoryL2Id} ORDER BY id ASC LIMIT 1
+    </select>
 
     <select id="findEnabledByIds" resultType="com.company.cps.domain.CpsKnowledgeCase">
         SELECT *
@@ -38,37 +41,67 @@
         ORDER BY id DESC
     </select>
 
+    <sql id="adminFilter">
+        <where>
+            <if test="enabled != null">
+                enabled = #{enabled}
+            </if>
+            <if test="category != null and category != ''">
+                AND (
+                    category_l1_name LIKE CONCAT('%', #{category}, '%')
+                    OR category_l2_name LIKE CONCAT('%', #{category}, '%')
+                )
+            </if>
+        </where>
+    </sql>
+
+    <select id="findAdminPage" resultType="com.company.cps.domain.CpsKnowledgeCase">
+        SELECT kc.*, image.file_url AS image_url, image.reason, image.measure, image.milvus_vector_id, image.vector_retry_count, image.vector_updated_at, image.vector_status, image.vector_error_msg
+        FROM cps_knowledge_case kc
+        LEFT JOIN cps_knowledge_case_image image ON image.id = (SELECT MIN(i2.id) FROM cps_knowledge_case_image i2 WHERE i2.case_id = kc.id)
+        <include refid="adminFilter"/>
+        ORDER BY updated_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="findAdminExport" resultType="com.company.cps.domain.CpsKnowledgeCase">
+        SELECT kc.*, image.file_url AS image_url, image.reason, image.measure, image.milvus_vector_id, image.vector_retry_count, image.vector_updated_at, image.vector_status, image.vector_error_msg
+        FROM cps_knowledge_case kc
+        LEFT JOIN cps_knowledge_case_image image ON image.id = (SELECT MIN(i2.id) FROM cps_knowledge_case_image i2 WHERE i2.case_id = kc.id)
+        <include refid="adminFilter"/>
+        ORDER BY updated_at DESC, id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countAdmin" resultType="long">
+        SELECT COUNT(1)
+        FROM cps_knowledge_case
+        <include refid="adminFilter"/>
+    </select>
+
     <insert id="upsert" parameterType="com.company.cps.domain.CpsKnowledgeCase" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_knowledge_case (
             id,
-            case_code,
-            case_title,
             category_l1_id,
             category_l2_id,
             category_l1_name,
             category_l2_name,
-            scope_remark,
             enabled,
             created_by
         ) VALUES (
             #{id},
-            #{caseCode},
-            #{caseTitle},
             #{categoryL1Id},
             #{categoryL2Id},
             #{categoryL1Name},
             #{categoryL2Name},
-            #{scopeRemark},
             #{enabled},
             #{createdBy}
         )
         ON DUPLICATE KEY UPDATE
-            case_title = VALUES(case_title),
             category_l1_id = VALUES(category_l1_id),
             category_l2_id = VALUES(category_l2_id),
             category_l1_name = VALUES(category_l1_name),
             category_l2_name = VALUES(category_l2_name),
-            scope_remark = VALUES(scope_remark),
             enabled = VALUES(enabled),
             updated_at = NOW()
     </insert>

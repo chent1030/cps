@@ -6,7 +6,7 @@
 
     <insert id="insert" parameterType="com.company.cps.domain.CpsIssue" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_issue (
-          issue_no, status, factory, area, line, process,
+          agent_inspection_id, status, factory, area, line, process,
           ai_category_l1_id, ai_category_l2_id, category_l1_id, category_l2_id,
           category_modified_flag, description, creator_emp_no, feedback_emp_no,
           responsible_emp_no, proof_emp_no, reviewer_emp_no, current_handler_emp_no,
@@ -15,7 +15,7 @@
           reason_analysis, corrective_measure, rectify_remark, review_opinion,
           submit_time, close_time, created_at, updated_at
         ) VALUES (
-          #{issueNo}, #{status}, #{factory}, #{area}, #{line}, #{process},
+          #{agentInspectionId}, #{status}, #{factory}, #{area}, #{line}, #{process},
           #{aiCategoryL1Id}, #{aiCategoryL2Id}, #{categoryL1Id}, #{categoryL2Id},
           #{categoryModifiedFlag}, #{description}, #{creatorEmpNo}, #{feedbackEmpNo},
           #{responsibleEmpNo}, #{proofEmpNo}, #{reviewerEmpNo}, #{currentHandlerEmpNo},
@@ -25,6 +25,10 @@
           #{submitTime}, #{closeTime}, #{createdAt}, #{updatedAt}
         )
     </insert>
+
+    <update id="updateAgentInspectionId">
+        UPDATE cps_issue SET agent_inspection_id = #{agentInspectionId} WHERE id = #{id}
+    </update>
 
     <select id="findById" resultType="com.company.cps.domain.CpsIssue">
         SELECT *
@@ -57,7 +61,6 @@
 
     <select id="listByTab" resultType="com.company.cps.dto.CpsIssueListItemResponse">
         SELECT id,
-               issue_no,
                status,
                factory,
                area,
@@ -106,6 +109,95 @@
               )))
         ORDER BY submit_time DESC
         LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <sql id="adminIssueFilter">
+        <where>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+            <if test="factory != null and factory != ''">
+                AND factory = #{factory}
+            </if>
+            <if test="area != null and area != ''">AND area = #{area}</if>
+            <if test="line != null and line != ''">AND line = #{line}</if>
+            <if test="process != null and process != ''">AND process = #{process}</if>
+            <if test="currentHandler != null and currentHandler != ''">AND (current_handler_emp_no LIKE CONCAT('%', #{currentHandler}, '%') OR current_handler_emp_name LIKE CONCAT('%', #{currentHandler}, '%'))</if>
+            <if test="createdFrom != null and createdFrom != ''">AND created_at &gt;= #{createdFrom}</if>
+            <if test="createdTo != null and createdTo != ''">AND created_at &lt;= #{createdTo}</if>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                    description LIKE CONCAT('%', #{keyword}, '%')
+                    OR current_handler_emp_no LIKE CONCAT('%', #{keyword}, '%')
+                    OR current_handler_emp_name LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+        </where>
+    </sql>
+
+    <sql id="adminIssueColumns">
+        i.id, i.status, i.factory, i.area, i.line, i.process,
+        i.ai_category_l1_id, i.ai_category_l2_id, i.category_l1_id, i.category_l2_id, i.description,
+        i.current_handler_emp_no, i.current_handler_emp_name, i.submit_time, i.updated_at,
+        i.creator_emp_no, i.creator_emp_name, i.feedback_emp_no, i.feedback_emp_name,
+        i.reason_analysis, i.corrective_measure, i.rectify_remark, i.review_opinion,
+        ai1.category_name AS ai_category_l1_name, ai2.category_name AS ai_category_l2_name,
+        c1.category_name AS category_l1_name, c2.category_name AS category_l2_name,
+        (SELECT GROUP_CONCAT(DISTINCT CONCAT(fl.operator_emp_no, '（', fl.operator_emp_name, '）') ORDER BY fl.created_at SEPARATOR '、') FROM cps_issue_flow_log fl WHERE fl.issue_id = i.id) AS all_flow_handlers,
+        (SELECT GROUP_CONCAT(a.id ORDER BY a.sort_no SEPARATOR ',') FROM cps_issue_attachment a WHERE a.issue_id = i.id AND a.stage = 'ISSUE') AS issue_image_ids,
+        (SELECT GROUP_CONCAT(a.id ORDER BY a.sort_no SEPARATOR ',') FROM cps_issue_attachment a WHERE a.issue_id = i.id AND a.stage = 'PROOF') AS proof_image_ids,
+        CASE
+          WHEN i.status &lt;&gt; 'CLOSED' AND i.submit_time &lt; DATE_SUB(NOW(), INTERVAL 3 DAY) THEN 1
+          ELSE 0
+        END AS overdue
+        FROM cps_issue i
+        LEFT JOIN cps_problem_category ai1 ON ai1.id = i.ai_category_l1_id
+        LEFT JOIN cps_problem_category ai2 ON ai2.id = i.ai_category_l2_id
+        LEFT JOIN cps_problem_category c1 ON c1.id = i.category_l1_id
+        LEFT JOIN cps_problem_category c2 ON c2.id = i.category_l2_id
+    </sql>
+
+    <select id="listForAdmin" resultType="com.company.cps.dto.CpsIssueListItemResponse">
+        SELECT <include refid="adminIssueColumns"/>
+        <include refid="adminIssueFilter"/>
+        ORDER BY submit_time DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="listForAdminExport" resultType="com.company.cps.dto.CpsIssueListItemResponse">
+        SELECT <include refid="adminIssueColumns"/>
+        <include refid="adminIssueFilter"/>
+        ORDER BY submit_time DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countForAdmin" resultType="long">
+        SELECT COUNT(1)
+        FROM cps_issue i
+        <include refid="adminIssueFilter"/>
+    </select>
+
+    <select id="countOpenIssues" resultType="long">
+        SELECT COUNT(1) FROM cps_issue WHERE status &lt;&gt; 'CLOSED'
+    </select>
+
+    <select id="countByStatus" resultType="long">
+        SELECT COUNT(1) FROM cps_issue WHERE status = #{status}
+    </select>
+
+    <select id="countOverdueIssues" resultType="long">
+        SELECT COUNT(1)
+        FROM cps_issue
+        WHERE status &lt;&gt; 'CLOSED'
+          AND submit_time &lt; DATE_SUB(NOW(), INTERVAL 3 DAY)
+    </select>
+
+    <select id="countClosedThisMonth" resultType="long">
+        SELECT COUNT(1)
+        FROM cps_issue
+        WHERE status = 'CLOSED'
+          AND close_time &gt;= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+          AND close_time &lt; DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
     </select>
 
 </mapper>

@@ -29,6 +29,8 @@ class KnowledgeVectorSyncServiceTest {
     private ImageEmbeddingClient embeddingClient;
     @Mock
     private MilvusVectorService milvusVectorService;
+    @Mock
+    private RustFsStorageService storage;
 
     private KnowledgeVectorSyncService service;
 
@@ -39,7 +41,8 @@ class KnowledgeVectorSyncServiceTest {
                 caseMapper,
                 embeddingClient,
                 milvusVectorService,
-                properties()
+                properties(),
+                storage
         );
     }
 
@@ -73,6 +76,25 @@ class KnowledgeVectorSyncServiceTest {
 
         verify(imageMapper).markVectorProcessing(502L);
         verify(imageMapper).markVectorFailed(502L, "model unavailable");
+    }
+
+    @Test
+    void syncReadsUploadedMaterialAndEmbedsItAsDataUrl() throws Exception {
+        String materialUrl = "http://storage.test/cps-attachments/cps/knowledge/sample.png";
+        CpsKnowledgeCaseImage image = image(503L, 14L, materialUrl);
+        image.setFileName("sample.png");
+        List<Float> vector = Arrays.asList(0.1f, 0.2f, 0.3f);
+        when(imageMapper.findById(503L)).thenReturn(java.util.Optional.of(image));
+        when(caseMapper.findById(14L)).thenReturn(java.util.Optional.of(caseData(14L)));
+        when(storage.isPublicObjectUrl(materialUrl)).thenReturn(true);
+        when(storage.readPublicObjectUrl(materialUrl)).thenReturn(new byte[]{1, 2, 3});
+        when(embeddingClient.embedImage("data:image/png;base64,AQID"))
+                .thenReturn(new ImageEmbeddingResult(vector, "siglip2", "v1", 3, "{}", "{}"));
+
+        service.syncOneImage(503L);
+
+        verify(embeddingClient).embedImage("data:image/png;base64,AQID");
+        verify(imageMapper).markVectorSuccess(503L, "503", 3);
     }
 
     private static CpsKnowledgeCaseImage image(Long id, Long caseId, String fileUrl) {

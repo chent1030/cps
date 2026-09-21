@@ -26,7 +26,39 @@ public interface CpsAreaPersonConfigMapper {
             @Param("enabled") Boolean enabled
     );
 
+    List<CpsAreaPersonConfig> findAdminPage(
+            @Param("factory") String factory,
+            @Param("area") String area,
+            @Param("line") String line,
+            @Param("process") String process,
+            @Param("enabled") Boolean enabled,
+            @Param("keyword") String keyword,
+            @Param("limit") int limit,
+            @Param("offset") int offset
+    );
+
+    List<CpsAreaPersonConfig> findAdminExport(
+            @Param("factory") String factory,
+            @Param("area") String area,
+            @Param("line") String line,
+            @Param("process") String process,
+            @Param("enabled") Boolean enabled,
+            @Param("keyword") String keyword,
+            @Param("limit") int limit
+    );
+
+    long countAdmin(
+            @Param("factory") String factory,
+            @Param("area") String area,
+            @Param("line") String line,
+            @Param("process") String process,
+            @Param("enabled") Boolean enabled,
+            @Param("keyword") String keyword
+    );
+
     Optional<CpsAreaPersonConfig> findById(@Param("id") Long id);
+
+    Optional<CpsAreaPersonConfig> findOperator(@Param("empNo") String empNo, @Param("empName") String empName);
 
     int upsert(CpsAreaPersonConfig config);
 

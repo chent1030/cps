@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 
 public class CpsIssue {
     private Long id;
-    private String issueNo;
+    private String agentInspectionId;
     private CpsIssueStatus status;
     private String factory;
     private String area;
@@ -39,8 +39,8 @@ public class CpsIssue {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
-    public String getIssueNo() { return issueNo; }
-    public void setIssueNo(String issueNo) { this.issueNo = issueNo; }
+    public String getAgentInspectionId() { return agentInspectionId; }
+    public void setAgentInspectionId(String agentInspectionId) { this.agentInspectionId = agentInspectionId; }
     public CpsIssueStatus getStatus() { return status; }
     public void setStatus(CpsIssueStatus status) { this.status = status; }
     public String getFactory() { return factory; }

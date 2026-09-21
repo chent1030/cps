@@ -4,17 +4,22 @@ import java.time.LocalDateTime;
 
 public class CpsKnowledgeCase {
     private Long id;
-    private String caseCode;
-    private String caseTitle;
     private Long categoryL1Id;
     private Long categoryL2Id;
     private String categoryL1Name;
     private String categoryL2Name;
-    private String scopeRemark;
     private Boolean enabled;
     private String createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String imageUrl;
+    private String reason;
+    private String measure;
+    private String milvusVectorId;
+    private Integer vectorRetryCount;
+    private LocalDateTime vectorUpdatedAt;
+    private String vectorStatus;
+    private String vectorErrorMsg;
 
     public Long getId() {
         return id;
@@ -24,21 +29,6 @@ public class CpsKnowledgeCase {
         this.id = id;
     }
 
-    public String getCaseCode() {
-        return caseCode;
-    }
-
-    public void setCaseCode(String caseCode) {
-        this.caseCode = caseCode;
-    }
-
-    public String getCaseTitle() {
-        return caseTitle;
-    }
-
-    public void setCaseTitle(String caseTitle) {
-        this.caseTitle = caseTitle;
-    }
 
     public Long getCategoryL1Id() {
         return categoryL1Id;
@@ -72,13 +62,6 @@ public class CpsKnowledgeCase {
         this.categoryL2Name = categoryL2Name;
     }
 
-    public String getScopeRemark() {
-        return scopeRemark;
-    }
-
-    public void setScopeRemark(String scopeRemark) {
-        this.scopeRemark = scopeRemark;
-    }
 
     public Boolean getEnabled() {
         return enabled;
@@ -111,4 +94,20 @@ public class CpsKnowledgeCase {
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
     }
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String v) { imageUrl = v; }
+    public String getReason() { return reason; }
+    public void setReason(String v) { reason = v; }
+    public String getMeasure() { return measure; }
+    public void setMeasure(String v) { measure = v; }
+    public String getMilvusVectorId() { return milvusVectorId; }
+    public void setMilvusVectorId(String v) { milvusVectorId = v; }
+    public Integer getVectorRetryCount() { return vectorRetryCount; }
+    public void setVectorRetryCount(Integer v) { vectorRetryCount = v; }
+    public LocalDateTime getVectorUpdatedAt() { return vectorUpdatedAt; }
+    public void setVectorUpdatedAt(LocalDateTime v) { vectorUpdatedAt = v; }
+    public String getVectorStatus() { return vectorStatus; }
+    public void setVectorStatus(String v) { vectorStatus = v; }
+    public String getVectorErrorMsg() { return vectorErrorMsg; }
+    public void setVectorErrorMsg(String v) { vectorErrorMsg = v; }
 }

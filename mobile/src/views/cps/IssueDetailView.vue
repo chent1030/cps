@@ -4,7 +4,7 @@
       <div class="cps-detail-hero__top">
         <div class="cps-detail-hero__identity">
           <p class="cps-detail-hero__eyebrow">巡检问题档案</p>
-          <h1>{{ detail.issueNo }}</h1>
+          <h1>巡检问题</h1>
         </div>
         <div class="cps-detail-hero__badges">
           <span class="cps-status-pill" :class="detailStatus.tone">{{ detailStatus.label }}</span>
@@ -247,7 +247,7 @@
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 
-import { getCpsAttachmentBase64, uploadCpsAttachment, type CpsAttachmentUploadSource } from '@/api/cps/attachment'
+import { uploadCpsAttachment, type CpsAttachmentUploadSource } from '@/api/cps/attachment'
 import { executeCpsIssueAction, getCpsIssueDetail } from '@/api/cps/issue'
 import { searchCpsEmployees, type CpsEmployeeOption } from '@/api/cps/master'
 import type {
@@ -506,25 +506,8 @@ const previewAttachments = (attachments: CpsAttachment[], startPosition: number)
   })
 }
 
-const toImageDataUrl = (value: string) => {
-  const data = value.trim()
-  if (data.startsWith('data:')) return data
-  if (data.includes(';base64,')) return `data:${data}`
-  return `data:image/jpeg;base64,${data.replace(/\s/g, '')}`
-}
-
-const loadAttachmentImageSources = async (attachments: CpsAttachment[]) => {
-  const resolved = await Promise.all(
-    attachments.map(async (attachment) => {
-      try {
-        const base64 = await getCpsAttachmentBase64(attachment.fileUrl)
-        return [attachment.id, toImageDataUrl(base64)] as const
-      } catch {
-        return null
-      }
-    }),
-  )
-  const sources = Object.fromEntries(resolved.filter((source): source is readonly [number, string] => source !== null))
+const loadAttachmentImageSources = (attachments: CpsAttachment[]) => {
+  const sources = Object.fromEntries(attachments.map((attachment) => [attachment.id, attachment.fileUrl]))
   attachmentImageSources.value = { ...attachmentImageSources.value, ...sources }
 }
 

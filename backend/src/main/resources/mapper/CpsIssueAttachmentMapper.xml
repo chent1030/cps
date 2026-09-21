@@ -13,7 +13,8 @@
             file_type,
             sort_no,
             created_by,
-            created_name
+            created_name,
+            content
         ) VALUES (
             #{issueId},
             #{stage},
@@ -22,7 +23,8 @@
             #{fileType},
             #{sortNo},
             #{createdBy},
-            #{createdName}
+            #{createdName},
+            #{content}
         )
     </insert>
 

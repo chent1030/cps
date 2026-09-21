@@ -7,6 +7,16 @@ const uni = typeof uniPlugin === 'function' ? uniPlugin : (uniPlugin as unknown 
 
 export default defineConfig({
   plugins: [uni()],
+  server: {
+    host: '127.0.0.1',
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

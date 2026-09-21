@@ -43,7 +43,7 @@
         <header class="cps-issue-card__head">
           <div class="cps-issue-card__identity">
             <span class="cps-issue-card__eyebrow">巡检单</span>
-            <strong class="cps-issue-card__no">{{ item.issueNo }}</strong>
+            <strong class="cps-issue-card__no">巡检问题</strong>
           </div>
           <div class="cps-issue-card__badges">
             <span class="cps-status-pill" :class="issueStatus(item).tone">{{ issueStatus(item).label }}</span>

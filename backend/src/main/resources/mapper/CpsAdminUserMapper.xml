@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsAdminUserMapper">
+    <select id="findEnabledByCredentials" resultType="com.company.cps.domain.CpsAdminUser">
+        SELECT id, emp_no, emp_name, enabled, created_at, updated_at
+        FROM cps_admin_user
+        WHERE enabled = 1 AND emp_no = #{empNo} AND emp_name = #{empName}
+        LIMIT 1
+    </select>
+</mapper>

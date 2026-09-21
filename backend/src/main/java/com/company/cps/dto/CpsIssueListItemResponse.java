@@ -6,7 +6,6 @@ import java.time.LocalDateTime;
 
 public class CpsIssueListItemResponse {
     private Long id;
-    private String issueNo;
     private CpsIssueStatus status;
     private String factory;
     private String area;
@@ -19,11 +18,25 @@ public class CpsIssueListItemResponse {
     private String currentHandlerEmpName;
     private LocalDateTime submitTime;
     private Boolean overdue;
+    private String aiCategoryL1Name;
+    private String aiCategoryL2Name;
+    private String categoryL1Name;
+    private String categoryL2Name;
+    private String creatorEmpNo;
+    private String creatorEmpName;
+    private String feedbackEmpNo;
+    private String feedbackEmpName;
+    private String allFlowHandlers;
+    private String issueImageIds;
+    private String proofImageIds;
+    private String reasonAnalysis;
+    private String correctiveMeasure;
+    private String rectifyRemark;
+    private String reviewOpinion;
+    private LocalDateTime updatedAt;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
-    public String getIssueNo() { return issueNo; }
-    public void setIssueNo(String issueNo) { this.issueNo = issueNo; }
     public CpsIssueStatus getStatus() { return status; }
     public void setStatus(CpsIssueStatus status) { this.status = status; }
     public String getFactory() { return factory; }
@@ -48,4 +61,36 @@ public class CpsIssueListItemResponse {
     public void setSubmitTime(LocalDateTime submitTime) { this.submitTime = submitTime; }
     public Boolean getOverdue() { return overdue; }
     public void setOverdue(Boolean overdue) { this.overdue = overdue; }
+    public String getAiCategoryL1Name() { return aiCategoryL1Name; }
+    public void setAiCategoryL1Name(String v) { this.aiCategoryL1Name = v; }
+    public String getAiCategoryL2Name() { return aiCategoryL2Name; }
+    public void setAiCategoryL2Name(String v) { this.aiCategoryL2Name = v; }
+    public String getCategoryL1Name() { return categoryL1Name; }
+    public void setCategoryL1Name(String v) { this.categoryL1Name = v; }
+    public String getCategoryL2Name() { return categoryL2Name; }
+    public void setCategoryL2Name(String v) { this.categoryL2Name = v; }
+    public String getCreatorEmpNo() { return creatorEmpNo; }
+    public void setCreatorEmpNo(String v) { this.creatorEmpNo = v; }
+    public String getCreatorEmpName() { return creatorEmpName; }
+    public void setCreatorEmpName(String v) { this.creatorEmpName = v; }
+    public String getFeedbackEmpNo() { return feedbackEmpNo; }
+    public void setFeedbackEmpNo(String v) { this.feedbackEmpNo = v; }
+    public String getFeedbackEmpName() { return feedbackEmpName; }
+    public void setFeedbackEmpName(String v) { this.feedbackEmpName = v; }
+    public String getAllFlowHandlers() { return allFlowHandlers; }
+    public void setAllFlowHandlers(String v) { this.allFlowHandlers = v; }
+    public String getIssueImageIds() { return issueImageIds; }
+    public void setIssueImageIds(String v) { this.issueImageIds = v; }
+    public String getProofImageIds() { return proofImageIds; }
+    public void setProofImageIds(String v) { this.proofImageIds = v; }
+    public String getReasonAnalysis() { return reasonAnalysis; }
+    public void setReasonAnalysis(String v) { this.reasonAnalysis = v; }
+    public String getCorrectiveMeasure() { return correctiveMeasure; }
+    public void setCorrectiveMeasure(String v) { this.correctiveMeasure = v; }
+    public String getRectifyRemark() { return rectifyRemark; }
+    public void setRectifyRemark(String v) { this.rectifyRemark = v; }
+    public String getReviewOpinion() { return reviewOpinion; }
+    public void setReviewOpinion(String v) { this.reviewOpinion = v; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime v) { this.updatedAt = v; }
 }

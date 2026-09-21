@@ -28,7 +28,6 @@ vi.mock('vant', async (importOriginal) => {
 
 const detail: CpsIssueDetail = {
   id: 1,
-  issueNo: 'CPS20260627001',
   status: 'PENDING_REVIEW',
   factoryName: '一厂',
   areaName: '注塑区',

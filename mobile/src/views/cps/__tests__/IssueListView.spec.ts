@@ -24,7 +24,6 @@ describe('IssueListView', () => {
     mocks.listCpsIssues.mockResolvedValue([
       {
         id: 1,
-        issueNo: 'CPS20260627001',
         status: 'PENDING_FEEDBACK',
         factoryName: '一厂',
         areaName: '注塑区',
@@ -39,7 +38,6 @@ describe('IssueListView', () => {
       },
       {
         id: 2,
-        issueNo: 'CPS20260626018',
         status: 'PENDING_UPLOAD_PROOF',
         factoryName: '二厂',
         areaName: '包装区',
@@ -70,7 +68,6 @@ describe('IssueListView', () => {
     mocks.listCpsIssues.mockResolvedValue([
       {
         id: 8,
-        issueNo: 'CPS20260701001',
         status: 'PENDING_FEEDBACK',
         factory: '一厂',
         area: '注塑区',

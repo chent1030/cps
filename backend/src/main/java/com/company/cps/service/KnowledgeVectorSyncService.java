@@ -7,6 +7,7 @@ import com.company.cps.mapper.CpsKnowledgeCaseImageMapper;
 import com.company.cps.mapper.CpsKnowledgeCaseMapper;
 import org.springframework.stereotype.Service;
 
+import java.util.Base64;
 import java.util.List;
 
 @Service
@@ -19,19 +20,22 @@ public class KnowledgeVectorSyncService {
     private final ImageEmbeddingClient embeddingClient;
     private final MilvusVectorService milvusVectorService;
     private final CpsAiProperties aiProperties;
+    private final RustFsStorageService storage;
 
     public KnowledgeVectorSyncService(
             CpsKnowledgeCaseImageMapper imageMapper,
             CpsKnowledgeCaseMapper caseMapper,
             ImageEmbeddingClient embeddingClient,
             MilvusVectorService milvusVectorService,
-            CpsAiProperties aiProperties
+            CpsAiProperties aiProperties,
+            RustFsStorageService storage
     ) {
         this.imageMapper = imageMapper;
         this.caseMapper = caseMapper;
         this.embeddingClient = embeddingClient;
         this.milvusVectorService = milvusVectorService;
         this.aiProperties = aiProperties;
+        this.storage = storage;
     }
 
     public void bootstrap() {
@@ -63,7 +67,7 @@ public class KnowledgeVectorSyncService {
         try {
             CpsKnowledgeCase knowledgeCase = caseMapper.findById(image.getCaseId())
                     .orElseThrow(() -> new IllegalArgumentException("Knowledge case not found: " + image.getCaseId()));
-            ImageEmbeddingResult embedding = embeddingClient.embedImage(image.getFileUrl());
+            ImageEmbeddingResult embedding = embeddingClient.embedImage(imageInput(image));
             milvusVectorService.upsertKnowledgeImage(
                     image.getId(),
                     image.getCaseId(),
@@ -87,6 +91,33 @@ public class KnowledgeVectorSyncService {
             return "unknown vector sync error";
         }
         return message.length() <= 1000 ? message : message.substring(0, 1000);
+    }
+
+    /**
+     * 新上传的知识库素材存储在 RustFS。读取其二进制并转为 Data URL，避免向量服务
+     * 因无法访问对象存储内网地址而把 URL 当作无效图片。
+     */
+    private String imageInput(CpsKnowledgeCaseImage image) {
+        if (!storage.isPublicObjectUrl(image.getFileUrl())) {
+            return image.getFileUrl();
+        }
+        try {
+            byte[] content = storage.readPublicObjectUrl(image.getFileUrl());
+            if (content == null || content.length == 0) {
+                throw new IllegalStateException("knowledge material content is empty");
+            }
+            return "data:" + mediaType(image.getFileName()) + ";base64,"
+                    + Base64.getEncoder().encodeToString(content);
+        } catch (Exception exception) {
+            throw new IllegalStateException("knowledge material content is unavailable in RustFS", exception);
+        }
+    }
+
+    private static String mediaType(String fileName) {
+        String value = fileName == null ? "" : fileName.toLowerCase();
+        if (value.endsWith(".png")) return "image/png";
+        if (value.endsWith(".webp")) return "image/webp";
+        return "image/jpeg";
     }
 
     private static boolean isBlank(String value) {

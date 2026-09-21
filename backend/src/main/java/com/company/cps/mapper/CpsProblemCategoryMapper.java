@@ -15,6 +15,30 @@ public interface CpsProblemCategoryMapper {
 
     List<CpsProblemCategory> findAll(@Param("parentId") Long parentId, @Param("enabled") Boolean enabled);
 
+    List<CpsProblemCategory> findAdminPage(
+            @Param("parentId") Long parentId,
+            @Param("allLevels") Boolean allLevels,
+            @Param("enabled") Boolean enabled,
+            @Param("keyword") String keyword,
+            @Param("limit") int limit,
+            @Param("offset") int offset
+    );
+
+    List<CpsProblemCategory> findAdminExport(
+            @Param("parentId") Long parentId,
+            @Param("allLevels") Boolean allLevels,
+            @Param("enabled") Boolean enabled,
+            @Param("keyword") String keyword,
+            @Param("limit") int limit
+    );
+
+    long countAdmin(
+            @Param("parentId") Long parentId,
+            @Param("allLevels") Boolean allLevels,
+            @Param("enabled") Boolean enabled,
+            @Param("keyword") String keyword
+    );
+
     List<CpsOptionResponse> findEnabledOptionsByParentId(@Param("parentId") Long parentId);
 
     Optional<CpsProblemCategory> findById(@Param("id") Long id);

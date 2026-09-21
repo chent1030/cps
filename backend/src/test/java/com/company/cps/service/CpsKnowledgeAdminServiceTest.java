@@ -27,12 +27,14 @@ class CpsKnowledgeAdminServiceTest {
     private CpsKnowledgeCaseImageMapper imageMapper;
     @Mock
     private KnowledgeVectorSyncService vectorSyncService;
+    @Mock
+    private RustFsStorageService storage;
 
     private CpsKnowledgeAdminService service;
 
     @BeforeEach
     void setUp() {
-        service = new CpsKnowledgeAdminService(caseMapper, imageMapper, vectorSyncService);
+        service = new CpsKnowledgeAdminService(caseMapper, imageMapper, vectorSyncService, storage);
     }
 
     @Test

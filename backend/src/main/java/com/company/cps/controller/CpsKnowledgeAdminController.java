@@ -5,18 +5,26 @@ import com.company.cps.domain.CpsKnowledgeCaseImage;
 import com.company.cps.dto.CpsKnowledgeCaseImageRequest;
 import com.company.cps.dto.CpsKnowledgeCaseRequest;
 import com.company.cps.dto.CpsKnowledgeVectorSyncResponse;
+import com.company.cps.dto.CpsKnowledgeMaterialRequest;
+import com.company.cps.dto.CpsAdminPageResponse;
 import com.company.cps.service.CpsKnowledgeAdminService;
+import com.company.cps.support.CpsExcelWriter;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.io.IOException;
+import javax.servlet.http.HttpServletResponse;
 
 @RestController
 @RequestMapping("/api/cps/admin/knowledge")
@@ -36,15 +44,40 @@ public class CpsKnowledgeAdminController {
         return knowledgeAdminService.listCases(enabled);
     }
 
-    /**
-     * 新增或更新知识库案例主信息；分类、标题和适用区域保存在案例主表。
-     */
+    @GetMapping("/cases/page")
+    public CpsAdminPageResponse<CpsKnowledgeCase> pageCases(
+            @RequestParam(required = false) Boolean enabled,
+            @RequestParam(required = false) String category,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int pageSize
+    ) {
+        return knowledgeAdminService.pageCases(enabled, category, page, pageSize);
+    }
+
+    @GetMapping("/cases/export")
+    public void exportCases(
+            @RequestParam(required = false) Boolean enabled,
+            @RequestParam(required = false) String category,
+            HttpServletResponse response
+    ) throws IOException {
+        List<CpsKnowledgeCase> records = knowledgeAdminService.exportCases(enabled, category);
+        List<String[]> rows = new ArrayList<>();
+        for (CpsKnowledgeCase item : records) {
+            rows.add(new String[] {
+                    item.getCategoryL1Name(), item.getCategoryL2Name(),
+                    Boolean.TRUE.equals(item.getEnabled()) ? "启用" : "停用"
+            });
+        }
+        CpsExcelWriter.write(response, "cps-knowledge-cases.xlsx", "案例知识库",
+                new String[] {"一级分类", "二级分类", "状态"}, rows);
+    }
+
+    /** 新增或更新知识库案例分类归集信息。 */
     @PostMapping("/cases")
     public CpsKnowledgeCase saveCase(
-            @RequestBody CpsKnowledgeCaseRequest request,
-            @RequestHeader(value = "X-Emp-No", required = false) String empNo
+            @RequestBody CpsKnowledgeCaseRequest request
     ) {
-        return knowledgeAdminService.saveCase(request, resolveCurrentEmpNo(empNo));
+        return knowledgeAdminService.saveCase(request, resolveCurrentEmpNo(request.getEmpNo()));
     }
 
     /**
@@ -70,6 +103,20 @@ public class CpsKnowledgeAdminController {
     public CpsKnowledgeCaseImage saveImage(@RequestBody CpsKnowledgeCaseImageRequest request) {
         return knowledgeAdminService.saveImage(request);
     }
+
+    @PostMapping("/materials")
+    public CpsKnowledgeCaseImage saveMaterial(@RequestBody CpsKnowledgeMaterialRequest request) { return knowledgeAdminService.saveMaterial(request, resolveCurrentEmpNo(request.getEmpNo())); }
+
+    @PostMapping(value = "/materials/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public CpsKnowledgeCaseImage uploadMaterial(
+            @RequestParam("file") MultipartFile file,
+            @ModelAttribute CpsKnowledgeMaterialRequest request
+    ) {
+        return knowledgeAdminService.uploadMaterial(file, request, resolveCurrentEmpNo(request.getEmpNo()));
+    }
+
+    @PostMapping("/cases/{caseId}/sync-vectors")
+    public CpsKnowledgeVectorSyncResponse syncCaseVectors(@PathVariable Long caseId) { return knowledgeAdminService.syncCaseVectors(caseId); }
 
     /**
      * 立即同步单张素材图片到向量库，用于素材保存后手动刷新或失败重试。

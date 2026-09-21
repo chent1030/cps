@@ -1,0 +1,92 @@
+:root {
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  color-scheme: light;
+  --color-primary-1: #edf5f1;
+  --color-primary-2: #d5e8df;
+  --color-primary-3: #b5d4c7;
+  --color-primary-4: #86b69f;
+  --color-primary-5: #528a74;
+  --color-primary-6: #276a58;
+  --color-primary-7: #1f594a;
+  --color-primary-8: #17463a;
+  --color-primary-9: #10362d;
+  --color-primary-10: #09251e;
+  --border-radius-small: 4px;
+  --border-radius-medium: 8px;
+  --border-radius-large: 12px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; background: #f5f7f7; color: #223033; }
+button, input, select, textarea { font: inherit; }
+
+.app-layout { min-height: 100dvh; background: #f5f7f7; }
+.login-page { min-height: 100dvh; display: grid; place-items: center; padding: 24px; background: #f1f5f3; }
+.login-card { width: min(420px, 100%); border-color: #dce8e3 !important; box-shadow: 0 18px 50px rgba(35, 65, 55, .09); }
+.login-card .arco-card-body { padding: 36px; }
+.login-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 38px; }
+.login-brand .arco-typography { margin: 0; }
+.app-sider { position: fixed !important; inset: 0 auto 0 0; z-index: 100; height: 100dvh; background: #fbfcfc !important; border-right: 1px solid #e3e9e8; box-shadow: none; }
+.app-sider .arco-layout-sider-children { display: flex; flex-direction: column; height: 100%; padding: 22px 12px; }
+.app-main-layout { min-width: 0; margin-left: 256px; }
+.app-menu { flex: 0 0 auto; margin-top: 30px; background: transparent !important; }
+.app-menu.arco-menu-light .arco-menu-item { color: #667477; border-radius: 8px; margin: 4px 0; font-weight: 500; transition: background-color 180ms ease, color 180ms ease; }
+.app-menu.arco-menu-light .arco-menu-item:hover { color: #264c46; background: #f0f5f4; }
+.app-menu.arco-menu-light .arco-menu-selected, .app-menu.arco-menu-light .arco-menu-selected:hover { color: #173d37; background: #e1efeb; font-weight: 600; }
+.app-menu.arco-menu-light .arco-menu-selected::before { display: none; }
+.app-header { height: 68px; padding: 0 32px !important; background: rgba(251,252,252,.8) !important; border-bottom: 1px solid #e3e9e8; backdrop-filter: blur(16px); }
+.app-content { padding: 30px 34px 44px !important; max-width: 1660px; width: 100%; margin: 0 auto; }
+.brand-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 9px; background: #183d37; color: #f6fbf9; font-weight: 700; letter-spacing: -.04em; box-shadow: none; }
+.brand-mark.compact { background: #276a58; color: #fff; }
+.brand-name { color: #1f2f31 !important; font-weight: 700; font-size: 16px; }
+.sider-footer { flex: 0 0 auto; margin-top: auto; padding: 16px 8px 0; border-top: 1px solid #e6eceb; }
+.sider-settings { width: 100%; justify-content: flex-start; color: #667477 !important; }
+.sider-settings:hover { color: #264c46 !important; background: #f0f5f4 !important; }
+.sider-account { margin-top: 16px; }
+.sider-avatar, .header-avatar { background: #e1efeb !important; color: #1f6155 !important; font-weight: 700; }
+.sider-user { color: #263638; }
+.sider-subtitle { color: #899799; font-size: 12px; margin-top: 3px; }
+.page-head { margin-bottom: 22px; }
+.page-head .arco-typography { margin: 0; }
+.page-description { margin-top: 7px !important; color: #718078 !important; }
+.filter-card, .table-card { border-color: #e1e8e6 !important; box-shadow: 0 8px 30px rgba(34, 51, 53, .028); }
+.filter-card .arco-card-body { padding: 18px; }
+.issue-filter-form {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+.issue-filter-form > * { min-width: 0; width: 100%; margin-right: 0 !important; }
+.issue-filter-form .arco-input-wrapper,
+.issue-filter-form .arco-select,
+.issue-filter-form .arco-picker { width: 100%; }
+.issue-filter-form .arco-btn { justify-self: start; width: auto; }
+.table-card .arco-card-body { padding: 0; }
+.table-toolbar { padding: 17px 20px 14px; }
+.table-toolbar .arco-typography { margin: 0; }
+.table-card .arco-table-th { background: #f5f8f7; color: #728083; font-size: 12px; font-weight: 600; }
+.table-card .arco-table-td { color: #4f6057; }
+.table-card .arco-table-tr:hover .arco-table-td { background: #f8fbf9; }
+.pagination-wrap { display: flex; justify-content: flex-end; padding: 15px 20px; border-top: 1px solid #e2e8e3; }
+.arco-btn { font-weight: 500; }
+.arco-btn-primary { box-shadow: 0 1px 2px rgba(23, 63, 53, .14); }
+.arco-tag { border-radius: 4px; font-weight: 500; }
+.metric-card { height: 100%; border-color: #e1e8e6 !important; box-shadow: none; }
+.metric-card .arco-card-body { padding: 20px; }
+.metric-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 9px; background: #e4efea; color: #276a58; margin-bottom: 16px; }
+.metric-card.risk .metric-icon { background: #f3e6df; color: #a75f4e; }
+.metric-card.pending .metric-icon { background: #f0ebdc; color: #8a7041; }
+.metric-card.info .metric-icon { background: #e2eceb; color: #4e7578; }
+.metric-card .arco-statistic-value { color: #273a31; font-variant-numeric: tabular-nums; }
+.agent-runtime-card, .settings-card { height: 100%; border-color: #d7e2df !important; box-shadow: 0 8px 24px rgba(35, 65, 65, .045); }
+.agent-runtime-card .arco-card-header, .settings-card .arco-card-header { border-bottom-color: #e3eae8; }
+.agent-runtime-card .arco-card-head-title, .settings-card .arco-card-head-title { color: #234a43; }
+.arco-modal-header { border-bottom: 1px solid #e5eae6; }
+.arco-modal-footer { border-top: 1px solid #e5eae6; }
+@media (max-width: 992px) { .app-sider { display: none; } .app-main-layout { margin-left: 0; } .app-header { padding: 0 20px !important; } .app-content { padding: 22px 20px 32px !important; } }
+@media (max-width: 1180px) { .issue-filter-form { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .issue-filter-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .issue-filter-form { grid-template-columns: minmax(0, 1fr); } .issue-filter-form .arco-btn { width: 100%; } }

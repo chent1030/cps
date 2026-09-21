@@ -73,9 +73,7 @@ class CpsKnowledgeMapperContractTest {
         assertEquals(int.class, enabled.getReturnType());
         assertTrue(sql.contains("FROM cps_knowledge_case"));
         assertTrue(sql.contains("ON DUPLICATE KEY UPDATE"));
-        assertTrue(sql.contains("scope_remark"));
-        assertTrue(!sql.contains("reason"));
-        assertTrue(!sql.contains("measure"));
+        assertTrue(!sql.contains("scope_remark"));
     }
 
     @Test

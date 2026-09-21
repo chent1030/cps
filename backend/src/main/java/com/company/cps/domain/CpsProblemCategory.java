@@ -7,7 +7,6 @@ public class CpsProblemCategory {
     private Long parentId;
     private Integer categoryLevel;
     private String categoryName;
-    private String categoryCode;
     private Integer sortNo;
     private Boolean enabled;
     private String createdBy;
@@ -23,8 +22,6 @@ public class CpsProblemCategory {
     public void setCategoryLevel(Integer categoryLevel) { this.categoryLevel = categoryLevel; }
     public String getCategoryName() { return categoryName; }
     public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
-    public String getCategoryCode() { return categoryCode; }
-    public void setCategoryCode(String categoryCode) { this.categoryCode = categoryCode; }
     public Integer getSortNo() { return sortNo; }
     public void setSortNo(Integer sortNo) { this.sortNo = sortNo; }
     public Boolean getEnabled() { return enabled; }

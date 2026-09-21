@@ -1,0 +1,5 @@
+package com.company.cps.dto;
+public class CpsKnowledgeMaterialRequest {
+ private Long caseId, categoryL1Id, categoryL2Id; private String categoryL1Name, categoryL2Name, fileUrl, fileName, reason, measure, empNo;
+ public Long getCaseId(){return caseId;} public void setCaseId(Long v){caseId=v;} public Long getCategoryL1Id(){return categoryL1Id;} public void setCategoryL1Id(Long v){categoryL1Id=v;} public Long getCategoryL2Id(){return categoryL2Id;} public void setCategoryL2Id(Long v){categoryL2Id=v;} public String getCategoryL1Name(){return categoryL1Name;} public void setCategoryL1Name(String v){categoryL1Name=v;} public String getCategoryL2Name(){return categoryL2Name;} public void setCategoryL2Name(String v){categoryL2Name=v;} public String getFileUrl(){return fileUrl;} public void setFileUrl(String v){fileUrl=v;} public String getFileName(){return fileName;} public void setFileName(String v){fileName=v;} public String getReason(){return reason;} public void setReason(String v){reason=v;} public String getMeasure(){return measure;} public void setMeasure(String v){measure=v;} public String getEmpNo(){return empNo;} public void setEmpNo(String v){empNo=v;}
+}

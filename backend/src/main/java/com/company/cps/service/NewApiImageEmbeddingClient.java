@@ -38,14 +38,20 @@ public class NewApiImageEmbeddingClient implements ImageEmbeddingClient {
     @Override
     public ImageEmbeddingResult embedImage(String imageUrl) {
         CpsAiProperties.Embedding embedding = properties.getEmbedding();
-        Map<String, Object> imageInput = new LinkedHashMap<>();
-        imageInput.put("image_url", imageUrl);
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("model", embedding.getModel());
-        request.put("input", Collections.singletonList(imageInput));
+        if ("siglip2".equalsIgnoreCase(embedding.getProvider())) {
+            request.put("image", imageUrl);
+        } else {
+            Map<String, Object> imageInput = new LinkedHashMap<>();
+            imageInput.put("image_url", imageUrl);
+            request.put("input", Collections.singletonList(imageInput));
+        }
         String rawRequest = json(request);
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(embedding.getApiKey() == null ? "" : embedding.getApiKey());
+        if (!isBlank(embedding.getApiKey())) {
+            headers.setBearerAuth(embedding.getApiKey());
+        }
         headers.setContentType(MediaType.APPLICATION_JSON);
         String rawResponse = restTemplate.postForObject(
                 baseUrl(embedding) + endpoint(embedding),
@@ -70,6 +76,9 @@ public class NewApiImageEmbeddingClient implements ImageEmbeddingClient {
         try {
             JsonNode root = OBJECT_MAPPER.readTree(rawResponse);
             JsonNode embeddingNode = root.path("data").path(0).path("embedding");
+            if (!embeddingNode.isArray()) {
+                embeddingNode = root.path("embedding");
+            }
             if (!embeddingNode.isArray()) {
                 throw new IllegalStateException("NewAPI response does not contain data[0].embedding");
             }

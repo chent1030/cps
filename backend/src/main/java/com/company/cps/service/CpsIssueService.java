@@ -19,9 +19,9 @@ import com.company.cps.mapper.CpsIssueFlowLogMapper;
 import com.company.cps.mapper.CpsIssueMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,6 +40,7 @@ public class CpsIssueService {
     private final CpsIssueFlowLogMapper flowLogMapper;
     private final CpsAssignmentService assignmentService;
     private final CpsWorkflowStateMachine stateMachine;
+    private final CpsAgentFrameworkClient agentFrameworkClient;
 
     public CpsIssueService(
             CpsIssueMapper issueMapper,
@@ -49,12 +50,27 @@ public class CpsIssueService {
             CpsAssignmentService assignmentService,
             CpsWorkflowStateMachine stateMachine
     ) {
+        this(issueMapper, attachmentMapper, aiSuggestionMapper, flowLogMapper,
+                assignmentService, stateMachine, new CpsAgentFrameworkClient(new com.company.cps.config.CpsAgentFrameworkProperties()));
+    }
+
+    @Autowired
+    public CpsIssueService(
+            CpsIssueMapper issueMapper,
+            CpsIssueAttachmentMapper attachmentMapper,
+            CpsIssueAiSuggestionMapper aiSuggestionMapper,
+            CpsIssueFlowLogMapper flowLogMapper,
+            CpsAssignmentService assignmentService,
+            CpsWorkflowStateMachine stateMachine,
+            CpsAgentFrameworkClient agentFrameworkClient
+    ) {
         this.issueMapper = issueMapper;
         this.attachmentMapper = attachmentMapper;
         this.aiSuggestionMapper = aiSuggestionMapper;
         this.flowLogMapper = flowLogMapper;
         this.assignmentService = assignmentService;
         this.stateMachine = stateMachine;
+        this.agentFrameworkClient = agentFrameworkClient;
     }
 
     @Transactional
@@ -77,7 +93,6 @@ public class CpsIssueService {
         validateAiSuggestionSource(request.getIssueAttachmentIds(), request.getAiSuggestion());
 
         CpsIssue issue = new CpsIssue();
-        issue.setIssueNo(newIssueNo(now));
         issue.setStatus(CpsIssueStatus.PENDING_FEEDBACK);
         issue.setFactory(request.getFactory().trim());
         issue.setArea(request.getArea().trim());
@@ -104,6 +119,14 @@ public class CpsIssueService {
         attachFiles(issueId, request.getIssueAttachmentIds(), "ISSUE", currentEmpNo);
         insertAiSuggestionIfPresent(issueId, request.getAiSuggestion(), now);
         insertFlowLog(issueId, null, CpsIssueStatus.PENDING_FEEDBACK, CpsIssueAction.SUBMIT, currentEmpNo, null, feedbackEmpNo, "submit issue");
+        String agentInspectionId = agentFrameworkClient.createAndStart(
+                issueId, currentEmpNo, request,
+                attachmentMapper.findByIssueAndStage(issueId, "ISSUE")
+        );
+        if (agentInspectionId != null) {
+            issue.setAgentInspectionId(agentInspectionId);
+            issueMapper.updateAgentInspectionId(issueId, agentInspectionId);
+        }
         return issueId;
     }
 
@@ -391,7 +414,4 @@ public class CpsIssueService {
                 || !Objects.equals(request.getAiCategoryL2Id(), request.getCategoryL2Id());
     }
 
-    private static String newIssueNo(LocalDateTime now) {
-        return "CPS" + now.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
-    }
 }

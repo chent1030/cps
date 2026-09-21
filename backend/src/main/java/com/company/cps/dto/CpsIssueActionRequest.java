@@ -5,6 +5,7 @@ import com.company.cps.domain.CpsIssueAction;
 import java.util.List;
 
 public class CpsIssueActionRequest {
+    private String empNo;
     private CpsIssueAction action;
     private String reasonAnalysis;
     private String correctiveMeasure;
@@ -18,6 +19,9 @@ public class CpsIssueActionRequest {
     private String comment;
     private Long categoryL1Id;
     private Long categoryL2Id;
+
+    public String getEmpNo() { return empNo; }
+    public void setEmpNo(String empNo) { this.empNo = empNo; }
 
     public CpsIssueAction getAction() { return action; }
     public void setAction(CpsIssueAction action) { this.action = action; }

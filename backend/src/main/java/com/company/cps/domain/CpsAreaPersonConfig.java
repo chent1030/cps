@@ -12,7 +12,9 @@ public class CpsAreaPersonConfig {
     private String empName;
     private Boolean enabled;
     private String createdBy;
+    private String createdName;
     private String updatedBy;
+    private String updatedName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -34,8 +36,12 @@ public class CpsAreaPersonConfig {
     public void setEnabled(Boolean enabled) { this.enabled = enabled; }
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
+    public String getCreatedName() { return createdName; }
+    public void setCreatedName(String createdName) { this.createdName = createdName; }
     public String getUpdatedBy() { return updatedBy; }
     public void setUpdatedBy(String updatedBy) { this.updatedBy = updatedBy; }
+    public String getUpdatedName() { return updatedName; }
+    public void setUpdatedName(String updatedName) { this.updatedName = updatedName; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

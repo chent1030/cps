@@ -281,7 +281,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 
 import { inspectCpsImage, transcribeIssueVoice } from '@/api/cps/ai'
-import { getCpsAttachmentBase64, uploadCpsAttachment, type CpsAttachmentUploadSource } from '@/api/cps/attachment'
+import { uploadCpsAttachment, type CpsAttachmentUploadSource } from '@/api/cps/attachment'
 import { createCpsIssue } from '@/api/cps/issue'
 import {
   getAreas,
@@ -469,7 +469,7 @@ const chooseAndUploadImages = () => {
         for (const source of sources) {
           const uploaded = await uploadCpsAttachment(source)
           next.push(uploaded)
-          void imageToBase64(uploaded)
+          imagePreviewSources.value = { ...imagePreviewSources.value, [uploaded.id]: uploaded.url }
         }
         images.value = next
         if (shouldInspectFirstImage && next.length > 0) {
@@ -512,24 +512,6 @@ const previewImage = (index: number) => {
     urls,
     current,
   })
-}
-
-const imageToBase64 = async (image: CpsUploadedImage) => {
-  try {
-    const base64 = await getCpsAttachmentBase64(image.url)
-    const data = base64.trim()
-    const source = data.startsWith('data:')
-      ? data
-      : data.includes(';base64,')
-        ? `data:${data}`
-        : `data:image/jpeg;base64,${data.replace(/\s/g, '')}`
-    imagePreviewSources.value = { ...imagePreviewSources.value, [image.id]: source }
-  } catch {
-    uni.showToast({
-      title: '图片预览加载失败',
-      icon: 'none',
-    })
-  }
 }
 
 const selectFactory = async (factoryValue: CpsOption['value']) => {

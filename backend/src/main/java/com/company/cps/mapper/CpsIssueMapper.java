@@ -1,6 +1,7 @@
 package com.company.cps.mapper;
 
 import com.company.cps.domain.CpsIssue;
+import com.company.cps.domain.CpsIssueStatus;
 import com.company.cps.dto.CpsIssueListItemResponse;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -26,6 +27,8 @@ public interface CpsIssueMapper {
      */
     void updateWorkflowFields(CpsIssue issue);
 
+    void updateAgentInspectionId(@Param("id") Long id, @Param("agentInspectionId") String agentInspectionId);
+
     /**
      * 按页签查询当前用户的问题列表。
      */
@@ -35,4 +38,51 @@ public interface CpsIssueMapper {
             @Param("limit") int limit,
             @Param("offset") int offset
     );
+
+    List<CpsIssueListItemResponse> listForAdmin(
+            @Param("status") CpsIssueStatus status,
+            @Param("factory") String factory,
+            @Param("area") String area,
+            @Param("line") String line,
+            @Param("process") String process,
+            @Param("currentHandler") String currentHandler,
+            @Param("createdFrom") String createdFrom,
+            @Param("createdTo") String createdTo,
+            @Param("keyword") String keyword,
+            @Param("limit") int limit,
+            @Param("offset") int offset
+    );
+
+    List<CpsIssueListItemResponse> listForAdminExport(
+            @Param("status") CpsIssueStatus status,
+            @Param("factory") String factory,
+            @Param("area") String area,
+            @Param("line") String line,
+            @Param("process") String process,
+            @Param("currentHandler") String currentHandler,
+            @Param("createdFrom") String createdFrom,
+            @Param("createdTo") String createdTo,
+            @Param("keyword") String keyword,
+            @Param("limit") int limit
+    );
+
+    long countForAdmin(
+            @Param("status") CpsIssueStatus status,
+            @Param("factory") String factory,
+            @Param("area") String area,
+            @Param("line") String line,
+            @Param("process") String process,
+            @Param("currentHandler") String currentHandler,
+            @Param("createdFrom") String createdFrom,
+            @Param("createdTo") String createdTo,
+            @Param("keyword") String keyword
+    );
+
+    long countOpenIssues();
+
+    long countByStatus(@Param("status") CpsIssueStatus status);
+
+    long countOverdueIssues();
+
+    long countClosedThisMonth();
 }

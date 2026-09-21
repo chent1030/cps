@@ -7,7 +7,7 @@
     <sql id="BaseColumns">
         id, factory, area, line, process,
         emp_no, emp_name,
-        enabled, created_by, updated_by, created_at, updated_at
+        enabled, created_by, created_name, updated_by, updated_name, created_at, updated_at
     </sql>
 
     <select id="findFeedbackCandidates" resultType="com.company.cps.domain.CpsAreaPersonConfig">
@@ -58,27 +58,90 @@
         ORDER BY factory ASC, area ASC, line ASC, process ASC, id ASC
     </select>
 
+    <sql id="adminFilter">
+        <where>
+            <if test="factory != null and factory != ''">
+              AND factory = #{factory}
+            </if>
+            <if test="area != null and area != ''">
+              AND area = #{area}
+            </if>
+            <if test="line != null and line != ''">AND line = #{line}</if>
+            <if test="process != null and process != ''">AND process = #{process}</if>
+            <if test="enabled != null">
+              AND enabled = #{enabled}
+            </if>
+            <if test="keyword != null and keyword != ''">
+              AND (
+                factory LIKE CONCAT('%', #{keyword}, '%')
+                OR area LIKE CONCAT('%', #{keyword}, '%')
+                OR line LIKE CONCAT('%', #{keyword}, '%')
+                OR process LIKE CONCAT('%', #{keyword}, '%')
+                OR emp_no LIKE CONCAT('%', #{keyword}, '%')
+                OR emp_name LIKE CONCAT('%', #{keyword}, '%')
+              )
+            </if>
+        </where>
+    </sql>
+
+    <select id="findAdminPage" resultType="com.company.cps.domain.CpsAreaPersonConfig">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_area_person_config
+        <include refid="adminFilter"/>
+        ORDER BY factory ASC, area ASC, line ASC, process ASC, id ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="findAdminExport" resultType="com.company.cps.domain.CpsAreaPersonConfig">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_area_person_config
+        <include refid="adminFilter"/>
+        ORDER BY factory ASC, area ASC, line ASC, process ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countAdmin" resultType="long">
+        SELECT COUNT(1)
+        FROM cps_area_person_config
+        <include refid="adminFilter"/>
+    </select>
+
     <select id="findById" resultType="com.company.cps.domain.CpsAreaPersonConfig">
         SELECT <include refid="BaseColumns" />
         FROM cps_area_person_config
         WHERE id = #{id}
     </select>
 
+    <select id="findOperator" resultType="com.company.cps.domain.CpsAreaPersonConfig">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_area_person_config
+        WHERE enabled = 1
+          AND emp_no = #{empNo}
+          AND emp_name = #{empName}
+        ORDER BY id ASC
+        LIMIT 1
+    </select>
+
     <insert id="upsert" parameterType="com.company.cps.domain.CpsAreaPersonConfig" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_area_person_config (
           id, factory, area, line, process,
           emp_no, emp_name,
-          enabled, created_by, updated_by
+          enabled, created_by, created_name, updated_by, updated_name
         ) VALUES (
           #{id}, #{factory}, #{area}, #{line}, #{process},
           #{empNo}, #{empName},
-          #{enabled}, #{createdBy}, #{updatedBy}
+          #{enabled}, #{createdBy}, #{createdName}, #{updatedBy}, #{updatedName}
         )
         ON DUPLICATE KEY UPDATE
+          factory = VALUES(factory),
+          area = VALUES(area),
+          line = VALUES(line),
+          process = VALUES(process),
           emp_no = VALUES(emp_no),
           emp_name = VALUES(emp_name),
           enabled = VALUES(enabled),
-          updated_by = VALUES(updated_by)
+          updated_by = VALUES(updated_by),
+          updated_name = VALUES(updated_name)
     </insert>
 
     <update id="setEnabled">

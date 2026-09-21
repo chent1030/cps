@@ -8,6 +8,8 @@ public class CpsAreaPersonConfigRequest {
     private String process;
     private String empNo;
     private String empName;
+    private String operatorEmpNo;
+    private String operatorEmpName;
     private Boolean enabled;
 
     public Long getId() { return id; }
@@ -24,6 +26,10 @@ public class CpsAreaPersonConfigRequest {
     public void setEmpNo(String empNo) { this.empNo = empNo; }
     public String getEmpName() { return empName; }
     public void setEmpName(String empName) { this.empName = empName; }
+    public String getOperatorEmpNo() { return operatorEmpNo; }
+    public void setOperatorEmpNo(String operatorEmpNo) { this.operatorEmpNo = operatorEmpNo; }
+    public String getOperatorEmpName() { return operatorEmpName; }
+    public void setOperatorEmpName(String operatorEmpName) { this.operatorEmpName = operatorEmpName; }
     public Boolean getEnabled() { return enabled; }
     public void setEnabled(Boolean enabled) { this.enabled = enabled; }
 }

@@ -44,6 +44,7 @@ const sendWithFetch = async <T>(path: string, options: RequestOptions) => {
   }
   const response = await fetch(buildUrl(path, options.params), {
     ...options,
+    cache: 'no-store',
     body,
     headers: {
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),

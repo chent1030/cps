@@ -89,7 +89,6 @@ class CpsIssueServiceTest {
         assertEquals("E00001", saved.getCreatorEmpNo());
         assertEquals("F1", saved.getFactory());
         assertEquals("E10001", saved.getCurrentHandlerEmpName());
-        assertFalse(saved.getIssueNo().trim().isEmpty());
         assertEquals(900L, saved.getId());
         verify(attachmentMapper).attachToIssue(101L, 900L, "ISSUE", 1, "E00001", "E00001");
         verify(flowLogMapper).insert(any());

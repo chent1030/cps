@@ -43,6 +43,8 @@ class CpsAiMatchServiceTest {
     private ImageEmbeddingClient embeddingClient;
     @Mock
     private MilvusVectorService milvusVectorService;
+    @Mock
+    private RustFsStorageService storage;
 
     private CpsAiMatchService service;
 
@@ -54,18 +56,21 @@ class CpsAiMatchServiceTest {
                 caseMapper,
                 matchMapper,
                 embeddingClient,
-                milvusVectorService
+                milvusVectorService,
+                storage
         );
     }
 
     @Test
-    void matchKnowledgeReturnsBestImageAndPersistsImageBoundSuggestion() {
+    void matchKnowledgeReturnsBestImageAndPersistsImageBoundSuggestion() throws Exception {
         CpsIssueAttachment attachment = new CpsIssueAttachment();
         attachment.setId(501L);
-        attachment.setFileUrl("https://files.test/issue.jpg");
+        attachment.setFileUrl("cps/issue.jpg");
+        attachment.setFileType("image/jpeg");
         when(attachmentMapper.findById(501L)).thenReturn(Optional.of(attachment));
+        when(storage.read("cps/issue.jpg")).thenReturn(new byte[]{1, 2, 3});
         List<Float> vector = Arrays.asList(0.1f, 0.2f, 0.3f);
-        when(embeddingClient.embedImage("https://files.test/issue.jpg"))
+        when(embeddingClient.embedImage("data:image/jpeg;base64,AQID"))
                 .thenReturn(new ImageEmbeddingResult(vector, "siglip2", "v1", 3, "{}", "{}"));
         when(milvusVectorService.searchSimilarImages(vector, 10))
                 .thenReturn(Arrays.asList(

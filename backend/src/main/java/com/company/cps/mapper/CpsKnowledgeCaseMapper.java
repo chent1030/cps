@@ -20,6 +20,8 @@ public interface CpsKnowledgeCaseMapper {
      */
     Optional<CpsKnowledgeCase> findById(@Param("id") Long id);
 
+    Optional<CpsKnowledgeCase> findByCategoryL2Id(@Param("categoryL2Id") Long categoryL2Id);
+
     /**
      * 根据案例 ID 列表批量查询启用状态的知识库案例。
      */
@@ -29,6 +31,21 @@ public interface CpsKnowledgeCaseMapper {
      * 查询知识库案例维护列表，可按启停状态过滤。
      */
     List<CpsKnowledgeCase> findAll(@Param("enabled") Boolean enabled);
+
+    List<CpsKnowledgeCase> findAdminPage(
+            @Param("enabled") Boolean enabled,
+            @Param("category") String category,
+            @Param("limit") int limit,
+            @Param("offset") int offset
+    );
+
+    List<CpsKnowledgeCase> findAdminExport(
+            @Param("enabled") Boolean enabled,
+            @Param("category") String category,
+            @Param("limit") int limit
+    );
+
+    long countAdmin(@Param("enabled") Boolean enabled, @Param("category") String category);
 
     /**
      * 新增或更新知识库案例主信息，原因和措施不保存在主表。

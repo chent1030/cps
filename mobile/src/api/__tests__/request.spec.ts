@@ -30,7 +30,7 @@ describe('request mock fallback', () => {
     )
 
     await expect(request.get('/api/cps/issues', { params: { tab: 'todo', page: 1, pageSize: 20 } })).resolves.toEqual(
-      expect.arrayContaining([expect.objectContaining({ issueNo: 'CPS20260627001' })]),
+      expect.arrayContaining([expect.objectContaining({ id: 1 })]),
     )
   })
 

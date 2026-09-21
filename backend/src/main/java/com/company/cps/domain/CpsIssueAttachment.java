@@ -13,6 +13,7 @@ public class CpsIssueAttachment {
     private String createdBy;
     private String createdName;
     private LocalDateTime createdAt;
+    private byte[] content;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -34,4 +35,6 @@ public class CpsIssueAttachment {
     public void setCreatedName(String createdName) { this.createdName = createdName; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public byte[] getContent() { return content; }
+    public void setContent(byte[] content) { this.content = content; }
 }

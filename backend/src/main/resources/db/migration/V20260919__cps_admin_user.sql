@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS cps_admin_user (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+  emp_no VARCHAR(40) NOT NULL COMMENT '管理员工号',
+  emp_name VARCHAR(80) NOT NULL COMMENT '管理员姓名',
+  enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否启用：1启用，0停用',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  UNIQUE KEY uk_cps_admin_user_emp_no (emp_no),
+  INDEX idx_cps_admin_user_enabled (enabled)
+) COMMENT='CPS管理端登录用户表';

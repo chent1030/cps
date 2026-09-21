@@ -3,6 +3,7 @@ package com.company.cps.dto;
 import java.util.List;
 
 public class CpsIssueCreateRequest {
+    private String empNo;
     private String factory;
     private String area;
     private String line;
@@ -15,6 +16,9 @@ public class CpsIssueCreateRequest {
     private String feedbackEmpNo;
     private List<Long> issueAttachmentIds;
     private CpsIssueAiSuggestionRequest aiSuggestion;
+
+    public String getEmpNo() { return empNo; }
+    public void setEmpNo(String empNo) { this.empNo = empNo; }
 
     public String getFactory() { return factory; }
     public void setFactory(String factory) { this.factory = factory; }

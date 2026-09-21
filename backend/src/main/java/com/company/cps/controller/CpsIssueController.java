@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -33,10 +32,9 @@ public class CpsIssueController {
      */
     @PostMapping
     public CpsIssueCreateResponse create(
-            @RequestBody CpsIssueCreateRequest request,
-            @RequestHeader(value = "X-Emp-No", required = false) String empNo
+            @RequestBody CpsIssueCreateRequest request
     ) {
-        Long issueId = issueService.createIssue(request, resolveCurrentEmpNo(empNo));
+        Long issueId = issueService.createIssue(request, resolveCurrentEmpNo(request.getEmpNo()));
         return new CpsIssueCreateResponse(issueId);
     }
 
@@ -48,7 +46,7 @@ public class CpsIssueController {
             @RequestParam(defaultValue = "todo") String tab,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize,
-            @RequestHeader(value = "X-Emp-No", required = false) String empNo
+            @RequestParam String empNo
     ) {
         return issueService.list(tab, page, pageSize, resolveCurrentEmpNo(empNo));
     }
@@ -59,7 +57,7 @@ public class CpsIssueController {
     @GetMapping("/{id}")
     public CpsIssueDetailResponse detail(
             @PathVariable Long id,
-            @RequestHeader(value = "X-Emp-No", required = false) String empNo
+            @RequestParam String empNo
     ) {
         return issueService.getDetail(id, resolveCurrentEmpNo(empNo));
     }
@@ -70,10 +68,9 @@ public class CpsIssueController {
     @PostMapping("/{id}/actions")
     public CpsIssueActionResponse action(
             @PathVariable Long id,
-            @RequestBody CpsIssueActionRequest request,
-            @RequestHeader(value = "X-Emp-No", required = false) String empNo
+            @RequestBody CpsIssueActionRequest request
     ) {
-        return issueService.executeAction(id, request, resolveCurrentEmpNo(empNo));
+        return issueService.executeAction(id, request, resolveCurrentEmpNo(request.getEmpNo()));
     }
 
     private String resolveCurrentEmpNo(String empNo) {

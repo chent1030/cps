@@ -85,7 +85,6 @@ export interface CpsIssueActionRequest {
 
 export interface CpsIssueListItem {
   id: number
-  issueNo: string
   status: CpsIssueStatus
   factory?: string
   area?: string
