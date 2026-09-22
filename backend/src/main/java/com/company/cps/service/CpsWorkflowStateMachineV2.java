@@ -100,4 +100,42 @@ public class CpsWorkflowStateMachineV2 {
                 CpsIssueStatus.CLOSED
         ).contains(status);
     }
+
+    // ==================== A2 编辑/转办锁定（AC-24/26，PRD §28.3） ====================
+
+    /**
+     * 是否允许编辑/转办当前版本（A2/AC-26，PRD §28.3）：
+     * 仅“整改办理中、退回整改”（均为 PENDING_RECTIFY）允许编辑或转办。
+     * 注意：PENDING_FEEDBACK 阶段的 TRANSFER 是反馈指派转交（反馈人改派），不属于整改转办。
+     */
+    public boolean isRectifyEditable(CpsIssueStatus status) {
+        return status == CpsIssueStatus.PENDING_RECTIFY;
+    }
+
+    /**
+     * 当前提交版本是否处于锁定态（A2/AC-26，PRD §28.3）：
+     * 提交后锁定当前提交版本，AI 初审中（PENDING_AI_REVIEW）、待配置审核员
+     * （PENDING_REVIEWER_CONFIG）、待人工审核（PENDING_REVIEW）期间不得继续修改或转办该版本。
+     * 这些状态下 TRANSITIONS 无 SAVE_DRAFT/TRANSFER/SUBMIT_RECTIFICATION 出边（锁定即隐式实现），
+     * 本方法供服务层守卫与前端提示显式调用。
+     */
+    public boolean isVersionLocked(CpsIssueStatus status) {
+        return status == CpsIssueStatus.PENDING_AI_REVIEW
+                || status == CpsIssueStatus.PENDING_REVIEWER_CONFIG
+                || status == CpsIssueStatus.PENDING_REVIEW;
+    }
+
+    /**
+     * 编辑/转办守卫（A2）：版本锁定态（AI 初审中/待配置/待人工审核）执行编辑类动作
+     * （SAVE_DRAFT/SUBMIT_RECTIFICATION/TRANSFER）即抛 IllegalStateException，给出明确锁定语义。
+     * 非锁定状态下不拦截（合法性由 TRANSITIONS 转移表校验，
+     * 例如 PENDING_FEEDBACK+TRANSFER 是反馈指派转交，不属于整改转办，仍按表放行）。
+     */
+    public void assertRectifyEditable(CpsIssueStatus status, CpsIssueAction action) {
+        if (isVersionLocked(status)) {
+            throw new IllegalStateException(
+                    "Issue version is locked in status " + status
+                            + ": edit/transfer not allowed until review finishes (PRD 28.3, AC-26)");
+        }
+    }
 }

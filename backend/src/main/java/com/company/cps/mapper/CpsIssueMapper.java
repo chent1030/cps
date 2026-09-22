@@ -24,8 +24,11 @@ public interface CpsIssueMapper {
 
     /**
      * 更新问题流程相关字段，包括状态、处理人、原因措施、审核意见和关闭时间。
+     *
+     * <p>A2 乐观锁（AC-24）：WHERE 追加 lock_version CAS 校验并自增；
+     * 返回受影响行数，0 表示并发冲突（他人已先提交修改），调用方应提示刷新重试。
      */
-    void updateWorkflowFields(CpsIssue issue);
+    int updateWorkflowFields(CpsIssue issue);
 
     void updateAgentInspectionId(@Param("id") Long id, @Param("agentInspectionId") String agentInspectionId);
 

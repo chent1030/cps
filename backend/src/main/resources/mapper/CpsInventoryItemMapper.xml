@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsInventoryItemMapper">
+
+    <sql id="BaseColumns">
+        id, item_code, item_name, unit, stock_qty, alert_threshold,
+        base AS base_code, factory, storage_room, room_keeper_emp_no, room_keeper_emp_name,
+        remark, enabled, created_by, updated_by, created_at, updated_at
+    </sql>
+
+    <select id="findAll" resultType="com.company.cps.domain.CpsInventoryItem">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_inventory_item
+        WHERE 1 = 1
+        <if test="factory != null and factory != ''">
+          AND factory = #{factory}
+        </if>
+        <if test="storageRoom != null and storageRoom != ''">
+          AND storage_room = #{storageRoom}
+        </if>
+        <if test="keyword != null and keyword != ''">
+          AND (item_name LIKE CONCAT('%', #{keyword}, '%') OR item_code LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="lowStock != null and lowStock">
+          AND stock_qty &lt;= alert_threshold
+        </if>
+        <if test="enabled != null">
+          AND enabled = #{enabled}
+        </if>
+        ORDER BY factory ASC, storage_room ASC, item_code ASC
+    </select>
+
+    <select id="findById" resultType="com.company.cps.domain.CpsInventoryItem">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_inventory_item
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByCode" resultType="com.company.cps.domain.CpsInventoryItem">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_inventory_item
+        WHERE item_code = #{itemCode}
+    </select>
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsInventoryItem" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_inventory_item (
+            item_code, item_name, unit, stock_qty, alert_threshold,
+            base, factory, storage_room, room_keeper_emp_no, room_keeper_emp_name,
+            remark, enabled, created_by, updated_by
+        ) VALUES (
+            #{itemCode}, #{itemName}, #{unit}, #{stockQty}, #{alertThreshold},
+            #{baseCode}, #{factory}, #{storageRoom}, #{roomKeeperEmpNo}, #{roomKeeperEmpName},
+            #{remark}, #{enabled}, #{createdBy}, #{updatedBy}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.company.cps.domain.CpsInventoryItem">
+        UPDATE cps_inventory_item
+        SET item_name = #{itemName},
+            unit = #{unit},
+            stock_qty = #{stockQty},
+            alert_threshold = #{alertThreshold},
+            base = #{baseCode},
+            factory = #{factory},
+            storage_room = #{storageRoom},
+            room_keeper_emp_no = #{roomKeeperEmpNo},
+            room_keeper_emp_name = #{roomKeeperEmpName},
+            remark = #{remark},
+            enabled = #{enabled},
+            updated_by = #{updatedBy}
+        WHERE id = #{id}
+    </update>
+
+    <update id="setEnabled">
+        UPDATE cps_inventory_item
+        SET enabled = #{enabled}, updated_by = #{updatedBy}
+        WHERE id = #{id}
+    </update>
+</mapper>

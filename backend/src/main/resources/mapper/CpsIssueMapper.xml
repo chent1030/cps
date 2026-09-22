@@ -34,7 +34,7 @@
 
     <update id="updateStatus">
         UPDATE cps_issue
-        SET status = #{status}, updated_at = #{updatedAt}
+        SET status = #{status}, lock_version = lock_version + 1, updated_at = #{updatedAt}
         WHERE id = #{id}
     </update>
 
@@ -45,6 +45,7 @@
             current_handler_emp_no = #{reviewerEmpNo},
             current_handler_emp_name = #{reviewerEmpName},
             status = #{status},
+            lock_version = lock_version + 1,
             updated_at = #{updatedAt}
         WHERE id = #{id}
     </update>
@@ -78,8 +79,10 @@
             category_l2_id = #{categoryL2Id},
             category_modified_flag = #{categoryModifiedFlag},
             close_time = #{closeTime},
+            lock_version = IFNULL(#{lockVersion}, 0) + 1,
             updated_at = #{updatedAt}
         WHERE id = #{id}
+          AND lock_version = IFNULL(#{lockVersion}, 0)
     </update>
 
     <select id="listByTab" resultType="com.company.cps.dto.CpsIssueListItemResponse">

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsRoomMapper">
+
+    <sql id="BaseColumns">
+        id, room_code, building, door_no, room_name, room_type, risk_level, dept_name,
+        base AS base_code, factory, keeper_emp_no, keeper_emp_name, keeper_manager_emp_no, keeper_manager_emp_name,
+        enabled, created_by, updated_by, created_at, updated_at
+    </sql>
+
+    <select id="findAll" resultType="com.company.cps.domain.CpsRoom">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_room
+        WHERE 1 = 1
+        <if test="factory != null and factory != ''">
+          AND factory = #{factory}
+        </if>
+        <if test="roomType != null and roomType != ''">
+          AND room_type = #{roomType}
+        </if>
+        <if test="enabled != null">
+          AND enabled = #{enabled}
+        </if>
+        ORDER BY factory ASC, room_type ASC, room_code ASC
+    </select>
+
+    <select id="findById" resultType="com.company.cps.domain.CpsRoom">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_room
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByCode" resultType="com.company.cps.domain.CpsRoom">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_room
+        WHERE room_code = #{roomCode}
+    </select>
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsRoom" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_room (
+            room_code, building, door_no, room_name, room_type, risk_level, dept_name,
+            base, factory, keeper_emp_no, keeper_emp_name, keeper_manager_emp_no, keeper_manager_emp_name,
+            enabled, created_by, updated_by
+        ) VALUES (
+            #{roomCode}, #{building}, #{doorNo}, #{roomName}, #{roomType}, #{riskLevel}, #{deptName},
+            #{baseCode}, #{factory}, #{keeperEmpNo}, #{keeperEmpName}, #{keeperManagerEmpNo}, #{keeperManagerEmpName},
+            #{enabled}, #{createdBy}, #{updatedBy}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.company.cps.domain.CpsRoom">
+        UPDATE cps_room
+        SET building = #{building},
+            door_no = #{doorNo},
+            room_name = #{roomName},
+            room_type = #{roomType},
+            risk_level = #{riskLevel},
+            dept_name = #{deptName},
+            base = #{baseCode},
+            factory = #{factory},
+            keeper_emp_no = #{keeperEmpNo},
+            keeper_emp_name = #{keeperEmpName},
+            keeper_manager_emp_no = #{keeperManagerEmpNo},
+            keeper_manager_emp_name = #{keeperManagerEmpName},
+            enabled = #{enabled},
+            updated_by = #{updatedBy}
+        WHERE id = #{id}
+    </update>
+
+    <update id="setEnabled">
+        UPDATE cps_room
+        SET enabled = #{enabled}, updated_by = #{updatedBy}
+        WHERE id = #{id}
+    </update>
+</mapper>

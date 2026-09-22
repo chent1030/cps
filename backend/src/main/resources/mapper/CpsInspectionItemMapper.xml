@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsInspectionItemMapper">
+
+    <sql id="BaseColumns">
+        id, item_code, item_name, factory, enabled, remark, created_by, updated_by, created_at, updated_at
+    </sql>
+
+    <sql id="PermissionColumns">
+        id, item_id, emp_no, emp_name, created_by, created_at
+    </sql>
+
+    <select id="findAll" resultType="com.company.cps.domain.CpsInspectionItem">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_inspection_item
+        WHERE 1 = 1
+        <if test="factory != null and factory != ''">
+          AND (factory = #{factory} OR factory IS NULL OR factory = '')
+        </if>
+        <if test="enabled != null">
+          AND enabled = #{enabled}
+        </if>
+        ORDER BY item_code ASC
+    </select>
+
+    <select id="findById" resultType="com.company.cps.domain.CpsInspectionItem">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_inspection_item
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByCode" resultType="com.company.cps.domain.CpsInspectionItem">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_inspection_item
+        WHERE item_code = #{itemCode}
+    </select>
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsInspectionItem" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_inspection_item (
+            item_code, item_name, factory, enabled, remark, created_by, updated_by
+        ) VALUES (
+            #{itemCode}, #{itemName}, #{factory}, #{enabled}, #{remark}, #{createdBy}, #{updatedBy}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.company.cps.domain.CpsInspectionItem">
+        UPDATE cps_inspection_item
+        SET item_name = #{itemName},
+            factory = #{factory},
+            enabled = #{enabled},
+            remark = #{remark},
+            updated_by = #{updatedBy}
+        WHERE id = #{id}
+    </update>
+
+    <update id="setEnabled">
+        UPDATE cps_inspection_item
+        SET enabled = #{enabled}, updated_by = #{updatedBy}
+        WHERE id = #{id}
+    </update>
+
+    <select id="findPermissions" resultType="com.company.cps.domain.CpsInspectionItemPermission">
+        SELECT <include refid="PermissionColumns" />
+        FROM cps_inspection_item_permission
+        WHERE item_id = #{itemId}
+        ORDER BY emp_no ASC
+    </select>
+
+    <!-- §30.1：无权限配置行=开放；有配置行=需包含该工号 -->
+    <select id="findVisibleItemIds" resultType="long">
+        SELECT i.id
+        FROM cps_inspection_item i
+        WHERE NOT EXISTS (
+                  SELECT 1 FROM cps_inspection_item_permission p WHERE p.item_id = i.id
+              )
+           OR EXISTS (
+                  SELECT 1 FROM cps_inspection_item_permission p2
+                  WHERE p2.item_id = i.id AND p2.emp_no = #{empNo}
+              )
+    </select>
+
+    <select id="countPermissions" resultType="int">
+        SELECT COUNT(*)
+        FROM cps_inspection_item_permission
+        WHERE item_id = #{itemId}
+    </select>
+
+    <insert id="insertPermission" parameterType="com.company.cps.domain.CpsInspectionItemPermission">
+        INSERT INTO cps_inspection_item_permission (item_id, emp_no, emp_name, created_by)
+        VALUES (#{itemId}, #{empNo}, #{empName}, #{createdBy})
+    </insert>
+
+    <delete id="deletePermissionsByItemId">
+        DELETE FROM cps_inspection_item_permission
+        WHERE item_id = #{itemId}
+    </delete>
+</mapper>

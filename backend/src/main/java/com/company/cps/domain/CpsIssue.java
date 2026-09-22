@@ -36,6 +36,8 @@ public class CpsIssue {
     private String longTermMeasure;
     private Integer currentSubmissionVersion;
     private Long inspectionItemId;
+    /** 乐观锁版本号（A2/AC-24）：DB 默认 0；更新时 CAS 校验并自增，防并发编辑。 */
+    private Integer lockVersion;
     private String rectifyRemark;
     private String reviewOpinion;
     private LocalDateTime submitTime;
@@ -107,6 +109,8 @@ public class CpsIssue {
     public void setCurrentSubmissionVersion(Integer currentSubmissionVersion) { this.currentSubmissionVersion = currentSubmissionVersion; }
     public Long getInspectionItemId() { return inspectionItemId; }
     public void setInspectionItemId(Long inspectionItemId) { this.inspectionItemId = inspectionItemId; }
+    public Integer getLockVersion() { return lockVersion; }
+    public void setLockVersion(Integer lockVersion) { this.lockVersion = lockVersion; }
     public String getRectifyRemark() { return rectifyRemark; }
     public void setRectifyRemark(String rectifyRemark) { this.rectifyRemark = rectifyRemark; }
     public String getReviewOpinion() { return reviewOpinion; }

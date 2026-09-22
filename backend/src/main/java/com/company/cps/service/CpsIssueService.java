@@ -173,7 +173,7 @@ public class CpsIssueService {
         CpsIssueStatus nextStatus = stateMachine.nextStatus(fromStatus, request.getAction());
         applyAction(issue, request, nextStatus, currentEmpNo);
         issue.setUpdatedAt(LocalDateTime.now());
-        issueMapper.updateWorkflowFields(issue);
+        requireUpdatedRows(issueMapper.updateWorkflowFields(issue), issue.getId());
 
         insertFlowLog(
                 issue.getId(),
@@ -338,7 +338,7 @@ public class CpsIssueService {
             applyActionV2(issue, request, nextStatus, currentEmpNo, now);
         }
         issue.setUpdatedAt(now);
-        issueMapper.updateWorkflowFields(issue);
+        requireUpdatedRows(issueMapper.updateWorkflowFields(issue), issue.getId());
         insertFlowLog(issue.getId(), fromStatus, nextStatus, request.getAction(), currentEmpNo,
                 fromHandler, issue.getCurrentHandlerEmpNo(), request.getComment());
         if (initialReviewTaskId != null) {
@@ -359,6 +359,72 @@ public class CpsIssueService {
         }
     }
 
+    /**
+     * A2 管理员改配审核员（PRD §30.2，AC-25）：
+     * 未完成审核单（PENDING_AI_REVIEW/PENDING_REVIEWER_CONFIG/PENDING_REVIEW）更换审核员：
+     * - 后续审核转新审核员，原审核员失权（PENDING_REVIEW 时当前办理人同步切到新审核员；
+     *   PENDING_AI_REVIEW 期间保持无办理人，AI 完成后按最新 reviewer_emp_no 路由）；
+     * - 不重置 AI 初审计时：不触碰 cps_initial_review_task（submitted_at/timeout_at 锚点不动），
+     *   初审中改配后任务推进时 advanceIssueAfterTaskTerminal 按最新审核员路由；
+     * - PENDING_REVIEWER_CONFIG 单在配置审核员的同时直接续路到 PENDING_REVIEW（AC-25：配置后继续流转，不要求重交）；
+     * - 变更记录写入流程日志（action=REVIEWER_REASSIGN，from/to=原/新审核员工号，comment=reason）；
+     * - 责任员工（responsible_emp_no）与整改内容不变；已完成审核（CLOSED 等）不可改配。
+     *
+     * <p>口径说明：PRD §28.3 的“转办”指整改办理人转交（TRANSFER，currentHandler 变更、责任员工不变）；
+     * 本方法承载的是 §30.2 审核员改配语义，两者是不同动作。
+     */
+    @Transactional
+    public CpsIssueActionResponse reassignReviewer(Long issueId, String newReviewerEmpNo,
+                                                   String operatorEmpNo, String reason) {
+        requireV2Dependencies();
+        CpsIssue issue = issueMapper.findById(issueId)
+                .orElseThrow(() -> new IllegalArgumentException("Issue not found: " + issueId));
+        if (!isV2(issue)) {
+            throw new IllegalArgumentException("Reviewer reassignment only supports v2 flow issues");
+        }
+        CpsIssueStatus fromStatus = issue.getStatus();
+        if (fromStatus != CpsIssueStatus.PENDING_AI_REVIEW
+                && fromStatus != CpsIssueStatus.PENDING_REVIEWER_CONFIG
+                && fromStatus != CpsIssueStatus.PENDING_REVIEW) {
+            throw new IllegalStateException(
+                    "Reviewer reassignment only allowed before review is finished, current status: " + fromStatus);
+        }
+        requireText(newReviewerEmpNo, "reviewerEmpNo is required");
+        requireText(reason, "reassign reason is required");
+        String reviewer = newReviewerEmpNo.trim();
+        String oldReviewer = issue.getReviewerEmpNo();
+        if (reviewer.equals(oldReviewer)) {
+            throw new IllegalArgumentException("New reviewer is the same as the current reviewer");
+        }
+
+        CpsIssueStatus toStatus = fromStatus;
+        if (fromStatus == CpsIssueStatus.PENDING_REVIEWER_CONFIG) {
+            // 配置完成即续路（AC-25）：待配置单直接进入待人工审核
+            stateMachineV2.assertSystemTransition(fromStatus, CpsIssueStatus.PENDING_REVIEW);
+            toStatus = CpsIssueStatus.PENDING_REVIEW;
+        }
+        issue.setReviewerEmpNo(reviewer);
+        issue.setReviewerEmpName(empName(reviewer));
+        issue.setStatus(toStatus);
+        if (toStatus == CpsIssueStatus.PENDING_REVIEW) {
+            // 待审核单转新审核员办理，原审核员失权（current_handler 即办理权）
+            issue.setCurrentHandlerEmpNo(reviewer);
+            issue.setCurrentHandlerEmpName(empName(reviewer));
+        }
+        // PENDING_AI_REVIEW 保持 current_handler 为空：初审期间无人可办理，计时锚（初审任务表）不受影响
+        LocalDateTime now = LocalDateTime.now();
+        issue.setUpdatedAt(now);
+        requireUpdatedRows(issueMapper.updateWorkflowFields(issue), issue.getId());
+        insertFlowLog(issue.getId(), fromStatus, toStatus, CpsIssueAction.REVIEWER_REASSIGN, operatorEmpNo,
+                oldReviewer, reviewer, reason.trim());
+        return new CpsIssueActionResponse(
+                issue.getId(),
+                issue.getStatus(),
+                issue.getCurrentHandlerEmpNo(),
+                stateMachineV2.availableActions(issue.getStatus())
+        );
+    }
+
     private void validateActionRequestV2(CpsIssue issue, CpsIssueActionRequest request) {
         requireNonNull(request.getAction(), "action is required");
         if (request.getAction() == CpsIssueAction.REPLY_ASSIGN) {
@@ -376,6 +442,13 @@ public class CpsIssueService {
             requireText(request.getReviewOpinion(), "reviewOpinion is required");
         } else if (request.getAction() == CpsIssueAction.TRANSFER) {
             requireText(request.getTargetEmpNo(), "targetEmpNo is required");
+        }
+        // A2 编辑/转办锁定（AC-26，PRD §28.3）：编辑类动作在版本锁定态（AI 初审中/待配置/
+        // 待人工审核）显式拒绝；非锁定态合法性仍由下方转移表校验。
+        if (request.getAction() == CpsIssueAction.SAVE_DRAFT
+                || request.getAction() == CpsIssueAction.SUBMIT_RECTIFICATION
+                || request.getAction() == CpsIssueAction.TRANSFER) {
+            stateMachineV2.assertRectifyEditable(issue.getStatus(), request.getAction());
         }
         // 确定性流转校验（SUBMIT_RECTIFICATION 的上下文落点由 resolveSubmissionTarget 承接）
         stateMachineV2.nextStatus(issue.getStatus(), request.getAction());
@@ -613,6 +686,17 @@ public class CpsIssueService {
     private static void requireText(String value, String message) {
         if (isBlank(value)) {
             throw new IllegalArgumentException(message);
+        }
+    }
+
+    /**
+     * A2 乐观锁结果检查（AC-24）：更新影响行数不为 1 即并发冲突
+     * （他人已基于同一 lock_version 先提交修改），事务回滚并提示刷新重试。
+     */
+    private static void requireUpdatedRows(int rows, Long issueId) {
+        if (rows != 1) {
+            throw new IllegalStateException(
+                    "Concurrent modification detected on issue " + issueId + ", please refresh and retry");
         }
     }
 

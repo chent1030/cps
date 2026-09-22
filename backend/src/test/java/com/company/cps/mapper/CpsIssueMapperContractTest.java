@@ -81,6 +81,18 @@ class CpsIssueMapperContractTest {
         assertTrue(sql.contains("useGeneratedKeys=\"true\""));
     }
 
+    @Test
+    void updateWorkflowFieldsUsesOptimisticLockCasClause() throws NoSuchMethodException, IOException {
+        // A2 乐观锁（AC-24）：CAS 校验 + 自增；方法返回受影响行数供服务层判冲突
+        Method method = CpsIssueMapper.class.getMethod("updateWorkflowFields", com.company.cps.domain.CpsIssue.class);
+        String sql = readXml("CpsIssueMapper.xml");
+
+        assertEquals(int.class, method.getReturnType());
+        assertTrue(sql.contains("lock_version = IFNULL(#{lockVersion}, 0) + 1"));
+        assertTrue(sql.contains("AND lock_version = IFNULL(#{lockVersion}, 0)"));
+        assertTrue(sql.contains("lock_version = lock_version + 1"));
+    }
+
     private static String readXml(String fileName) throws IOException {
         return new String(Files.readAllBytes(Paths.get("src/main/resources/mapper", fileName)), StandardCharsets.UTF_8);
     }

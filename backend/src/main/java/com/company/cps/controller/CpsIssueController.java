@@ -6,6 +6,7 @@ import com.company.cps.dto.CpsIssueCreateRequest;
 import com.company.cps.dto.CpsIssueCreateResponse;
 import com.company.cps.dto.CpsIssueDetailResponse;
 import com.company.cps.dto.CpsIssueListItemResponse;
+import com.company.cps.dto.CpsReviewerReassignRequest;
 import com.company.cps.service.CpsIssueService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -71,6 +72,23 @@ public class CpsIssueController {
             @RequestBody CpsIssueActionRequest request
     ) {
         return issueService.executeAction(id, request, resolveCurrentEmpNo(request.getEmpNo()));
+    }
+
+    /**
+     * A2 管理员改配审核员（PRD §30.2，AC-25）：未完成审核单转新审核员，原审核员失权；
+     * 不重置 AI 初审计时；reason 必填留痕；已完成审核单不可改配。
+     */
+    @PostMapping("/{id}/reassign-reviewer")
+    public CpsIssueActionResponse reassignReviewer(
+            @PathVariable Long id,
+            @RequestBody CpsReviewerReassignRequest request
+    ) {
+        return issueService.reassignReviewer(
+                id,
+                request.getReviewerEmpNo(),
+                resolveCurrentEmpNo(request.getOperatorEmpNo()),
+                request.getReason()
+        );
     }
 
     private String resolveCurrentEmpNo(String empNo) {

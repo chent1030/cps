@@ -213,6 +213,8 @@ class CpsIssueServiceTest {
         request.setResponsibleEmpNo("E10023");
         request.setComment("today");
 
+        when(issueMapper.updateWorkflowFields(issue)).thenReturn(1);
+
         service.executeAction(1L, request, "E10001");
 
         assertEquals(CpsIssueStatus.PENDING_RECTIFY, issue.getStatus());
