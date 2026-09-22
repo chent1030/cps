@@ -7,6 +7,10 @@ import com.company.cps.domain.CpsIssueAction;
 import com.company.cps.domain.CpsIssueAiSuggestion;
 import com.company.cps.domain.CpsIssueFlowLog;
 import com.company.cps.domain.CpsIssueStatus;
+import com.company.cps.domain.CpsInitialReviewTask;
+import com.company.cps.domain.CpsRectificationSubmission;
+import com.company.cps.domain.CpsRectificationSubmissionStatus;
+import com.company.cps.domain.CpsRectificationTransfer;
 import com.company.cps.dto.CpsIssueActionRequest;
 import com.company.cps.dto.CpsIssueActionResponse;
 import com.company.cps.dto.CpsIssueAiSuggestionRequest;
@@ -17,6 +21,8 @@ import com.company.cps.mapper.CpsIssueAiSuggestionMapper;
 import com.company.cps.mapper.CpsIssueAttachmentMapper;
 import com.company.cps.mapper.CpsIssueFlowLogMapper;
 import com.company.cps.mapper.CpsIssueMapper;
+import com.company.cps.mapper.CpsRectificationSubmissionMapper;
+import com.company.cps.mapper.CpsRectificationTransferMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,12 +33,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 @Service
 public class CpsIssueService {
 
     private static final int MAX_ATTACHMENTS = 5;
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    /** flow_version 取值：legacy（旧状态机，冻结）/ v2（整改域新流程）。 */
+    private static final String FLOW_VERSION_V2 = "v2";
 
     private final CpsIssueMapper issueMapper;
     private final CpsIssueAttachmentMapper attachmentMapper;
@@ -40,7 +49,11 @@ public class CpsIssueService {
     private final CpsIssueFlowLogMapper flowLogMapper;
     private final CpsAssignmentService assignmentService;
     private final CpsWorkflowStateMachine stateMachine;
+    private final CpsWorkflowStateMachineV2 stateMachineV2;
     private final CpsAgentFrameworkClient agentFrameworkClient;
+    private final CpsRectificationSubmissionMapper submissionMapper;
+    private final CpsRectificationTransferMapper transferMapper;
+    private final CpsInitialReviewService initialReviewService;
 
     public CpsIssueService(
             CpsIssueMapper issueMapper,
@@ -51,7 +64,10 @@ public class CpsIssueService {
             CpsWorkflowStateMachine stateMachine
     ) {
         this(issueMapper, attachmentMapper, aiSuggestionMapper, flowLogMapper,
-                assignmentService, stateMachine, new CpsAgentFrameworkClient(new com.company.cps.config.CpsAgentFrameworkProperties()));
+                assignmentService, stateMachine,
+                new CpsAgentFrameworkClient(new com.company.cps.config.CpsAgentFrameworkProperties(),
+                        CpsAttachmentContentResolver.unsupported()),
+                null, null, null, null);
     }
 
     @Autowired
@@ -62,7 +78,11 @@ public class CpsIssueService {
             CpsIssueFlowLogMapper flowLogMapper,
             CpsAssignmentService assignmentService,
             CpsWorkflowStateMachine stateMachine,
-            CpsAgentFrameworkClient agentFrameworkClient
+            CpsAgentFrameworkClient agentFrameworkClient,
+            CpsWorkflowStateMachineV2 stateMachineV2,
+            CpsRectificationSubmissionMapper submissionMapper,
+            CpsRectificationTransferMapper transferMapper,
+            CpsInitialReviewService initialReviewService
     ) {
         this.issueMapper = issueMapper;
         this.attachmentMapper = attachmentMapper;
@@ -70,7 +90,11 @@ public class CpsIssueService {
         this.flowLogMapper = flowLogMapper;
         this.assignmentService = assignmentService;
         this.stateMachine = stateMachine;
+        this.stateMachineV2 = stateMachineV2;
         this.agentFrameworkClient = agentFrameworkClient;
+        this.submissionMapper = submissionMapper;
+        this.transferMapper = transferMapper;
+        this.initialReviewService = initialReviewService;
     }
 
     @Transactional
@@ -94,6 +118,8 @@ public class CpsIssueService {
 
         CpsIssue issue = new CpsIssue();
         issue.setStatus(CpsIssueStatus.PENDING_FEEDBACK);
+        // 新单统一走 V2 整改域流程（flow_version 路由；存量行 DB 默认 'legacy' 不受影响）
+        issue.setFlowVersion(FLOW_VERSION_V2);
         issue.setFactory(request.getFactory().trim());
         issue.setArea(request.getArea().trim());
         issue.setLine(request.getLine().trim());
@@ -137,6 +163,9 @@ public class CpsIssueService {
         if (!Objects.equals(issue.getCurrentHandlerEmpNo(), currentEmpNo)) {
             throw new IllegalStateException("Current employee is not issue handler");
         }
+        if (isV2(issue)) {
+            return executeActionV2(issue, request, currentEmpNo);
+        }
 
         CpsIssueStatus fromStatus = issue.getStatus();
         String fromHandler = issue.getCurrentHandlerEmpNo();
@@ -175,8 +204,8 @@ public class CpsIssueService {
         response.setFlowLogs(flowLogMapper.findByIssueId(issueId));
         response.setAvailableActions(
                 Objects.equals(issue.getCurrentHandlerEmpNo(), currentEmpNo)
-                        ? stateMachine.availableActions(issue.getStatus())
-                        : Collections.emptySet()
+                        ? availableActionsFor(issue)
+                        : Collections.<CpsIssueAction>emptySet()
         );
         return response;
     }
@@ -278,6 +307,208 @@ public class CpsIssueService {
             }
         }
     }
+
+    // ==================== V2 整改域（flow_version='v2' 路由） ====================
+
+    /** flow_version 路由判定：仅 'v2' 走新状态机；null/'legacy' 保持旧机（语义冻结）。 */
+    private static boolean isV2(CpsIssue issue) {
+        return FLOW_VERSION_V2.equalsIgnoreCase(issue.getFlowVersion());
+    }
+
+    private Set<CpsIssueAction> availableActionsFor(CpsIssue issue) {
+        return isV2(issue) ? stateMachineV2.availableActions(issue.getStatus())
+                : stateMachine.availableActions(issue.getStatus());
+    }
+
+    private CpsIssueActionResponse executeActionV2(CpsIssue issue, CpsIssueActionRequest request, String currentEmpNo) {
+        requireV2Dependencies();
+        CpsIssueStatus fromStatus = issue.getStatus();
+        String fromHandler = issue.getCurrentHandlerEmpNo();
+        validateActionRequestV2(issue, request);
+        LocalDateTime now = LocalDateTime.now();
+        CpsIssueStatus nextStatus;
+        Long initialReviewTaskId = null;
+        if (request.getAction() == CpsIssueAction.SUBMIT_RECTIFICATION) {
+            String reviewer = initialReviewService.resolveReviewer(issue, request.getReviewerEmpNo());
+            // 提交落点带上下文：审核员可解析→PENDING_AI_REVIEW；无人可审→PENDING_REVIEWER_CONFIG（AC-25 提交保留）
+            nextStatus = stateMachineV2.resolveSubmissionTarget(reviewer != null);
+            initialReviewTaskId = applySubmitRectification(issue, request, nextStatus, reviewer, currentEmpNo, now);
+        } else {
+            nextStatus = stateMachineV2.nextStatus(fromStatus, request.getAction());
+            applyActionV2(issue, request, nextStatus, currentEmpNo, now);
+        }
+        issue.setUpdatedAt(now);
+        issueMapper.updateWorkflowFields(issue);
+        insertFlowLog(issue.getId(), fromStatus, nextStatus, request.getAction(), currentEmpNo,
+                fromHandler, issue.getCurrentHandlerEmpNo(), request.getComment());
+        if (initialReviewTaskId != null) {
+            // 事务提交后投递 C-01（事务外；投递失败由任务 FAILED 承接，不回滚提交快照）
+            initialReviewService.dispatchAfterCommit(initialReviewTaskId);
+        }
+        return new CpsIssueActionResponse(
+                issue.getId(),
+                issue.getStatus(),
+                issue.getCurrentHandlerEmpNo(),
+                stateMachineV2.availableActions(issue.getStatus())
+        );
+    }
+
+    private void requireV2Dependencies() {
+        if (stateMachineV2 == null || initialReviewService == null || submissionMapper == null || transferMapper == null) {
+            throw new IllegalStateException("V2 rectification flow dependencies are not wired for this service instance");
+        }
+    }
+
+    private void validateActionRequestV2(CpsIssue issue, CpsIssueActionRequest request) {
+        requireNonNull(request.getAction(), "action is required");
+        if (request.getAction() == CpsIssueAction.REPLY_ASSIGN) {
+            // V2：原因/措施在 SUBMIT_RECTIFICATION 时填写；REPLY_ASSIGN 仅指派整改办理人
+            requireText(request.getResponsibleEmpNo(), "responsibleEmpNo is required");
+        } else if (request.getAction() == CpsIssueAction.SUBMIT_RECTIFICATION) {
+            requireText(request.getReasonAnalysis(), "reasonAnalysis is required");
+            requireText(request.getShortTermMeasure(), "shortTermMeasure is required");
+            requireText(request.getLongTermMeasure(), "longTermMeasure is required");
+            requireText(request.getResponsibleEmpNo(), "responsibleEmpNo is required");
+            validateAttachmentCount(request.getProofAttachmentIds(), "proof attachments must contain 1 to 5 files");
+        } else if (request.getAction() == CpsIssueAction.SAVE_DRAFT) {
+            // 暂存允许不完整内容（PRD §28.3），不触发初审
+        } else if (request.getAction() == CpsIssueAction.REVIEW_CLOSE || request.getAction() == CpsIssueAction.REVIEW_REJECT) {
+            requireText(request.getReviewOpinion(), "reviewOpinion is required");
+        } else if (request.getAction() == CpsIssueAction.TRANSFER) {
+            requireText(request.getTargetEmpNo(), "targetEmpNo is required");
+        }
+        // 确定性流转校验（SUBMIT_RECTIFICATION 的上下文落点由 resolveSubmissionTarget 承接）
+        stateMachineV2.nextStatus(issue.getStatus(), request.getAction());
+    }
+
+    /**
+     * 提交整改（PRD §28.1/28.3）：版本快照+锁定、旧版本 SUPERSEDED、创建初审任务（RUNNING，+600s）。
+     * 版本锁定期间（PENDING_AI_REVIEW/PENDING_REVIEWER_CONFIG/PENDING_REVIEW）不可编辑或转办。
+     */
+    private Long applySubmitRectification(CpsIssue issue, CpsIssueActionRequest request,
+                                          CpsIssueStatus target, String reviewer,
+                                          String currentEmpNo, LocalDateTime now) {
+        int versionNo = issue.getCurrentSubmissionVersion() == null ? 1 : issue.getCurrentSubmissionVersion() + 1;
+        submissionMapper.markSuperseded(issue.getId());
+        attachFiles(issue.getId(), request.getProofAttachmentIds(), "PROOF", currentEmpNo);
+
+        CpsRectificationSubmission submission = new CpsRectificationSubmission();
+        submission.setIssueId(issue.getId());
+        submission.setVersionNo(versionNo);
+        submission.setReason(request.getReasonAnalysis().trim());
+        submission.setShortTermMeasure(request.getShortTermMeasure().trim());
+        submission.setLongTermMeasure(request.getLongTermMeasure().trim());
+        submission.setResponsibleEmpNo(request.getResponsibleEmpNo().trim());
+        submission.setResponsibleEmpName(empName(request.getResponsibleEmpNo().trim()));
+        submission.setAttachmentIds(submissionAttachmentJson(issue.getId(), request.getProofAttachmentIds()));
+        submission.setSubmittedBy(currentEmpNo);
+        submission.setSubmittedName(empName(currentEmpNo));
+        submission.setSubmittedAt(now);
+        submission.setSource(versionNo > 1 ? "RESUBMIT" : "SUBMIT");
+        submission.setStatus(CpsRectificationSubmissionStatus.LOCKED.name());
+        submission.setCreatedAt(now);
+        submission.setUpdatedAt(now);
+        submissionMapper.insert(submission);
+
+        issue.setReasonAnalysis(request.getReasonAnalysis().trim());
+        issue.setShortTermMeasure(request.getShortTermMeasure().trim());
+        issue.setLongTermMeasure(request.getLongTermMeasure().trim());
+        issue.setResponsibleEmpNo(request.getResponsibleEmpNo().trim());
+        issue.setResponsibleEmpName(empName(request.getResponsibleEmpNo().trim()));
+        issue.setCurrentSubmissionVersion(versionNo);
+        issue.setStatus(target);
+        if (reviewer != null) {
+            issue.setReviewerEmpNo(reviewer);
+            issue.setReviewerEmpName(empName(reviewer));
+        }
+        // 初审中/待配置期间无人可办理：清空当前处理人（后续系统流转将路由到审核员）
+        issue.setCurrentHandlerEmpNo(null);
+        issue.setCurrentHandlerEmpName(null);
+
+        CpsInitialReviewTask task = initialReviewService.createTask(issue.getId(), submission.getId(), versionNo, now);
+        return task.getId();
+    }
+
+    private void applyActionV2(CpsIssue issue, CpsIssueActionRequest request,
+                               CpsIssueStatus nextStatus, String currentEmpNo, LocalDateTime now) {
+        issue.setStatus(nextStatus);
+        if (request.getAction() == CpsIssueAction.REPLY_ASSIGN) {
+            issue.setResponsibleEmpNo(request.getResponsibleEmpNo().trim());
+            issue.setResponsibleEmpName(empName(issue.getResponsibleEmpNo()));
+            issue.setCurrentHandlerEmpNo(issue.getResponsibleEmpNo());
+            issue.setCurrentHandlerEmpName(issue.getResponsibleEmpName());
+            if (request.getCategoryL1Id() != null && request.getCategoryL2Id() != null) {
+                issue.setCategoryL1Id(request.getCategoryL1Id());
+                issue.setCategoryL2Id(request.getCategoryL2Id());
+                issue.setCategoryModifiedFlag(
+                        !Objects.equals(issue.getAiCategoryL1Id(), request.getCategoryL1Id())
+                                || !Objects.equals(issue.getAiCategoryL2Id(), request.getCategoryL2Id())
+                );
+            }
+        } else if (request.getAction() == CpsIssueAction.SAVE_DRAFT) {
+            issue.setReasonAnalysis(trimToNull(request.getReasonAnalysis()));
+            issue.setShortTermMeasure(trimToNull(request.getShortTermMeasure()));
+            issue.setLongTermMeasure(trimToNull(request.getLongTermMeasure()));
+            issue.setRectifyRemark(trimToNull(request.getRectifyRemark()));
+            if (!isBlank(request.getResponsibleEmpNo())) {
+                issue.setResponsibleEmpNo(request.getResponsibleEmpNo().trim());
+                issue.setResponsibleEmpName(empName(issue.getResponsibleEmpNo()));
+            }
+        } else if (request.getAction() == CpsIssueAction.TRANSFER) {
+            // 转办：仅当前承办人办理并接收退回，原办理人失权；责任员工不变（PRD §28.3）
+            issue.setCurrentHandlerEmpNo(request.getTargetEmpNo().trim());
+            issue.setCurrentHandlerEmpName(empName(issue.getCurrentHandlerEmpNo()));
+            CpsRectificationTransfer transfer = new CpsRectificationTransfer();
+            transfer.setIssueId(issue.getId());
+            transfer.setVersionNo(issue.getCurrentSubmissionVersion() == null || issue.getCurrentSubmissionVersion() <= 0
+                    ? null : issue.getCurrentSubmissionVersion());
+            transfer.setFromEmpNo(currentEmpNo);
+            transfer.setFromEmpName(empName(currentEmpNo));
+            transfer.setToEmpNo(issue.getCurrentHandlerEmpNo());
+            transfer.setToEmpName(issue.getCurrentHandlerEmpName());
+            transfer.setTransferredAt(now);
+            transfer.setRemark(trimToNull(request.getComment()));
+            transfer.setCreatedAt(now);
+            transferMapper.insert(transfer);
+        } else if (request.getAction() == CpsIssueAction.REVIEW_CLOSE) {
+            issue.setReviewOpinion(request.getReviewOpinion().trim());
+            issue.setCurrentHandlerEmpNo(null);
+            issue.setCurrentHandlerEmpName(null);
+            issue.setCloseTime(now);
+            markLatestSubmissionReviewed(issue);
+        } else if (request.getAction() == CpsIssueAction.REVIEW_REJECT) {
+            // 退回整改人员：重提必须再次触发 AI 初审（新版本），不沿用旧版本意见（PRD §28.3）
+            issue.setReviewOpinion(request.getReviewOpinion().trim());
+            CpsRectificationSubmission latest = submissionMapper.findLatestByIssueId(issue.getId());
+            String rectifier = latest != null ? latest.getSubmittedBy() : issue.getResponsibleEmpNo();
+            issue.setCurrentHandlerEmpNo(rectifier);
+            issue.setCurrentHandlerEmpName(empName(rectifier));
+            markLatestSubmissionReviewed(issue);
+        }
+    }
+
+    private void markLatestSubmissionReviewed(CpsIssue issue) {
+        if (issue.getCurrentSubmissionVersion() != null && issue.getCurrentSubmissionVersion() > 0) {
+            submissionMapper.markReviewed(issue.getId(), issue.getCurrentSubmissionVersion());
+        }
+    }
+
+    /** 版本证据附件快照：{"before":[ISSUE 阶段 ID],"after":[PROOF 阶段 ID]}。 */
+    private String submissionAttachmentJson(Long issueId, List<Long> proofAttachmentIds) {
+        List<Long> before = new java.util.ArrayList<>();
+        for (com.company.cps.domain.CpsIssueAttachment attachment : attachmentMapper.findByIssueAndStage(issueId, "ISSUE")) {
+            before.add(attachment.getId());
+        }
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("before", before);
+        snapshot.put("after", proofAttachmentIds);
+        try {
+            return OBJECT_MAPPER.writeValueAsString(snapshot);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to serialize submission attachment ids", exception);
+        }
+    }
+
 
     private void insertAiSuggestionIfPresent(Long issueId, CpsIssueAiSuggestionRequest request, LocalDateTime now) {
         if (request == null) {

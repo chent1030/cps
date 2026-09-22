@@ -29,6 +29,19 @@ cps:
     base-url: http://127.0.0.1:8000/api/v1
     tenant-id: local-factory
     timeout-ms: 10000
+  initial-review:
+    # 初审超时扫描（PRD §28.4）：RUNNING 且超 timeout-at 判 TIMEOUT_OPEN（可接管），30s 一轮
+    scan-enabled: ${CPS_INITIAL_REVIEW_SCAN_ENABLED:true}
+    scan-interval-ms: ${CPS_INITIAL_REVIEW_SCAN_INTERVAL_MS:30000}
+    scan-initial-delay-ms: ${CPS_INITIAL_REVIEW_SCAN_INITIAL_DELAY_MS:15000}
+    # 接管阈值（秒）：自提交成功时刻起算；默认 600s = 10 分钟
+    timeout-seconds: ${CPS_INITIAL_REVIEW_TIMEOUT_SECONDS:600}
+    # C-01 投递给 Python 的回调地址（指向本服务 C-02 端点）
+    callback-base-url: ${CPS_INITIAL_REVIEW_CALLBACK_BASE_URL:http://127.0.0.1:8080}
+  callback:
+    # C-02 来源校验：仅信 TCP 对端地址；本机联调可置 false 放行
+    trust-enabled: ${CPS_CALLBACK_TRUST_ENABLED:true}
+    trusted-ips: ${CPS_CALLBACK_TRUSTED_IPS:127.0.0.1,::1}
   knowledge:
     vector:
       bootstrap-enabled: ${CPS_KNOWLEDGE_VECTOR_BOOTSTRAP_ENABLED:false}

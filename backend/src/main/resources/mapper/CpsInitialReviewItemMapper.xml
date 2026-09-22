@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsInitialReviewItemMapper">
+
+    <insert id="insertBatch">
+        INSERT INTO cps_initial_review_item (
+          review_id, task_id, check_type, field_name, verdict,
+          text_length, punctuation_count, ratio_ok, reason, problem_fragment,
+          evidence_refs, confidence, created_at
+        ) VALUES
+        <foreach collection="items" item="item" separator=",">
+          (#{item.reviewId}, #{item.taskId}, #{item.checkType}, #{item.fieldName}, #{item.verdict},
+           #{item.textLength}, #{item.punctuationCount}, #{item.ratioOk}, #{item.reason}, #{item.problemFragment},
+           #{item.evidenceRefs}, #{item.confidence}, #{item.createdAt})
+        </foreach>
+    </insert>
+
+    <select id="findByReviewId" resultType="com.company.cps.domain.CpsInitialReviewItem">
+        SELECT * FROM cps_initial_review_item WHERE review_id = #{reviewId} ORDER BY id ASC
+    </select>
+
+    <select id="findByTaskId" resultType="com.company.cps.domain.CpsInitialReviewItem">
+        SELECT * FROM cps_initial_review_item WHERE task_id = #{taskId} ORDER BY id ASC
+    </select>
+</mapper>

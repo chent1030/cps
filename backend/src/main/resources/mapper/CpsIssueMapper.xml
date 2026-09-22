@@ -6,28 +6,47 @@
 
     <insert id="insert" parameterType="com.company.cps.domain.CpsIssue" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_issue (
-          agent_inspection_id, status, factory, area, line, process,
+          agent_inspection_id, flow_version, status, factory, area, line, process,
           ai_category_l1_id, ai_category_l2_id, category_l1_id, category_l2_id,
           category_modified_flag, description, creator_emp_no, feedback_emp_no,
           responsible_emp_no, proof_emp_no, reviewer_emp_no, current_handler_emp_no,
           creator_emp_name, feedback_emp_name, responsible_emp_name, proof_emp_name,
           reviewer_emp_name, current_handler_emp_name,
-          reason_analysis, corrective_measure, rectify_remark, review_opinion,
+          reason_analysis, corrective_measure, short_term_measure, long_term_measure,
+          current_submission_version, inspection_item_id, rectify_remark, review_opinion,
           submit_time, close_time, created_at, updated_at
         ) VALUES (
-          #{agentInspectionId}, #{status}, #{factory}, #{area}, #{line}, #{process},
+          #{agentInspectionId}, #{flowVersion}, #{status}, #{factory}, #{area}, #{line}, #{process},
           #{aiCategoryL1Id}, #{aiCategoryL2Id}, #{categoryL1Id}, #{categoryL2Id},
           #{categoryModifiedFlag}, #{description}, #{creatorEmpNo}, #{feedbackEmpNo},
           #{responsibleEmpNo}, #{proofEmpNo}, #{reviewerEmpNo}, #{currentHandlerEmpNo},
           #{creatorEmpName}, #{feedbackEmpName}, #{responsibleEmpName}, #{proofEmpName},
           #{reviewerEmpName}, #{currentHandlerEmpName},
-          #{reasonAnalysis}, #{correctiveMeasure}, #{rectifyRemark}, #{reviewOpinion},
+          #{reasonAnalysis}, #{correctiveMeasure}, #{shortTermMeasure}, #{longTermMeasure},
+          #{currentSubmissionVersion}, #{inspectionItemId}, #{rectifyRemark}, #{reviewOpinion},
           #{submitTime}, #{closeTime}, #{createdAt}, #{updatedAt}
         )
     </insert>
 
     <update id="updateAgentInspectionId">
         UPDATE cps_issue SET agent_inspection_id = #{agentInspectionId} WHERE id = #{id}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE cps_issue
+        SET status = #{status}, updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateReviewRouting">
+        UPDATE cps_issue
+        SET reviewer_emp_no = #{reviewerEmpNo},
+            reviewer_emp_name = #{reviewerEmpName},
+            current_handler_emp_no = #{reviewerEmpNo},
+            current_handler_emp_name = #{reviewerEmpName},
+            status = #{status},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
     </update>
 
     <select id="findById" resultType="com.company.cps.domain.CpsIssue">
@@ -49,6 +68,10 @@
             current_handler_emp_name = #{currentHandlerEmpName},
             reason_analysis = #{reasonAnalysis},
             corrective_measure = #{correctiveMeasure},
+            short_term_measure = #{shortTermMeasure},
+            long_term_measure = #{longTermMeasure},
+            current_submission_version = #{currentSubmissionVersion},
+            inspection_item_id = #{inspectionItemId},
             rectify_remark = #{rectifyRemark},
             review_opinion = #{reviewOpinion},
             category_l1_id = #{categoryL1Id},

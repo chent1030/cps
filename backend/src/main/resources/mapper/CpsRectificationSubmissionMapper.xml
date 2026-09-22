@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsRectificationSubmissionMapper">
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsRectificationSubmission" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_rectification_submission (
+          issue_id, version_no, reason, short_term_measure, long_term_measure,
+          responsible_emp_no, responsible_emp_name, attachment_ids,
+          submitted_by, submitted_name, submitted_at, source, status,
+          created_at, updated_at
+        ) VALUES (
+          #{issueId}, #{versionNo}, #{reason}, #{shortTermMeasure}, #{longTermMeasure},
+          #{responsibleEmpNo}, #{responsibleEmpName}, #{attachmentIds},
+          #{submittedBy}, #{submittedName}, #{submittedAt}, #{source}, #{status},
+          #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="findById" resultType="com.company.cps.domain.CpsRectificationSubmission">
+        SELECT * FROM cps_rectification_submission WHERE id = #{id}
+    </select>
+
+    <select id="findByIssueAndVersion" resultType="com.company.cps.domain.CpsRectificationSubmission">
+        SELECT * FROM cps_rectification_submission WHERE issue_id = #{issueId} AND version_no = #{versionNo}
+    </select>
+
+    <select id="findLatestByIssueId" resultType="com.company.cps.domain.CpsRectificationSubmission">
+        SELECT * FROM cps_rectification_submission
+        WHERE issue_id = #{issueId}
+        ORDER BY version_no DESC
+        LIMIT 1
+    </select>
+
+    <update id="markSuperseded">
+        UPDATE cps_rectification_submission
+        SET status = 'SUPERSEDED', updated_at = NOW()
+        WHERE issue_id = #{issueId} AND status = 'LOCKED'
+    </update>
+
+    <update id="markReviewed">
+        UPDATE cps_rectification_submission
+        SET status = 'REVIEWED', updated_at = NOW()
+        WHERE issue_id = #{issueId} AND version_no = #{versionNo}
+    </update>
+
+    <select id="findByIssueId" resultType="com.company.cps.domain.CpsRectificationSubmission">
+        SELECT * FROM cps_rectification_submission WHERE issue_id = #{issueId} ORDER BY version_no ASC
+    </select>
+</mapper>

@@ -7,5 +7,13 @@ public enum CpsIssueAction {
     UPLOAD_PROOF,
     REVIEW_CLOSE,
     REVIEW_REJECT,
-    TRANSFER
+    TRANSFER,
+    /** V2 整改域：提交整改（原因+短期/长期措施+整改照片，触发 AI 初审）。 */
+    SUBMIT_RECTIFICATION,
+    /** V2 整改域：暂存（允许不完整内容，不触发初审，不生成版本）。 */
+    SAVE_DRAFT,
+    /** V2 系统事件（不进入 availableActions）：AI 初审终态推进（结果就绪/执行失败/超时可接管）。 */
+    AI_REVIEW_ADVANCE,
+    /** V2 系统事件（不进入 availableActions）：审核员配置完成，待配置单继续流转（AC-25）。 */
+    REVIEWER_CONFIGURED
 }

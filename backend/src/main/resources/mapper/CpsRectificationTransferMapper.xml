@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsRectificationTransferMapper">
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsRectificationTransfer" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_rectification_transfer (
+          issue_id, version_no, from_emp_no, from_emp_name, to_emp_no, to_emp_name,
+          transferred_at, remark, created_at
+        ) VALUES (
+          #{issueId}, #{versionNo}, #{fromEmpNo}, #{fromEmpName}, #{toEmpNo}, #{toEmpName},
+          #{transferredAt}, #{remark}, #{createdAt}
+        )
+    </insert>
+
+    <select id="findByIssueId" resultType="com.company.cps.domain.CpsRectificationTransfer">
+        SELECT * FROM cps_rectification_transfer WHERE issue_id = #{issueId} ORDER BY transferred_at ASC
+    </select>
+</mapper>

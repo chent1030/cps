@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsInitialReviewTaskMapper">
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsInitialReviewTask" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_initial_review_task (
+          issue_id, submission_id, version_no, status, review_task_ref, idempotency_key,
+          submitted_at, timeout_at, retry_count, created_at, updated_at
+        ) VALUES (
+          #{issueId}, #{submissionId}, #{versionNo}, #{status}, #{reviewTaskRef}, #{idempotencyKey},
+          #{submittedAt}, #{timeoutAt}, #{retryCount}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="findById" resultType="com.company.cps.domain.CpsInitialReviewTask">
+        SELECT * FROM cps_initial_review_task WHERE id = #{id}
+    </select>
+
+    <select id="findByIssueAndVersion" resultType="com.company.cps.domain.CpsInitialReviewTask">
+        SELECT * FROM cps_initial_review_task WHERE issue_id = #{issueId} AND version_no = #{versionNo}
+    </select>
+
+    <select id="findByIdempotencyKey" resultType="com.company.cps.domain.CpsInitialReviewTask">
+        SELECT * FROM cps_initial_review_task WHERE idempotency_key = #{idempotencyKey}
+    </select>
+
+    <select id="findExpiredRunning" resultType="com.company.cps.domain.CpsInitialReviewTask">
+        SELECT * FROM cps_initial_review_task
+        WHERE status = 'RUNNING' AND timeout_at &lt;= #{now}
+    </select>
+
+    <select id="findTerminalUnderReviewerConfig" resultType="com.company.cps.domain.CpsInitialReviewTask">
+        SELECT t.*
+        FROM cps_initial_review_task t
+        INNER JOIN cps_issue i ON i.id = t.issue_id
+        WHERE i.status = 'PENDING_REVIEWER_CONFIG'
+          AND t.status IN ('COMPLETED', 'FAILED', 'TIMEOUT_OPEN')
+    </select>
+
+    <update id="updateReviewTaskRef">
+        UPDATE cps_initial_review_task
+        SET review_task_ref = #{reviewTaskRef}, updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="markTimeoutOpen">
+        UPDATE cps_initial_review_task
+        SET status = 'TIMEOUT_OPEN', updated_at = NOW()
+        WHERE id = #{id} AND status = 'RUNNING'
+    </update>
+
+    <update id="markFailed">
+        UPDATE cps_initial_review_task
+        SET status = 'FAILED', error_code = #{errorCode}, completed_at = #{now}, updated_at = NOW()
+        WHERE id = #{id} AND status IN ('RUNNING', 'TIMEOUT_OPEN')
+    </update>
+
+    <update id="markCompleted">
+        UPDATE cps_initial_review_task
+        SET status = 'COMPLETED', completed_at = #{now}, updated_at = NOW()
+        WHERE id = #{id} AND status IN ('RUNNING', 'TIMEOUT_OPEN')
+    </update>
+
+    <update id="markTakenOver">
+        UPDATE cps_initial_review_task
+        SET status = 'TAKEN_OVER', taken_over_by = #{takenOverBy}, taken_over_name = #{takenOverName},
+            taken_over_at = #{now}, takeover_reason = #{reason}, completed_at = #{now}, updated_at = NOW()
+        WHERE id = #{id} AND status IN ('RUNNING', 'TIMEOUT_OPEN', 'FAILED')
+    </update>
+
+    <update id="markLateResult">
+        UPDATE cps_initial_review_task
+        SET status = 'LATE_RESULT', updated_at = NOW()
+        WHERE id = #{id} AND status = 'TAKEN_OVER'
+    </update>
+</mapper>

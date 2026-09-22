@@ -29,6 +29,18 @@ public interface CpsIssueMapper {
 
     void updateAgentInspectionId(@Param("id") Long id, @Param("agentInspectionId") String agentInspectionId);
 
+    /** 系统驱动流转：仅更新状态与更新时间（V2 AI 初审推进/待配置）。 */
+    void updateStatus(@Param("id") Long id, @Param("status") CpsIssueStatus status, @Param("updatedAt") java.time.LocalDateTime updatedAt);
+
+    /** 系统驱动流转：审核员路由落位（V2 AI 完成/接管后，当前处理人切到审核员）。 */
+    void updateReviewRouting(
+            @Param("id") Long id,
+            @Param("reviewerEmpNo") String reviewerEmpNo,
+            @Param("reviewerEmpName") String reviewerEmpName,
+            @Param("status") CpsIssueStatus status,
+            @Param("updatedAt") java.time.LocalDateTime updatedAt
+    );
+
     /**
      * 按页签查询当前用户的问题列表。
      */

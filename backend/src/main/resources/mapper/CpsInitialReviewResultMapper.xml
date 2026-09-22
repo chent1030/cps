@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsInitialReviewResultMapper">
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsInitialReviewResult" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_initial_review_result (
+          task_id, submission_id, issue_id, version_no, overall, model_status,
+          is_late, callback_idempotency_key, created_at
+        ) VALUES (
+          #{taskId}, #{submissionId}, #{issueId}, #{versionNo}, #{overall}, #{modelStatus},
+          #{isLate}, #{callbackIdempotencyKey}, #{createdAt}
+        )
+    </insert>
+
+    <select id="findByTaskId" resultType="com.company.cps.domain.CpsInitialReviewResult">
+        SELECT * FROM cps_initial_review_result WHERE task_id = #{taskId}
+    </select>
+
+    <select id="findByIssueId" resultType="com.company.cps.domain.CpsInitialReviewResult">
+        SELECT * FROM cps_initial_review_result WHERE issue_id = #{issueId} ORDER BY version_no ASC
+    </select>
+</mapper>

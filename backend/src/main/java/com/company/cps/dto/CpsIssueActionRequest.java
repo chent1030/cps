@@ -9,6 +9,8 @@ public class CpsIssueActionRequest {
     private CpsIssueAction action;
     private String reasonAnalysis;
     private String correctiveMeasure;
+    private String shortTermMeasure;
+    private String longTermMeasure;
     private String responsibleEmpNo;
     private String proofEmpNo;
     private String reviewerEmpNo;
@@ -29,6 +31,10 @@ public class CpsIssueActionRequest {
     public void setReasonAnalysis(String reasonAnalysis) { this.reasonAnalysis = reasonAnalysis; }
     public String getCorrectiveMeasure() { return correctiveMeasure; }
     public void setCorrectiveMeasure(String correctiveMeasure) { this.correctiveMeasure = correctiveMeasure; }
+    public String getShortTermMeasure() { return shortTermMeasure; }
+    public void setShortTermMeasure(String shortTermMeasure) { this.shortTermMeasure = shortTermMeasure; }
+    public String getLongTermMeasure() { return longTermMeasure; }
+    public void setLongTermMeasure(String longTermMeasure) { this.longTermMeasure = longTermMeasure; }
     public String getResponsibleEmpNo() { return responsibleEmpNo; }
     public void setResponsibleEmpNo(String responsibleEmpNo) { this.responsibleEmpNo = responsibleEmpNo; }
     public String getProofEmpNo() { return proofEmpNo; }

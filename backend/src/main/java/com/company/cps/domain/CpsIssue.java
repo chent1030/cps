@@ -5,6 +5,8 @@ import java.time.LocalDateTime;
 public class CpsIssue {
     private Long id;
     private String agentInspectionId;
+    /** 流程版本：legacy（旧状态机，冻结）/ v2（整改域新流程）。 */
+    private String flowVersion;
     private CpsIssueStatus status;
     private String factory;
     private String area;
@@ -30,6 +32,10 @@ public class CpsIssue {
     private String currentHandlerEmpName;
     private String reasonAnalysis;
     private String correctiveMeasure;
+    private String shortTermMeasure;
+    private String longTermMeasure;
+    private Integer currentSubmissionVersion;
+    private Long inspectionItemId;
     private String rectifyRemark;
     private String reviewOpinion;
     private LocalDateTime submitTime;
@@ -41,6 +47,8 @@ public class CpsIssue {
     public void setId(Long id) { this.id = id; }
     public String getAgentInspectionId() { return agentInspectionId; }
     public void setAgentInspectionId(String agentInspectionId) { this.agentInspectionId = agentInspectionId; }
+    public String getFlowVersion() { return flowVersion; }
+    public void setFlowVersion(String flowVersion) { this.flowVersion = flowVersion; }
     public CpsIssueStatus getStatus() { return status; }
     public void setStatus(CpsIssueStatus status) { this.status = status; }
     public String getFactory() { return factory; }
@@ -91,6 +99,14 @@ public class CpsIssue {
     public void setReasonAnalysis(String reasonAnalysis) { this.reasonAnalysis = reasonAnalysis; }
     public String getCorrectiveMeasure() { return correctiveMeasure; }
     public void setCorrectiveMeasure(String correctiveMeasure) { this.correctiveMeasure = correctiveMeasure; }
+    public String getShortTermMeasure() { return shortTermMeasure; }
+    public void setShortTermMeasure(String shortTermMeasure) { this.shortTermMeasure = shortTermMeasure; }
+    public String getLongTermMeasure() { return longTermMeasure; }
+    public void setLongTermMeasure(String longTermMeasure) { this.longTermMeasure = longTermMeasure; }
+    public Integer getCurrentSubmissionVersion() { return currentSubmissionVersion; }
+    public void setCurrentSubmissionVersion(Integer currentSubmissionVersion) { this.currentSubmissionVersion = currentSubmissionVersion; }
+    public Long getInspectionItemId() { return inspectionItemId; }
+    public void setInspectionItemId(Long inspectionItemId) { this.inspectionItemId = inspectionItemId; }
     public String getRectifyRemark() { return rectifyRemark; }
     public void setRectifyRemark(String rectifyRemark) { this.rectifyRemark = rectifyRemark; }
     public String getReviewOpinion() { return reviewOpinion; }
