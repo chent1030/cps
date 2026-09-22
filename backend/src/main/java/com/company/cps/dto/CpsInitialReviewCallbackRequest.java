@@ -13,9 +13,9 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class CpsInitialReviewCallbackRequest {
 
-    /** Java 侧初审任务 ID（C-01 投递时 callback.task_id）。 */
+    /** 任务定位键：数字主键字符串，或 Python 侧任务引用 cps-rectify-{issueId}-v{n}（J0 联调修正：Python 只持有字符串引用）。 */
     @JsonProperty("task_id")
-    private Long taskId;
+    private String taskId;
 
     @JsonProperty("submission_id")
     private Long submissionId;
@@ -104,8 +104,8 @@ public class CpsInitialReviewCallbackRequest {
         public void setConfidence(BigDecimal confidence) { this.confidence = confidence; }
     }
 
-    public Long getTaskId() { return taskId; }
-    public void setTaskId(Long taskId) { this.taskId = taskId; }
+    public String getTaskId() { return taskId; }
+    public void setTaskId(String taskId) { this.taskId = taskId; }
     public Long getSubmissionId() { return submissionId; }
     public void setSubmissionId(Long submissionId) { this.submissionId = submissionId; }
     public Long getIssueId() { return issueId; }

@@ -169,7 +169,7 @@ public class CpsInitialReviewService {
         CpsInitialReviewTask task = resolveTask(request);
         if (task == null) {
             throw new IllegalArgumentException("Initial review task not found for callback: "
-                    + (request.getTaskId() != null ? request.getTaskId() : request.getIdempotencyKey()));
+                    + (notBlank(request.getTaskId()) ? request.getTaskId() : request.getIdempotencyKey()));
         }
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("task_id", task.getId());
@@ -382,22 +382,41 @@ public class CpsInitialReviewService {
     }
 
     private CpsInitialReviewTask resolveTask(CpsInitialReviewCallbackRequest request) {
-        if (request.getTaskId() != null) {
-            return taskMapper.findById(request.getTaskId());
+        // J0 联调修正：C-01 载荷不含 Java 数字主键，Python 只持有字符串引用。
+        // 定位顺序：task_id（数字串→主键；cps-rectify-*→投递幂等键）
+        //         → idempotency_key（initial-review-result-{数字|引用}）
+        //         → issue_id+version_no 兜底。
+        if (notBlank(request.getTaskId())) {
+            Long numericId = parseLongOrNull(request.getTaskId());
+            if (numericId != null) {
+                return taskMapper.findById(numericId);
+            }
+            return taskMapper.findByIdempotencyKey(request.getTaskId());
         }
         if (notBlank(request.getIdempotencyKey())
                 && request.getIdempotencyKey().startsWith("initial-review-result-")) {
             String idPart = request.getIdempotencyKey().substring("initial-review-result-".length());
-            try {
-                return taskMapper.findById(Long.parseLong(idPart));
-            } catch (NumberFormatException ignored) {
-                return null;
+            Long numericId = parseLongOrNull(idPart);
+            if (numericId != null) {
+                return taskMapper.findById(numericId);
             }
+            return taskMapper.findByIdempotencyKey(idPart);
         }
         if (request.getIssueId() != null && request.getVersionNo() != null) {
             return taskMapper.findByIssueAndVersion(request.getIssueId(), request.getVersionNo());
         }
         return null;
+    }
+
+    private Long parseLongOrNull(String value) {
+        if (value == null || value.isEmpty()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(value.trim());
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 
     /**

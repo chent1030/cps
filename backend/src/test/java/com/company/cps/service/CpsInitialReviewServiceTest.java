@@ -374,7 +374,7 @@ class CpsInitialReviewServiceTest {
 
     private CpsInitialReviewCallbackRequest callback(Long taskId, String idempotencyKey) {
         CpsInitialReviewCallbackRequest request = new CpsInitialReviewCallbackRequest();
-        request.setTaskId(taskId);
+        request.setTaskId(taskId == null ? null : String.valueOf(taskId));
         request.setIdempotencyKey(idempotencyKey);
         request.setSubmissionId(55L);
         request.setIssueId(101L);
