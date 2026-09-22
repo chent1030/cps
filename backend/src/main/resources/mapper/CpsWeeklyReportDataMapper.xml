@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsWeeklyReportDataMapper">
+
+    <select id="findIssueSummary" resultType="map">
+        SELECT submit_date, factory, line, process, status,
+               issue_count, closed_count, v2_count
+        FROM weekly_report_data_issue_summary
+        WHERE submit_date >= DATE(#{periodStart})
+          AND submit_date &lt; DATE(#{periodEnd})
+          <if test="factory != null and factory != ''">
+              AND factory = #{factory}
+          </if>
+        ORDER BY submit_date ASC, factory ASC, line ASC
+    </select>
+
+    <select id="findRectificationSummary" resultType="map">
+        SELECT submit_date, source, status, submit_count
+        FROM weekly_report_data_rectification_summary
+        WHERE submit_date >= DATE(#{periodStart})
+          AND submit_date &lt; DATE(#{periodEnd})
+        ORDER BY submit_date ASC
+    </select>
+
+    <select id="findInitialReviewSummary" resultType="map">
+        SELECT submit_date, task_status, overall, task_count
+        FROM weekly_report_data_initial_review_summary
+        WHERE submit_date >= DATE(#{periodStart})
+          AND submit_date &lt; DATE(#{periodEnd})
+        ORDER BY submit_date ASC
+    </select>
+
+    <select id="findCheckItemSnapshot" resultType="map">
+        SELECT check_item_id, photo_category, applicable_status, config_version, enabled
+        FROM weekly_report_data_check_item_snapshot
+        ORDER BY check_item_id ASC
+    </select>
+
+    <select id="findInventoryLowStock" resultType="map">
+        SELECT factory, storage_room, room_keeper_emp_no, room_keeper_emp_name,
+               low_stock_count, total_short_qty
+        FROM weekly_report_data_inventory_low_stock
+        ORDER BY factory ASC, storage_room ASC
+    </select>
+
+</mapper>

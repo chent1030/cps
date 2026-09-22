@@ -174,6 +174,92 @@ public class CpsAgentFrameworkClient {
         return payloads;
     }
 
+    /**
+     * C-07：调 Python 计划 Agent 生成巡检计划草稿。
+     * POST {base}/api/agent/inspection-plans/draft；幂等键 plan-draft-{sourceRunId}。
+     * 返回 Map 内含 draft_content_json / title / tasks 建议等，由 Java 落 cps_inspection_plan。
+     * Python 侧实现可后置，本期 Python 缺位时 client 禁用或返回 5xx 由 service 兜底降级——保存请求而非拒绝。
+     */
+    public Map<String, Object> requestInspectionPlanDraft(
+            String sourceRunId,
+            String planType,
+            String title,
+            String factory,
+            String area,
+            String riskBasis) {
+        if (!properties.isEnabled()) return null;
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("idempotency_key", "plan-draft-" + sourceRunId);
+        payload.put("source_run_id", sourceRunId);
+        payload.put("plan_type", planType);
+        payload.put("title", title);
+        if (factory != null) payload.put("factory", factory);
+        if (area != null) payload.put("area", area);
+        if (riskBasis != null) payload.put("risk_basis", riskBasis);
+        Map response = client.postForObject(url("/agent/inspection-plans/draft"),
+                new HttpEntity<>(payload, headers()), Map.class);
+        return response == null ? new LinkedHashMap<>() : response;
+    }
+
+    /**
+     * C-05/C-08：admin 端周报运行记录查询（PRD §21.3；AC-04/05）。
+     * GET {base}/api/agent/weekly-report-runs；按类型/周期/状态过滤。
+     * 返回 Map 列表（不强制 schema，由 service 透传给 admin）。
+     */
+    public List<Map<String, Object>> listWeeklyReportRuns(
+            String inspectionType,
+            String status,
+            String periodStart,
+            String periodEnd) {
+        if (!properties.isEnabled()) return new java.util.ArrayList<>();
+        StringBuilder query = new StringBuilder();
+        if (inspectionType != null) query.append("&inspection_type=").append(inspectionType);
+        if (status != null) query.append("&status=").append(status);
+        if (periodStart != null) query.append("&period_start=").append(periodStart);
+        if (periodEnd != null) query.append("&period_end=").append(periodEnd);
+        String url = url("/agent/weekly-report-runs")
+                + (query.length() == 0 ? "" : "?" + query.substring(1));
+        java.util.List<Map<String, Object>> response =
+                (java.util.List<Map<String, Object>>) client.getForObject(url, List.class);
+        return response == null ? new java.util.ArrayList<>() : response;
+    }
+
+    /**
+     * C-05/C-08：受控下载周报文件流。Python 校验 internal_trust + status=ARCHIVED；
+     * Java 侧不做二次权限过滤（admin 端已在 controller 校验登录 + operator 身份）。
+     * 返回字节数组 + contentType；Java 写入 HttpServletResponse 流。
+     */
+    public WeeklyReportFile downloadWeeklyReportFile(String runId) {
+        if (!properties.isEnabled()) return null;
+        org.springframework.http.ResponseEntity<byte[]> response = client.exchange(
+                url("/agent/weekly-report-runs/" + runId + "/file"),
+                org.springframework.http.HttpMethod.GET,
+                null,
+                byte[].class);
+        if (response == null || response.getBody() == null) return null;
+        org.springframework.http.HttpHeaders headers = response.getHeaders();
+        String contentType = headers.getContentType() == null
+                ? "application/octet-stream" : headers.getContentType().toString();
+        String fileName = headers.getFirst("Content-Disposition");
+        return new WeeklyReportFile(response.getBody(), contentType, fileName);
+    }
+
+    /** 受控下载周报文件包装（C-05/C-08）。 */
+    public static class WeeklyReportFile {
+        private final byte[] content;
+        private final String contentType;
+        private final String contentDisposition;
+
+        public WeeklyReportFile(byte[] content, String contentType, String contentDisposition) {
+            this.content = content;
+            this.contentType = contentType;
+            this.contentDisposition = contentDisposition;
+        }
+        public byte[] getContent() { return content; }
+        public String getContentType() { return contentType; }
+        public String getContentDisposition() { return contentDisposition; }
+    }
+
     /** Read-only admin projections are exposed through CPS so the browser never talks to Agent runtime directly. */
     public Map<String, Object> runtimeStatus() {
         Map<String, Object> status = new LinkedHashMap<>();

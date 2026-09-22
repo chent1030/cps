@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsInspectionPlanMapper">
+
+    <sql id="BaseColumns">
+        id, source_run_id, report_id, plan_type, title, target_factory, target_area,
+        risk_basis, draft_content_json, status, draft_idempotency_key, config_version,
+        lock_version, draft_by, approver, approver_name, approved_at, reject_reason,
+        created_at, updated_at
+    </sql>
+
+    <resultMap id="planMap" type="com.company.cps.domain.CpsInspectionPlan">
+        <id column="id" property="id"/>
+        <result column="source_run_id" property="sourceRunId"/>
+        <result column="report_id" property="reportId"/>
+        <result column="plan_type" property="planType"/>
+        <result column="title" property="title"/>
+        <result column="target_factory" property="targetFactory"/>
+        <result column="target_area" property="targetArea"/>
+        <result column="risk_basis" property="riskBasis"/>
+        <result column="draft_content_json" property="draftContentJson"/>
+        <result column="status" property="status"/>
+        <result column="draft_idempotency_key" property="draftIdempotencyKey"/>
+        <result column="config_version" property="configVersion"/>
+        <result column="lock_version" property="lockVersion"/>
+        <result column="draft_by" property="draftBy"/>
+        <result column="approver" property="approver"/>
+        <result column="approver_name" property="approverName"/>
+        <result column="approved_at" property="approvedAt"/>
+        <result column="reject_reason" property="rejectReason"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <select id="findById" resultMap="planMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_inspection_plan
+        WHERE id = #{id}
+    </select>
+
+    <select id="findBySourceRunIdAndPlanType" resultMap="planMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_inspection_plan
+        WHERE source_run_id = #{sourceRunId} AND plan_type = #{planType}
+    </select>
+
+    <select id="findByDraftIdempotencyKey" resultMap="planMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_inspection_plan
+        WHERE draft_idempotency_key = #{key}
+    </select>
+
+    <select id="findByStatus" resultMap="planMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_inspection_plan
+        WHERE status = #{status}
+        ORDER BY created_at DESC
+    </select>
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsInspectionPlan" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_inspection_plan (
+            source_run_id, report_id, plan_type, title, target_factory, target_area,
+            risk_basis, draft_content_json, status, draft_idempotency_key, config_version,
+            lock_version, draft_by, approver, approver_name, approved_at, reject_reason
+        ) VALUES (
+            #{sourceRunId}, #{reportId}, #{planType}, #{title}, #{targetFactory}, #{targetArea},
+            #{riskBasis}, #{draftContentJson}, #{status}, #{draftIdempotencyKey}, #{configVersion},
+            #{lockVersion}, #{draftBy}, #{approver}, #{approverName}, #{approvedAt}, #{rejectReason}
+        )
+    </insert>
+
+    <!-- 草稿回写 CAS：config_version++，lock_version 不动。status 必须仍为 PENDING_REVIEW（service 守卫）。 -->
+    <update id="updateDraftCas" parameterType="com.company.cps.domain.CpsInspectionPlan">
+        UPDATE cps_inspection_plan
+        SET draft_content_json = #{draftContentJson},
+            config_version = IFNULL(#{configVersion}, 0) + 1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+          AND status = 'PENDING_REVIEW'
+    </update>
+
+    <!-- 批准 CAS：lock_version 命中自增，否则返回 0 抛并发冲突（service 层）。 -->
+    <update id="approveCas" parameterType="com.company.cps.domain.CpsInspectionPlan">
+        UPDATE cps_inspection_plan
+        SET status = 'APPROVED',
+            approver = #{approver},
+            approver_name = #{approverName},
+            approved_at = #{approvedAt},
+            lock_version = IFNULL(#{lockVersion}, 0) + 1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+          AND status = 'PENDING_REVIEW'
+          AND lock_version = IFNULL(#{lockVersion}, 0)
+    </update>
+
+    <!-- 拒绝 CAS：同 approveCas 但落 REJECTED + reject_reason。 -->
+    <update id="rejectCas" parameterType="com.company.cps.domain.CpsInspectionPlan">
+        UPDATE cps_inspection_plan
+        SET status = 'REJECTED',
+            approver = #{approver},
+            approver_name = #{approverName},
+            approved_at = #{approvedAt},
+            reject_reason = #{rejectReason},
+            lock_version = IFNULL(#{lockVersion}, 0) + 1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+          AND status = 'PENDING_REVIEW'
+          AND lock_version = IFNULL(#{lockVersion}, 0)
+    </update>
+
+</mapper>

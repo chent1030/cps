@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsInspectionPlanTaskMapper">
+
+    <sql id="BaseColumns">
+        id, plan_id, task_type, title, target_emp_no, target_emp_name,
+        scheduled_at, frequency, acceptance_criteria, evidence_requirement,
+        task_status, reference_issue_id, reference_object_key, reference_object_type,
+        created_at, updated_at
+    </sql>
+
+    <resultMap id="taskMap" type="com.company.cps.domain.CpsInspectionPlanTask">
+        <id column="id" property="id"/>
+        <result column="plan_id" property="planId"/>
+        <result column="task_type" property="taskType"/>
+        <result column="title" property="title"/>
+        <result column="target_emp_no" property="targetEmpNo"/>
+        <result column="target_emp_name" property="targetEmpName"/>
+        <result column="scheduled_at" property="scheduledAt"/>
+        <result column="frequency" property="frequency"/>
+        <result column="acceptance_criteria" property="acceptanceCriteria"/>
+        <result column="evidence_requirement" property="evidenceRequirement"/>
+        <result column="task_status" property="taskStatus"/>
+        <result column="reference_issue_id" property="referenceIssueId"/>
+        <result column="reference_object_key" property="referenceObjectKey"/>
+        <result column="reference_object_type" property="referenceObjectType"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <select id="findByPlanId" resultMap="taskMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_inspection_plan_task
+        WHERE plan_id = #{planId}
+        ORDER BY id ASC
+    </select>
+
+    <select id="findByPlanIdAndTaskType" resultMap="taskMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_inspection_plan_task
+        WHERE plan_id = #{planId} AND task_type = #{taskType}
+    </select>
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsInspectionPlanTask" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_inspection_plan_task (
+            plan_id, task_type, title, target_emp_no, target_emp_name,
+            scheduled_at, frequency, acceptance_criteria, evidence_requirement,
+            task_status, reference_issue_id, reference_object_key, reference_object_type
+        ) VALUES (
+            #{planId}, #{taskType}, #{title}, #{targetEmpNo}, #{targetEmpName},
+            #{scheduledAt}, #{frequency}, #{acceptanceCriteria}, #{evidenceRequirement},
+            #{taskStatus}, #{referenceIssueId}, #{referenceObjectKey}, #{referenceObjectType}
+        )
+    </insert>
+
+    <select id="findExistingTaskTypes" resultType="com.company.cps.domain.CpsInspectionPlanTaskType">
+        SELECT task_type
+        FROM cps_inspection_plan_task
+        WHERE plan_id = #{planId}
+    </select>
+
+</mapper>
