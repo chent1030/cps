@@ -7,6 +7,8 @@ import com.company.cps.domain.CpsInitialReviewTaskStatus;
 import com.company.cps.domain.CpsIssue;
 import com.company.cps.domain.CpsIssueStatus;
 import com.company.cps.dto.CpsInitialReviewCallbackRequest;
+import com.company.cps.mapper.CpsInitialReviewConfigMapper;
+import com.company.cps.mapper.CpsInitialReviewEventMapper;
 import com.company.cps.mapper.CpsInitialReviewItemMapper;
 import com.company.cps.mapper.CpsInitialReviewResultMapper;
 import com.company.cps.mapper.CpsInitialReviewTaskMapper;
@@ -14,6 +16,7 @@ import com.company.cps.mapper.CpsIssueAttachmentMapper;
 import com.company.cps.mapper.CpsIssueFlowLogMapper;
 import com.company.cps.mapper.CpsIssueMapper;
 import com.company.cps.mapper.CpsRectificationSubmissionMapper;
+import com.company.cps.mapper.CpsReviewAdjudicationMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -57,6 +60,9 @@ class CpsInitialReviewServiceTest {
     @Mock private CpsIssueFlowLogMapper flowLogMapper;
     @Mock private CpsAgentFrameworkClient agentFrameworkClient;
     @Mock private CpsAssignmentService assignmentService;
+    @Mock private CpsInitialReviewConfigMapper configMapper;
+    @Mock private CpsInitialReviewEventMapper eventMapper;
+    @Mock private CpsReviewAdjudicationMapper adjudicationMapper;
 
     private CpsInitialReviewService service;
 
@@ -67,7 +73,7 @@ class CpsInitialReviewServiceTest {
         properties.setCallbackBaseUrl("http://127.0.0.1:8080/");
         service = new CpsInitialReviewService(taskMapper, resultMapper, itemMapper, submissionMapper,
                 issueMapper, attachmentMapper, flowLogMapper, agentFrameworkClient, assignmentService,
-                properties, new CpsWorkflowStateMachineV2());
+                properties, new CpsWorkflowStateMachineV2(), configMapper, eventMapper, adjudicationMapper);
     }
 
     // ---------- createTask 幂等 ----------

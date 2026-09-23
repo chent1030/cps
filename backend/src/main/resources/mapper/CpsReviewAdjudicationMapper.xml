@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsReviewAdjudicationMapper">
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsReviewAdjudication" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_review_adjudication (
+          issue_id, version_no, task_id, reviewer_emp_no, reviewer_emp_name,
+          decision, ai_overall, ai_relation, reason, from_status, to_status, created_at
+        ) VALUES (
+          #{issueId}, #{versionNo}, #{taskId}, #{reviewerEmpNo}, #{reviewerEmpName},
+          #{decision}, #{aiOverall}, #{aiRelation}, #{reason}, #{fromStatus}, #{toStatus}, #{createdAt}
+        )
+    </insert>
+
+    <select id="findByIssueAndVersion" resultType="com.company.cps.domain.CpsReviewAdjudication">
+        SELECT * FROM cps_review_adjudication WHERE issue_id = #{issueId} AND version_no = #{versionNo}
+    </select>
+
+    <select id="findLatestByIssueId" resultType="com.company.cps.domain.CpsReviewAdjudication">
+        SELECT * FROM cps_review_adjudication WHERE issue_id = #{issueId} ORDER BY id DESC LIMIT 1
+    </select>
+</mapper>

@@ -75,4 +75,53 @@
         SET status = 'LATE_RESULT', updated_at = NOW()
         WHERE id = #{id} AND status = 'TAKEN_OVER'
     </update>
+
+    <update id="incrementRetryCount">
+        UPDATE cps_initial_review_task
+        SET retry_count = retry_count + 1, updated_at = NOW()
+        WHERE id = #{id} AND status = 'RUNNING'
+    </update>
+
+    <update id="markRetriggered">
+        UPDATE cps_initial_review_task
+        SET status = 'RUNNING',
+            idempotency_key = #{idempotencyKey},
+            submitted_at = #{submittedAt},
+            timeout_at = #{timeoutAt},
+            retry_count = retry_count + 1,
+            review_task_ref = NULL,
+            error_code = NULL,
+            completed_at = NULL,
+            updated_at = NOW()
+        WHERE id = #{id} AND status IN ('FAILED', 'PENDING_DISPATCH')
+    </update>
+
+    <select id="findAdminPage" resultType="com.company.cps.dto.CpsInitialReviewAdminTaskView">
+        SELECT t.id, t.issue_id, t.submission_id, t.version_no, t.status, t.review_task_ref,
+               t.idempotency_key, t.submitted_at, t.timeout_at, t.completed_at, t.error_code,
+               t.retry_count, t.taken_over_by, t.taken_over_name, t.taken_over_at, t.takeover_reason,
+               i.status AS issue_status,
+               r.overall AS result_overall,
+               r.is_late AS result_is_late,
+               a.decision AS adjudication_decision
+        FROM cps_initial_review_task t
+        LEFT JOIN cps_issue i ON i.id = t.issue_id
+        LEFT JOIN cps_initial_review_result r ON r.task_id = t.id
+        LEFT JOIN cps_review_adjudication a ON a.issue_id = t.issue_id AND a.version_no = t.version_no
+        <where>
+            <if test="status != null and status != ''">t.status = #{status}</if>
+            <if test="issueId != null">AND t.issue_id = #{issueId}</if>
+        </where>
+        ORDER BY t.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countAdminPage" resultType="long">
+        SELECT COUNT(*)
+        FROM cps_initial_review_task t
+        <where>
+            <if test="status != null and status != ''">t.status = #{status}</if>
+            <if test="issueId != null">AND t.issue_id = #{issueId}</if>
+        </where>
+    </select>
 </mapper>

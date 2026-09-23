@@ -1,17 +1,22 @@
 package com.company.cps.service;
 
 import com.company.cps.config.CpsInitialReviewProperties;
+import com.company.cps.domain.CpsInitialReviewEvent;
 import com.company.cps.domain.CpsInitialReviewItem;
 import com.company.cps.domain.CpsInitialReviewResult;
 import com.company.cps.domain.CpsInitialReviewTask;
 import com.company.cps.domain.CpsInitialReviewTaskStatus;
+import com.company.cps.domain.CpsInitialReviewTriggerConfig;
 import com.company.cps.domain.CpsIssue;
 import com.company.cps.domain.CpsIssueAction;
 import com.company.cps.domain.CpsIssueAttachment;
 import com.company.cps.domain.CpsIssueFlowLog;
 import com.company.cps.domain.CpsIssueStatus;
 import com.company.cps.domain.CpsRectificationSubmission;
+import com.company.cps.domain.CpsReviewAdjudication;
 import com.company.cps.dto.CpsInitialReviewCallbackRequest;
+import com.company.cps.mapper.CpsInitialReviewConfigMapper;
+import com.company.cps.mapper.CpsInitialReviewEventMapper;
 import com.company.cps.mapper.CpsInitialReviewItemMapper;
 import com.company.cps.mapper.CpsInitialReviewResultMapper;
 import com.company.cps.mapper.CpsInitialReviewTaskMapper;
@@ -19,6 +24,7 @@ import com.company.cps.mapper.CpsIssueAttachmentMapper;
 import com.company.cps.mapper.CpsIssueFlowLogMapper;
 import com.company.cps.mapper.CpsIssueMapper;
 import com.company.cps.mapper.CpsRectificationSubmissionMapper;
+import com.company.cps.mapper.CpsReviewAdjudicationMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -26,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronizationAdapter;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -38,11 +45,18 @@ import java.util.Map;
  * Python 回调 C-02 写结果 / 30s 扫描超时置 TIMEOUT_OPEN → 审核专员裁决（REVIEW_CLOSE/REVIEW_REJECT）。
  *
  * Java 是任务状态唯一真相源：Python 只执行与上报，不做任何裁决。
+ *
+ * 波次5 A3/A4 扩展：审核员三态视图/接管/裁决留痕；触发配置（自动开关+技术重试）+事件流水+手动重触发。
  */
 @Service
 public class CpsInitialReviewService {
 
     public static final String SYSTEM_OPERATOR = "SYSTEM";
+    /** D-21 技术重试缺省：投递失败重试 1 次。 */
+    static final int DEFAULT_MAX_RETRY_ATTEMPTS = 1;
+    static final int DEFAULT_RETRY_BACKOFF_MS = 3000;
+    /** 重试退避上限（防配置错误把提交线程 sleep 过久）。 */
+    static final int MAX_BACKOFF_MS = 30_000;
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final CpsInitialReviewTaskMapper taskMapper;
@@ -56,6 +70,9 @@ public class CpsInitialReviewService {
     private final CpsAssignmentService assignmentService;
     private final CpsInitialReviewProperties properties;
     private final CpsWorkflowStateMachineV2 stateMachineV2;
+    private final CpsInitialReviewConfigMapper configMapper;
+    private final CpsInitialReviewEventMapper eventMapper;
+    private final CpsReviewAdjudicationMapper adjudicationMapper;
 
     public CpsInitialReviewService(
             CpsInitialReviewTaskMapper taskMapper,
@@ -68,7 +85,10 @@ public class CpsInitialReviewService {
             CpsAgentFrameworkClient agentFrameworkClient,
             CpsAssignmentService assignmentService,
             CpsInitialReviewProperties properties,
-            CpsWorkflowStateMachineV2 stateMachineV2
+            CpsWorkflowStateMachineV2 stateMachineV2,
+            CpsInitialReviewConfigMapper configMapper,
+            CpsInitialReviewEventMapper eventMapper,
+            CpsReviewAdjudicationMapper adjudicationMapper
     ) {
         this.taskMapper = taskMapper;
         this.resultMapper = resultMapper;
@@ -81,26 +101,32 @@ public class CpsInitialReviewService {
         this.assignmentService = assignmentService;
         this.properties = properties;
         this.stateMachineV2 = stateMachineV2;
+        this.configMapper = configMapper;
+        this.eventMapper = eventMapper;
+        this.adjudicationMapper = adjudicationMapper;
     }
 
     /**
      * 提交事务内创建初审任务（幂等：同 issue+version 已存在则返回既有任务）。
      * 计时起点=提交成功时刻；timeout_at=submitted_at+timeoutSeconds（默认 600s，PRD §28.4）。
+     * A4：自动触发关闭时建 PENDING_DISPATCH 任务（不投递，待 admin 手动重触发）。
      */
     public CpsInitialReviewTask createTask(Long issueId, Long submissionId, Integer versionNo, LocalDateTime submittedAt) {
         CpsInitialReviewTask existing = taskMapper.findByIssueAndVersion(issueId, versionNo);
         if (existing != null) {
             return existing;
         }
+        TriggerRuntimeConfig config = loadRuntimeConfig();
+        boolean autoTrigger = config.autoTriggerEnabled;
         LocalDateTime now = LocalDateTime.now();
         CpsInitialReviewTask task = new CpsInitialReviewTask();
         task.setIssueId(issueId);
         task.setSubmissionId(submissionId);
         task.setVersionNo(versionNo);
-        task.setStatus(CpsInitialReviewTaskStatus.RUNNING);
+        task.setStatus(autoTrigger ? CpsInitialReviewTaskStatus.RUNNING : CpsInitialReviewTaskStatus.PENDING_DISPATCH);
         task.setIdempotencyKey("cps-rectify-" + issueId + "-v" + versionNo);
         task.setSubmittedAt(submittedAt);
-        task.setTimeoutAt(submittedAt.plusSeconds(properties.getTimeoutSeconds()));
+        task.setTimeoutAt(submittedAt.plusSeconds(config.timeoutSeconds));
         task.setRetryCount(0);
         task.setCreatedAt(now);
         task.setUpdatedAt(now);
@@ -109,6 +135,9 @@ public class CpsInitialReviewService {
         } catch (DuplicateKeyException exception) {
             return taskMapper.findByIssueAndVersion(issueId, versionNo);
         }
+        recordEvent(task, "TRIGGERED",
+                autoTrigger ? "auto trigger on submission" : "auto trigger disabled, awaiting manual dispatch",
+                SYSTEM_OPERATOR);
         return task;
     }
 
@@ -129,32 +158,52 @@ public class CpsInitialReviewService {
         });
     }
 
-    /** C-01 投递：成功回写 review_task_ref；失败置 FAILED（立即可接管）并推进问题单。 */
+    /**
+     * C-01 投递（A4：带技术重试，D-21 缺省重试 1 次；重试不重置计时）：
+     * 成功回写 review_task_ref；重试耗尽置 FAILED（立即可接管）并推进问题单。
+     * PENDING_DISPATCH 任务（自动触发关闭）不投递。
+     */
     void dispatch(Long taskId) {
         CpsInitialReviewTask task = taskMapper.findById(taskId);
         if (task == null || task.getStatus() != CpsInitialReviewTaskStatus.RUNNING) {
-            return; // 已终态（含人工接管）不再投递
+            return; // PENDING_DISPATCH 待手动触发；已终态（含人工接管）不再投递
         }
-        try {
-            CpsRectificationSubmission submission = submissionMapper.findById(task.getSubmissionId());
-            if (submission == null) {
-                throw new IllegalStateException("Submission not found: " + task.getSubmissionId());
+        TriggerRuntimeConfig config = loadRuntimeConfig();
+        int maxAttempts = 1 + Math.max(0, config.maxRetryAttempts);
+        String lastError = null;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                CpsRectificationSubmission submission = submissionMapper.findById(task.getSubmissionId());
+                if (submission == null) {
+                    throw new IllegalStateException("Submission not found: " + task.getSubmissionId());
+                }
+                CpsIssue issue = issueMapper.findById(task.getIssueId())
+                        .orElseThrow(() -> new IllegalStateException("Issue not found: " + task.getIssueId()));
+                List<CpsIssueAttachment> beforeImages = attachmentMapper.findByIssueAndStage(issue.getId(), "ISSUE");
+                List<CpsIssueAttachment> afterImages = attachmentMapper.findByIssueAndStage(issue.getId(), "PROOF");
+                String callbackUrl = properties.getCallbackBaseUrl().replaceAll("/+$", "")
+                        + "/api/callbacks/initial-review/result";
+                String reviewTaskRef = agentFrameworkClient.triggerInitialReview(
+                        submission, issue, beforeImages, afterImages, callbackUrl, task.getId());
+                if (reviewTaskRef != null) {
+                    taskMapper.updateReviewTaskRef(task.getId(), reviewTaskRef);
+                }
+                return;
+            } catch (Exception exception) {
+                lastError = exception.getMessage();
+                if (attempt < maxAttempts) {
+                    taskMapper.incrementRetryCount(task.getId());
+                    recordEvent(task, "DISPATCH_RETRY",
+                            "retry attempt " + (attempt + 1) + "/" + maxAttempts + " after error: " + abbreviate(lastError),
+                            SYSTEM_OPERATOR);
+                    sleepQuietly(Math.min(config.retryBackoffMs, MAX_BACKOFF_MS));
+                }
             }
-            CpsIssue issue = issueMapper.findById(task.getIssueId())
-                    .orElseThrow(() -> new IllegalStateException("Issue not found: " + task.getIssueId()));
-            List<CpsIssueAttachment> beforeImages = attachmentMapper.findByIssueAndStage(issue.getId(), "ISSUE");
-            List<CpsIssueAttachment> afterImages = attachmentMapper.findByIssueAndStage(issue.getId(), "PROOF");
-            String callbackUrl = properties.getCallbackBaseUrl().replaceAll("/+$", "")
-                    + "/api/callbacks/initial-review/result";
-            String reviewTaskRef = agentFrameworkClient.triggerInitialReview(
-                    submission, issue, beforeImages, afterImages, callbackUrl, task.getId());
-            if (reviewTaskRef != null) {
-                taskMapper.updateReviewTaskRef(task.getId(), reviewTaskRef);
-            }
-        } catch (Exception exception) {
-            taskMapper.markFailed(task.getId(), "DELIVERY_FAILED", LocalDateTime.now());
-            advanceIssueAfterTaskTerminal(task, "delivery failed: " + exception.getMessage());
         }
+        taskMapper.markFailed(task.getId(), "DELIVERY_FAILED", LocalDateTime.now());
+        recordEvent(task, "DISPATCH_FAILED",
+                "delivery failed after " + maxAttempts + " attempts: " + abbreviate(lastError), SYSTEM_OPERATOR);
+        advanceIssueAfterTaskTerminal(task, "delivery failed: " + lastError);
     }
 
     /**
@@ -175,10 +224,16 @@ public class CpsInitialReviewService {
         response.put("task_id", task.getId());
         response.put("issue_id", task.getIssueId());
         response.put("version_no", task.getVersionNo());
+        recordEvent(task, "CALLBACK_RECEIVED",
+                notBlank(request.getErrorCode())
+                        ? "callback with error_code=" + request.getErrorCode()
+                        : "callback with overall=" + request.getOverall(),
+                SYSTEM_OPERATOR);
 
         // 幂等：结果已落库 → 不重复写（PRD §3.2 回写幂等键去重）
         CpsInitialReviewResult existing = resultMapper.findByTaskId(task.getId());
         if (existing != null) {
+            recordEvent(task, "CALLBACK_DUPLICATED", "duplicate callback ignored", SYSTEM_OPERATOR);
             response.put("received", true);
             response.put("duplicated", true);
             response.put("task_status", task.getStatus().name());
@@ -193,6 +248,7 @@ public class CpsInitialReviewService {
             if (lateArrival) {
                 // 迟到失败：仅任务状态留痕，不写结果、不推进
                 taskMapper.markLateResult(task.getId(), LocalDateTime.now());
+                recordEvent(task, "LATE_RESULT", "late failure callback after takeover: " + request.getErrorCode(), SYSTEM_OPERATOR);
                 response.put("received", true);
                 response.put("duplicated", false);
                 response.put("task_status", CpsInitialReviewTaskStatus.LATE_RESULT.name());
@@ -201,6 +257,7 @@ public class CpsInitialReviewService {
             }
             taskMapper.markFailed(task.getId(), request.getErrorCode(), LocalDateTime.now());
             advanceIssueAfterTaskTerminal(task, "execution failed: " + request.getErrorCode());
+            recordEvent(task, "FAILED", "execution failed: " + request.getErrorCode(), SYSTEM_OPERATOR);
             response.put("received", true);
             response.put("duplicated", false);
             response.put("task_status", CpsInitialReviewTaskStatus.FAILED.name());
@@ -213,6 +270,7 @@ public class CpsInitialReviewService {
             resultMapper.insert(result);
         } catch (DuplicateKeyException exception) {
             // 并发重复回调：唯一索引兜底
+            recordEvent(task, "CALLBACK_DUPLICATED", "concurrent duplicate callback", SYSTEM_OPERATOR);
             response.put("received", true);
             response.put("duplicated", true);
             response.put("task_status", task.getStatus().name());
@@ -227,11 +285,13 @@ public class CpsInitialReviewService {
         if (lateArrival) {
             // PRD §28.4：接管后迟到结果仅留痕供参考，不覆盖人工裁决、不再次推进业务流程
             taskMapper.markLateResult(task.getId(), LocalDateTime.now());
+            recordEvent(task, "LATE_RESULT", "late result after takeover, overall=" + result.getOverall(), SYSTEM_OPERATOR);
             response.put("task_status", CpsInitialReviewTaskStatus.LATE_RESULT.name());
             response.put("is_late", true);
         } else {
             taskMapper.markCompleted(task.getId(), LocalDateTime.now());
             advanceIssueAfterTaskTerminal(task, "initial review completed");
+            recordEvent(task, "COMPLETED", "callback received, overall=" + result.getOverall(), SYSTEM_OPERATOR);
             response.put("task_status", CpsInitialReviewTaskStatus.COMPLETED.name());
             response.put("is_late", false);
         }
@@ -252,6 +312,10 @@ public class CpsInitialReviewService {
         for (CpsInitialReviewTask task : taskMapper.findExpiredRunning(now)) {
             int updated = taskMapper.markTimeoutOpen(task.getId(), now);
             if (updated == 1) {
+                recordEvent(task, "TIMEOUT_OPENED",
+                        "running exceeded " + Duration.between(task.getSubmittedAt(), task.getTimeoutAt()).getSeconds()
+                                + "s threshold, open for takeover",
+                        SYSTEM_OPERATOR);
                 advanceIssueAfterTaskTerminal(task, "initial review timed out");
                 moved++;
             }
@@ -297,6 +361,7 @@ public class CpsInitialReviewService {
                 && task.getStatus() == CpsInitialReviewTaskStatus.RUNNING) {
             taskMapper.markFailed(task.getId(), "REMOTE_REPORTED_FAILED", LocalDateTime.now());
             advanceIssueAfterTaskTerminal(task, "remote reported failed");
+            recordEvent(task, "FAILED", "remote C-03 reported failed", SYSTEM_OPERATOR);
             response.put("task_status", CpsInitialReviewTaskStatus.FAILED.name());
         }
         return response;
@@ -360,6 +425,7 @@ public class CpsInitialReviewService {
         if (updated != 1) {
             throw new IllegalStateException("Takeover conflict, task state changed: " + taskId);
         }
+        recordEvent(task, "TAKEN_OVER", "reason: " + reason, reviewerEmpNo);
         // 接管后由人工直接审核：确保问题单处于 PENDING_REVIEW 且指向接管人
         issueMapper.findById(task.getIssueId()).ifPresent(issue -> {
             if (issue.getStatus() == CpsIssueStatus.PENDING_AI_REVIEW
@@ -371,6 +437,184 @@ public class CpsInitialReviewService {
         response.put("task_id", taskId);
         response.put("task_status", CpsInitialReviewTaskStatus.TAKEN_OVER.name());
         response.put("taken_over_by", reviewerEmpNo);
+        return response;
+    }
+
+    // ---------- 波次5 A3：审核员视图 / 接管 / 裁决留痕 ----------
+
+    /**
+     * 审核员裁决视图（PRD §28.2/§29 三态呈现）：任务三态 + 可接管性 + 秒数 +
+     * AI 结果与逐项意见 + 提交快照 + 既有裁决 + 事件流水（可追溯）。
+     */
+    public Map<String, Object> reviewerView(Long issueId) {
+        CpsInitialReviewTask task = taskMapper.findByIssueAndVersion(issueId, latestVersion(issueId));
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("issue_id", issueId);
+        if (task == null) {
+            view.put("state_view", "none");
+            view.put("can_take_over", false);
+            view.put("task", null);
+            view.put("result", null);
+            view.put("items", new ArrayList<>());
+            view.put("submission", null);
+            view.put("adjudication", null);
+            view.put("events", new ArrayList<>());
+            return view;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        boolean runningExpired = task.getStatus() == CpsInitialReviewTaskStatus.RUNNING
+                && task.getTimeoutAt() != null && !now.isBefore(task.getTimeoutAt());
+        view.put("state_view", stateView(task, runningExpired));
+        view.put("can_take_over", task.getStatus() == CpsInitialReviewTaskStatus.TIMEOUT_OPEN
+                || task.getStatus() == CpsInitialReviewTaskStatus.FAILED || runningExpired);
+        view.put("seconds_until_takeover", secondsUntilTakeover(task, runningExpired, now));
+        view.put("task", task);
+        view.put("result", resultMapper.findByTaskId(task.getId()));
+        view.put("items", itemMapper.findByTaskId(task.getId()));
+        view.put("submission", task.getSubmissionId() == null ? null : submissionMapper.findById(task.getSubmissionId()));
+        view.put("adjudication", adjudicationMapper.findLatestByIssueId(issueId));
+        view.put("events", eventMapper.findByIssueId(issueId));
+        return view;
+    }
+
+    private String stateView(CpsInitialReviewTask task, boolean runningExpired) {
+        switch (task.getStatus()) {
+            case RUNNING:
+                return runningExpired ? "timeout_open" : "running";
+            case FAILED:
+                return "failed";
+            case TIMEOUT_OPEN:
+                return "timeout_open";
+            case PENDING_DISPATCH:
+                return "pending_dispatch";
+            case TAKEN_OVER:
+                return "taken_over";
+            case LATE_RESULT:
+                return "late_result";
+            case COMPLETED:
+            default:
+                return "completed";
+        }
+    }
+
+    private Long secondsUntilTakeover(CpsInitialReviewTask task, boolean runningExpired, LocalDateTime now) {
+        if (runningExpired || task.getStatus() == CpsInitialReviewTaskStatus.TIMEOUT_OPEN
+                || task.getStatus() == CpsInitialReviewTaskStatus.FAILED) {
+            return 0L;
+        }
+        if (task.getStatus() == CpsInitialReviewTaskStatus.RUNNING && task.getTimeoutAt() != null) {
+            return Math.max(0L, Duration.between(now, task.getTimeoutAt()).getSeconds());
+        }
+        return null;
+    }
+
+    /** 按问题单接管最新版本初审任务（mobile 端点入口；规则同 takeOver，AC-27）。 */
+    @Transactional
+    public Map<String, Object> takeOverForIssue(Long issueId, String reviewerEmpNo, String reason) {
+        Integer versionNo = latestVersion(issueId);
+        CpsInitialReviewTask task = versionNo == null ? null : taskMapper.findByIssueAndVersion(issueId, versionNo);
+        if (task == null) {
+            throw new IllegalArgumentException("Initial review task not found for issue: " + issueId);
+        }
+        return takeOver(task.getId(), reviewerEmpNo, reason);
+    }
+
+    /** 裁决用 AI 意见快照：该版本初审结果 overall（PASS/PARTIAL/PROBLEM），无结果返回 null。 */
+    public String aiOpinionSnapshot(Long issueId, Integer versionNo) {
+        CpsInitialReviewTask task = taskMapper.findByIssueAndVersion(issueId, versionNo);
+        if (task == null) {
+            return null;
+        }
+        CpsInitialReviewResult result = resultMapper.findByTaskId(task.getId());
+        return result == null ? null : result.getOverall();
+    }
+
+    public CpsReviewAdjudication findAdjudication(Long issueId, Integer versionNo) {
+        return adjudicationMapper.findByIssueAndVersion(issueId, versionNo);
+    }
+
+    /**
+     * 裁决留痕（issue 终态写回由 CpsIssueService.adjudicate 先行完成，本方法同事务落裁决行+事件）。
+     * uk(issue_id,version_no) 兜底：并发重复裁决返回既有记录（幂等）。
+     */
+    public CpsReviewAdjudication recordAdjudication(CpsReviewAdjudication adjudication) {
+        try {
+            adjudicationMapper.insert(adjudication);
+        } catch (DuplicateKeyException exception) {
+            return adjudicationMapper.findByIssueAndVersion(adjudication.getIssueId(), adjudication.getVersionNo());
+        }
+        CpsInitialReviewTask task = adjudication.getTaskId() == null
+                ? taskMapper.findByIssueAndVersion(adjudication.getIssueId(), adjudication.getVersionNo())
+                : taskMapper.findById(adjudication.getTaskId());
+        if (task != null) {
+            recordEvent(task, "ADJUDICATED",
+                    adjudication.getDecision() + " (" + adjudication.getAiRelation() + "): "
+                            + abbreviate(adjudication.getReason()),
+                    adjudication.getReviewerEmpNo());
+        }
+        return adjudication;
+    }
+
+    // ---------- 波次5 A4：手动重触发 ----------
+
+    /**
+     * 手动重触发（admin）：仅 FAILED/PENDING_DISPATCH 且该版本未裁决（未 CLOSE）。
+     * 新幂等键 cps-rectify-{issueId}-v{n}-r{retry}；手动重触发=新投递轮次，submitted_at/timeout_at 重置
+     * （区别于投递内自动技术重试不重置计时，D-21）。
+     * 问题单 PENDING_REVIEW → PENDING_AI_REVIEW（清当前处理人，系统回退转移）后事务提交再投递。
+     */
+    @Transactional
+    public Map<String, Object> retrigger(Long taskId, String operatorEmpNo, String reason) {
+        if (!notBlank(operatorEmpNo)) {
+            throw new IllegalArgumentException("operatorEmpNo is required");
+        }
+        if (!notBlank(reason)) {
+            throw new IllegalArgumentException("retrigger reason is required");
+        }
+        CpsInitialReviewTask task = taskMapper.findById(taskId);
+        if (task == null) {
+            throw new IllegalArgumentException("Initial review task not found: " + taskId);
+        }
+        if (task.getStatus() != CpsInitialReviewTaskStatus.FAILED
+                && task.getStatus() != CpsInitialReviewTaskStatus.PENDING_DISPATCH) {
+            throw new IllegalStateException("Only FAILED or PENDING_DISPATCH tasks can be retriggered, current: "
+                    + task.getStatus());
+        }
+        CpsIssue issue = issueMapper.findById(task.getIssueId())
+                .orElseThrow(() -> new IllegalStateException("Issue not found: " + task.getIssueId()));
+        if (adjudicationMapper.findByIssueAndVersion(task.getIssueId(), task.getVersionNo()) != null) {
+            throw new IllegalStateException("Version " + task.getVersionNo()
+                    + " already adjudicated, retrigger rejected");
+        }
+        if (issue.getStatus() == CpsIssueStatus.CLOSED) {
+            throw new IllegalStateException("Issue already closed, retrigger rejected");
+        }
+        int newRetryCount = (task.getRetryCount() == null ? 0 : task.getRetryCount()) + 1;
+        String newIdempotencyKey = "cps-rectify-" + task.getIssueId() + "-v" + task.getVersionNo()
+                + "-r" + newRetryCount;
+        LocalDateTime now = LocalDateTime.now();
+        int timeoutSeconds = loadRuntimeConfig().timeoutSeconds;
+        int updated = taskMapper.markRetriggered(taskId, newIdempotencyKey, now, now.plusSeconds(timeoutSeconds));
+        if (updated != 1) {
+            throw new IllegalStateException("Retrigger conflict, task state changed: " + taskId);
+        }
+        if (issue.getStatus() == CpsIssueStatus.PENDING_REVIEW) {
+            // 系统回退：重开初审窗口，清当前处理人（仅未裁决版本，上方已校验）
+            stateMachineV2.assertSystemTransition(CpsIssueStatus.PENDING_REVIEW, CpsIssueStatus.PENDING_AI_REVIEW);
+            issueMapper.updateStatusClearHandler(issue.getId(), CpsIssueStatus.PENDING_REVIEW,
+                    CpsIssueStatus.PENDING_AI_REVIEW, now);
+            insertFlowLog(issue.getId(), CpsIssueStatus.PENDING_REVIEW, CpsIssueStatus.PENDING_AI_REVIEW,
+                    CpsIssueAction.AI_REVIEW_RETRIGGER, operatorEmpNo, issue.getCurrentHandlerEmpNo(), null,
+                    "retriggered by " + operatorEmpNo + ": " + reason);
+        }
+        recordEvent(task, "RETRIGGERED", "by " + operatorEmpNo + ", reason: " + reason, operatorEmpNo);
+        dispatchAfterCommit(taskId);
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("task_id", taskId);
+        response.put("task_status", CpsInitialReviewTaskStatus.RUNNING.name());
+        response.put("idempotency_key", newIdempotencyKey);
+        response.put("retry_count", newRetryCount);
+        response.put("timeout_at", now.plusSeconds(timeoutSeconds));
         return response;
     }
 
@@ -496,13 +740,19 @@ public class CpsInitialReviewService {
 
     private void insertFlowLog(Long issueId, CpsIssueStatus fromStatus, CpsIssueStatus toStatus,
                                CpsIssueAction action, String fromHandler, String toHandler, String comment) {
+        insertFlowLog(issueId, fromStatus, toStatus, action, SYSTEM_OPERATOR, fromHandler, toHandler, comment);
+    }
+
+    private void insertFlowLog(Long issueId, CpsIssueStatus fromStatus, CpsIssueStatus toStatus,
+                               CpsIssueAction action, String operatorEmpNo,
+                               String fromHandler, String toHandler, String comment) {
         CpsIssueFlowLog log = new CpsIssueFlowLog();
         log.setIssueId(issueId);
         log.setFromStatus(fromStatus);
         log.setToStatus(toStatus);
         log.setAction(action);
-        log.setOperatorEmpNo(SYSTEM_OPERATOR);
-        log.setOperatorEmpName(SYSTEM_OPERATOR);
+        log.setOperatorEmpNo(operatorEmpNo);
+        log.setOperatorEmpName(operatorEmpNo);
         log.setFromHandlerEmpNo(fromHandler);
         log.setFromHandlerEmpName(fromHandler);
         log.setToHandlerEmpNo(toHandler);
@@ -550,5 +800,64 @@ public class CpsInitialReviewService {
             }
         }
         return null;
+    }
+
+    /** 触发运行时配置：DB 单行 GLOBAL 优先，NULL 字段回退应用配置/缺省（D-21：重试 1 次）。 */
+    private TriggerRuntimeConfig loadRuntimeConfig() {
+        CpsInitialReviewTriggerConfig config = configMapper.findGlobal();
+        boolean autoTriggerEnabled = config == null || config.getAutoTriggerEnabled() == null
+                ? true : config.getAutoTriggerEnabled();
+        int maxRetryAttempts = config == null || config.getMaxRetryAttempts() == null
+                ? DEFAULT_MAX_RETRY_ATTEMPTS : Math.max(0, config.getMaxRetryAttempts());
+        int retryBackoffMs = config == null || config.getRetryBackoffMs() == null
+                ? DEFAULT_RETRY_BACKOFF_MS : Math.max(0, config.getRetryBackoffMs());
+        int timeoutSeconds = config == null || config.getTimeoutSeconds() == null
+                ? properties.getTimeoutSeconds() : config.getTimeoutSeconds();
+        return new TriggerRuntimeConfig(autoTriggerEnabled, maxRetryAttempts, retryBackoffMs, timeoutSeconds);
+    }
+
+    private void recordEvent(CpsInitialReviewTask task, String eventType, String detail, String operatorEmpNo) {
+        CpsInitialReviewEvent event = new CpsInitialReviewEvent();
+        event.setTaskId(task.getId());
+        event.setIssueId(task.getIssueId());
+        event.setVersionNo(task.getVersionNo());
+        event.setEventType(eventType);
+        event.setDetail(abbreviate(detail));
+        event.setOperatorEmpNo(operatorEmpNo);
+        event.setCreatedAt(LocalDateTime.now());
+        eventMapper.insert(event);
+    }
+
+    private static String abbreviate(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value.length() <= 400 ? value : value.substring(0, 400);
+    }
+
+    private static void sleepQuietly(long millis) {
+        if (millis <= 0) {
+            return;
+        }
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /** 触发配置运行时快照（DB GLOBAL 行 + 回退缺省）。 */
+    static final class TriggerRuntimeConfig {
+        final boolean autoTriggerEnabled;
+        final int maxRetryAttempts;
+        final int retryBackoffMs;
+        final int timeoutSeconds;
+
+        TriggerRuntimeConfig(boolean autoTriggerEnabled, int maxRetryAttempts, int retryBackoffMs, int timeoutSeconds) {
+            this.autoTriggerEnabled = autoTriggerEnabled;
+            this.maxRetryAttempts = maxRetryAttempts;
+            this.retryBackoffMs = retryBackoffMs;
+            this.timeoutSeconds = timeoutSeconds;
+        }
     }
 }

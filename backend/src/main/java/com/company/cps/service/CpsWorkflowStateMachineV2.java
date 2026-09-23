@@ -28,6 +28,7 @@ import java.util.Set;
  * - PENDING_AI_REVIEW       → PENDING_REVIEW         （AI 完成/失败可接管/超时可接管，三态差异由任务表承载）
  * - PENDING_AI_REVIEW       → PENDING_REVIEWER_CONFIG（结果就绪但审核员缺失，AC-25 待配置）
  * - PENDING_REVIEWER_CONFIG → PENDING_REVIEW         （配置完成后继续流转，不要求重新提交）
+ * - PENDING_REVIEW          → PENDING_AI_REVIEW      （A4 手动重触发回退：仅未裁决版本，失败任务重投）
  */
 @Component
 public class CpsWorkflowStateMachineV2 {
@@ -49,6 +50,8 @@ public class CpsWorkflowStateMachineV2 {
         putSystem(CpsIssueStatus.PENDING_AI_REVIEW, CpsIssueStatus.PENDING_REVIEW);
         putSystem(CpsIssueStatus.PENDING_AI_REVIEW, CpsIssueStatus.PENDING_REVIEWER_CONFIG);
         putSystem(CpsIssueStatus.PENDING_REVIEWER_CONFIG, CpsIssueStatus.PENDING_REVIEW);
+        // A4 手动重触发回退：PENDING_REVIEW → PENDING_AI_REVIEW（仅未裁决版本，服务层双重校验）
+        putSystem(CpsIssueStatus.PENDING_REVIEW, CpsIssueStatus.PENDING_AI_REVIEW);
     }
 
     private static void put(CpsIssueStatus from, CpsIssueAction action, CpsIssueStatus to) {

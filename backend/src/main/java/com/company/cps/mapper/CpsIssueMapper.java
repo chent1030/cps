@@ -44,6 +44,14 @@ public interface CpsIssueMapper {
             @Param("updatedAt") java.time.LocalDateTime updatedAt
     );
 
+    /** 系统回退（A4 手动重触发）：PENDING_REVIEW → PENDING_AI_REVIEW 并清空当前处理人；CAS 限定原状态。 */
+    int updateStatusClearHandler(
+            @Param("id") Long id,
+            @Param("fromStatus") CpsIssueStatus fromStatus,
+            @Param("status") CpsIssueStatus status,
+            @Param("updatedAt") java.time.LocalDateTime updatedAt
+    );
+
     /**
      * 按页签查询当前用户的问题列表。
      */

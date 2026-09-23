@@ -50,6 +50,16 @@
         WHERE id = #{id}
     </update>
 
+    <update id="updateStatusClearHandler">
+        UPDATE cps_issue
+        SET status = #{status},
+            current_handler_emp_no = NULL,
+            current_handler_emp_name = NULL,
+            lock_version = lock_version + 1,
+            updated_at = #{updatedAt}
+        WHERE id = #{id} AND status = #{fromStatus}
+    </update>
+
     <select id="findById" resultType="com.company.cps.domain.CpsIssue">
         SELECT *
         FROM cps_issue

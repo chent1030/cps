@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsInitialReviewConfigMapper">
+
+    <select id="findGlobal" resultType="com.company.cps.domain.CpsInitialReviewTriggerConfig">
+        SELECT * FROM cps_initial_review_config WHERE config_key = 'GLOBAL' LIMIT 1
+    </select>
+
+    <insert id="insertGlobal" parameterType="com.company.cps.domain.CpsInitialReviewTriggerConfig"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_initial_review_config
+            (config_key, auto_trigger_enabled, max_retry_attempts, retry_backoff_ms, timeout_seconds,
+             updated_by, updated_at)
+        VALUES (#{configKey}, #{autoTriggerEnabled}, #{maxRetryAttempts}, #{retryBackoffMs},
+                #{timeoutSeconds}, #{updatedBy}, NOW())
+    </insert>
+
+    <update id="updateGlobal" parameterType="com.company.cps.domain.CpsInitialReviewTriggerConfig">
+        UPDATE cps_initial_review_config
+        SET auto_trigger_enabled = #{autoTriggerEnabled},
+            max_retry_attempts = #{maxRetryAttempts},
+            retry_backoff_ms = #{retryBackoffMs},
+            timeout_seconds = #{timeoutSeconds},
+            updated_by = #{updatedBy},
+            updated_at = NOW()
+        WHERE config_key = 'GLOBAL'
+    </update>
+</mapper>

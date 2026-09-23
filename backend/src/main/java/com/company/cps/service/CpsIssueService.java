@@ -11,12 +11,14 @@ import com.company.cps.domain.CpsInitialReviewTask;
 import com.company.cps.domain.CpsRectificationSubmission;
 import com.company.cps.domain.CpsRectificationSubmissionStatus;
 import com.company.cps.domain.CpsRectificationTransfer;
+import com.company.cps.domain.CpsReviewAdjudication;
 import com.company.cps.dto.CpsIssueActionRequest;
 import com.company.cps.dto.CpsIssueActionResponse;
 import com.company.cps.dto.CpsIssueAiSuggestionRequest;
 import com.company.cps.dto.CpsIssueCreateRequest;
 import com.company.cps.dto.CpsIssueDetailResponse;
 import com.company.cps.dto.CpsIssueListItemResponse;
+import com.company.cps.dto.CpsReviewAdjudicationResponse;
 import com.company.cps.mapper.CpsIssueAiSuggestionMapper;
 import com.company.cps.mapper.CpsIssueAttachmentMapper;
 import com.company.cps.mapper.CpsIssueFlowLogMapper;
@@ -423,6 +425,97 @@ public class CpsIssueService {
                 issue.getCurrentHandlerEmpNo(),
                 stateMachineV2.availableActions(issue.getStatus())
         );
+    }
+
+    /**
+     * A3 审核裁决（PRD §28.3/§29，AC-16/18/27）：审核员查看 AI 初审意见后人工裁决。
+     * - 决策权在人工：APPROVE=维持整改（走 REVIEW_CLOSE 关单）；REJECT=改判退回（走 REVIEW_REJECT 回整改人员）；
+     * - 复用 executeAction(REVIEW_CLOSE/REVIEW_REJECT) 拿当前办理人校验（PENDING_REVIEW 时 handler=审核员/接管人）、
+     *   状态机转移、lock_version 乐观锁 CAS、流程日志与提交单标记已审，保证幂等口径与 A2 一致；
+     * - AI 意见仅作参考留痕：裁决时快照 ai_overall 与 ai_relation（WITH_AI/AGAINST_AI/NO_AI_RESULT）；
+     * - 幂等：同 (issue, version) 已有裁决直接返回 duplicated=true，不重复流转；
+     * - 仅 v2 流程、存在提交版本、状态=PENDING_REVIEW（含超时接管后开放态）可裁决；理由必填。
+     */
+    @Transactional
+    public CpsReviewAdjudicationResponse adjudicate(Long issueId, String decision, String reason, String currentEmpNo) {
+        requireV2Dependencies();
+        CpsIssue issue = issueMapper.findById(issueId)
+                .orElseThrow(() -> new IllegalArgumentException("Issue not found: " + issueId));
+        if (!isV2(issue)) {
+            throw new IllegalArgumentException("Adjudication only supports v2 flow issues");
+        }
+        requireText(reason, "adjudication reason is required");
+        String normalizedDecision = decision == null ? "" : decision.trim().toUpperCase();
+        CpsIssueAction action;
+        if ("APPROVE".equals(normalizedDecision)) {
+            action = CpsIssueAction.REVIEW_CLOSE;
+        } else if ("REJECT".equals(normalizedDecision)) {
+            action = CpsIssueAction.REVIEW_REJECT;
+        } else {
+            throw new IllegalArgumentException("decision must be APPROVE or REJECT");
+        }
+        Integer versionNo = issue.getCurrentSubmissionVersion();
+        if (versionNo == null || versionNo <= 0) {
+            throw new IllegalStateException("No rectification submission to adjudicate for issue: " + issueId);
+        }
+        CpsReviewAdjudication existing = initialReviewService.findAdjudication(issueId, versionNo);
+        if (existing != null) {
+            // 幂等：该版本已裁决，返回既有裁决与当前单据状态，不重复流转
+            return new CpsReviewAdjudicationResponse(
+                    issue.getId(), issue.getStatus(), issue.getCurrentHandlerEmpNo(),
+                    stateMachineV2.availableActions(issue.getStatus()), true,
+                    existing.getVersionNo(), existing.getDecision(), existing.getAiOverall(),
+                    existing.getAiRelation(), existing.getReason(), existing.getCreatedAt());
+        }
+        CpsIssueStatus fromStatus = issue.getStatus();
+        if (fromStatus != CpsIssueStatus.PENDING_REVIEW) {
+            throw new IllegalStateException(
+                    "Only PENDING_REVIEW issues can be adjudicated, current status: " + fromStatus);
+        }
+        String aiOverall = initialReviewService.aiOpinionSnapshot(issueId, versionNo);
+        String aiRelation = aiRelation(normalizedDecision, aiOverall);
+        CpsIssueActionRequest request = new CpsIssueActionRequest();
+        request.setAction(action);
+        request.setReviewOpinion(reason.trim());
+        // 复用 executeAction：当前办理人校验（裁决权=办理权）、状态机、乐观锁 CAS、流程日志、提交单标记已审
+        CpsIssueActionResponse actionResponse = executeAction(issueId, request, currentEmpNo);
+        CpsReviewAdjudication adjudication = new CpsReviewAdjudication();
+        adjudication.setIssueId(issueId);
+        adjudication.setVersionNo(versionNo);
+        adjudication.setReviewerEmpNo(currentEmpNo);
+        adjudication.setReviewerEmpName(empName(currentEmpNo));
+        adjudication.setDecision(normalizedDecision);
+        adjudication.setAiOverall(aiOverall);
+        adjudication.setAiRelation(aiRelation);
+        adjudication.setReason(reason.trim());
+        adjudication.setFromStatus(fromStatus.name());
+        adjudication.setToStatus(actionResponse.getStatus().name());
+        adjudication.setCreatedAt(LocalDateTime.now());
+        CpsReviewAdjudication stored = initialReviewService.recordAdjudication(adjudication);
+        if (stored == null) {
+            // recordAdjudication 正常不会返回 null（插入成功回传入参/并发重复回传既有行）；防御兜底
+            stored = adjudication;
+        }
+        boolean duplicated = stored != adjudication;
+        return new CpsReviewAdjudicationResponse(
+                actionResponse.getIssueId(), actionResponse.getStatus(), actionResponse.getCurrentHandlerEmpNo(),
+                actionResponse.getAvailableActions(), duplicated,
+                stored.getVersionNo(), stored.getDecision(), stored.getAiOverall(), stored.getAiRelation(),
+                stored.getReason(), stored.getCreatedAt());
+    }
+
+    /** 裁决与 AI 意见的关系矩阵：无结果=NO_AI_RESULT；同向=WITH_AI；反向=AGAINST_AI（AI 只供意见，PRD §29）。 */
+    private static String aiRelation(String decision, String aiOverall) {
+        if (aiOverall == null || aiOverall.isBlank()) {
+            return "NO_AI_RESULT";
+        }
+        String opinion = aiOverall.trim().toUpperCase();
+        boolean aiPass = "PASS".equals(opinion);
+        boolean aiProblem = "PROBLEM".equals(opinion);
+        if ("APPROVE".equals(decision)) {
+            return aiPass ? "WITH_AI" : "AGAINST_AI";
+        }
+        return aiProblem ? "WITH_AI" : "AGAINST_AI";
     }
 
     private void validateActionRequestV2(CpsIssue issue, CpsIssueActionRequest request) {
