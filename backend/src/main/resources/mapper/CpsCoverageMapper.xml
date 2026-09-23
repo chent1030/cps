@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsCoverageMapper">
+
+    <!--
+      共用过滤 SQL 片段（frequency 子查询展开）。
+      频率维度：factory / area / category_l1_id / submit_time 区间。
+    -->
+    <sql id="issueFilterWhere">
+        <where>
+            <if test="factory != null and factory != ''">AND i.factory = #{factory}</if>
+            <if test="area != null and area != ''">AND i.area = #{area}</if>
+            <if test="categoryL1Id != null">AND i.category_l1_id = #{categoryL1Id}</if>
+            <if test="startTime != null and startTime != ''">AND i.submit_time &gt;= #{startTime}</if>
+            <if test="endTime != null and endTime != ''">AND i.submit_time &lt;= #{endTime}</if>
+        </where>
+    </sql>
+
+    <!--
+      FR-10 /frequency：按 (factory, area, category_l1_id) 聚合 cps_issue。
+      - issue_count：分组总数
+      - recent_count：过去 30 天 submit_time 新增
+      - closed_count：status='CLOSED' 数
+      - close_rate：ROUND(closed*100/total, 2)
+      GROUP BY 三元组稳定；ORDER BY issue_count DESC 便于命中主要矛盾。
+    -->
+    <select id="frequencyGroupBy" resultType="java.util.LinkedHashMap">
+        SELECT i.factory          AS factory,
+               i.area             AS area,
+               i.category_l1_id   AS categoryL1Id,
+               COUNT(1)           AS issueCount,
+               SUM(CASE WHEN i.submit_time &gt;= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) AS recentCount,
+               SUM(CASE WHEN i.status = 'CLOSED' THEN 1 ELSE 0 END) AS closedCount,
+               ROUND(
+                 SUM(CASE WHEN i.status = 'CLOSED' THEN 1 ELSE 0 END) * 100.0 / COUNT(1),
+                 2
+               ) AS closeRate
+        FROM cps_issue i
+        <include refid="issueFilterWhere"/>
+        GROUP BY i.factory, i.area, i.category_l1_id
+        ORDER BY issueCount DESC, i.factory, i.area, i.category_l1_id
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countFrequencyGroupBy" resultType="long">
+        SELECT COUNT(1)
+        FROM (
+          SELECT 1
+          FROM cps_issue i
+          <include refid="issueFilterWhere"/>
+          GROUP BY i.factory, i.area, i.category_l1_id
+        ) g
+    </select>
+
+    <!--
+      FR-10 /region-supervisor：按 (area, current_handler_emp_no) 聚合 cps_issue。
+      - open_count：status 非 CLOSED 在手数
+      - handled_count：累计处理数（current_handler_emp_no 非空）
+      - overdue_count：status 非 CLOSED 且 submit_time 早于 (NOW - overdueDays 天)
+      overdueDays 参数化阈值（默认 3，admin 可调）。
+    -->
+    <select id="regionSupervisorGroupBy" resultType="java.util.LinkedHashMap">
+        SELECT i.area                       AS area,
+               i.current_handler_emp_no     AS currentHandlerEmpNo,
+               i.current_handler_emp_name   AS currentHandlerEmpName,
+               SUM(CASE WHEN i.status &lt;&gt; 'CLOSED' THEN 1 ELSE 0 END) AS openCount,
+               COUNT(1)                     AS handledCount,
+               SUM(CASE
+                     WHEN i.status &lt;&gt; 'CLOSED'
+                          AND i.submit_time &lt; DATE_SUB(NOW(), INTERVAL #{overdueDays} DAY)
+                     THEN 1 ELSE 0 END)     AS overdueCount
+        FROM cps_issue i
+        <where>
+            i.current_handler_emp_no IS NOT NULL
+            <if test="status != null and status != ''">
+                <choose>
+                    <when test="status == '__OPEN__'">AND i.status &lt;&gt; 'CLOSED'</when>
+                    <otherwise>AND i.status = #{status}</otherwise>
+                </choose>
+            </if>
+            <if test="status == null">AND i.status &lt;&gt; 'CLOSED'</if>
+            <if test="factory != null and factory != ''">AND i.factory = #{factory}</if>
+            <if test="area != null and area != ''">AND i.area = #{area}</if>
+            <if test="categoryL1Id != null">AND i.category_l1_id = #{categoryL1Id}</if>
+        </where>
+        GROUP BY i.area, i.current_handler_emp_no, i.current_handler_emp_name
+        ORDER BY openCount DESC, overdueCount DESC, i.area, i.current_handler_emp_no
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countRegionSupervisorGroupBy" resultType="long">
+        SELECT COUNT(1)
+        FROM (
+          SELECT 1
+          FROM cps_issue i
+          <where>
+              i.current_handler_emp_no IS NOT NULL
+              <if test="status != null and status != ''">
+                  <choose>
+                      <when test="status == '__OPEN__'">AND i.status &lt;&gt; 'CLOSED'</when>
+                      <otherwise>AND i.status = #{status}</otherwise>
+                  </choose>
+              </if>
+              <if test="status == null">AND i.status &lt;&gt; 'CLOSED'</if>
+              <if test="factory != null and factory != ''">AND i.factory = #{factory}</if>
+              <if test="area != null and area != ''">AND i.area = #{area}</if>
+              <if test="categoryL1Id != null">AND i.category_l1_id = #{categoryL1Id}</if>
+          </where>
+          GROUP BY i.area, i.current_handler_emp_no, i.current_handler_emp_name
+        ) g
+    </select>
+
+    <!--
+      FR-10 /recurrence：复发分析。
+      同一 issue 在窗口内：
+        - cps_issue_flow_log.action='REOPEN' 次数
+        - cps_review_adjudication.decision='REJECT' 次数
+      合计 ≥ threshold 即纳入复发列表，附 lastRecurrenceAt（最近一次信号时间）。
+      通过 UNION ALL 子查询聚合两侧信号再 HAVING 过滤，复用 cps_issue JOIN 透出 factory/area/category。
+    -->
+    <sql id="recurrenceSignals">
+        SELECT issue_id, COUNT(1) AS cnt, MAX(created_at) AS last_at
+        FROM cps_issue_flow_log
+        WHERE action = 'REOPEN'
+          <if test="startTime != null and startTime != ''">AND created_at &gt;= #{startTime}</if>
+          <if test="endTime != null and endTime != ''">AND created_at &lt;= #{endTime}</if>
+        GROUP BY issue_id
+        UNION ALL
+        SELECT issue_id, COUNT(1) AS cnt, MAX(created_at) AS last_at
+        FROM cps_review_adjudication
+        WHERE decision = 'REJECT'
+          <if test="startTime != null and startTime != ''">AND created_at &gt;= #{startTime}</if>
+          <if test="endTime != null and endTime != ''">AND created_at &lt;= #{endTime}</if>
+        GROUP BY issue_id
+    </sql>
+
+    <select id="recurrenceGroupBy" resultType="java.util.LinkedHashMap">
+        SELECT i.id               AS issueId,
+               i.factory          AS factory,
+               i.area             AS area,
+               i.category_l1_id   AS categoryL1Id,
+               i.category_l2_id   AS categoryL2Id,
+               recur.cnt          AS recurrenceCount,
+               recur.lastAt       AS lastRecurrenceAt
+        FROM cps_issue i
+        INNER JOIN (
+          SELECT issue_id, SUM(cnt) AS cnt, MAX(last_at) AS lastAt
+          FROM (<include refid="recurrenceSignals"/>) t
+          GROUP BY issue_id
+          HAVING SUM(cnt) &gt;= #{threshold}
+        ) recur ON recur.issue_id = i.id
+        <where>
+            <if test="categoryL1Id != null">AND i.category_l1_id = #{categoryL1Id}</if>
+        </where>
+        ORDER BY recur.cnt DESC, recur.lastAt DESC, i.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countRecurrenceGroupBy" resultType="long">
+        SELECT COUNT(1)
+        FROM cps_issue i
+        INNER JOIN (
+          SELECT issue_id, SUM(cnt) AS cnt
+          FROM (<include refid="recurrenceSignals"/>) t
+          GROUP BY issue_id
+          HAVING SUM(cnt) &gt;= #{threshold}
+        ) recur ON recur.issue_id = i.id
+        <where>
+            <if test="categoryL1Id != null">AND i.category_l1_id = #{categoryL1Id}</if>
+        </where>
+    </select>
+
+    <!--
+      FR-10 /gaps：覆盖缺口。
+      简化语义：cps_inspection_item 启用项 × cps_room（启用）× cps_room_check_record 最近一次记录时间。
+      - gapDays 内无 submitted_at 记录的房间视为缺口
+      - lastRecordAt 取 MAX(submitted_at)；若从无记录则为 NULL
+      - daysSinceLastRecord 同理可空
+      storageRoomType 走 cps_room.room_type（任务书参数名沿用）。
+    -->
+    <select id="coverageGaps" resultType="java.util.LinkedHashMap">
+        SELECT r.id                       AS roomId,
+               r.room_name                AS roomName,
+               ii.id                      AS itemId,
+               ii.item_name               AS itemName,
+               last_rc.last_record_at     AS lastRecordAt,
+               CASE
+                 WHEN last_rc.last_record_at IS NULL THEN NULL
+                 ELSE DATEDIFF(NOW(), last_rc.last_record_at)
+               END                        AS daysSinceLastRecord
+        FROM cps_room r
+        CROSS JOIN cps_inspection_item ii
+        LEFT JOIN (
+          SELECT room_id, MAX(submitted_at) AS last_record_at
+          FROM cps_room_check_record
+          WHERE submitted_at IS NOT NULL
+          GROUP BY room_id
+        ) last_rc ON last_rc.room_id = r.id
+        <where>
+            ii.enabled = 1
+            AND r.enabled = 1
+            AND (last_rc.last_record_at IS NULL
+                 OR last_rc.last_record_at &lt; DATE_SUB(NOW(), INTERVAL #{gapDays} DAY))
+            <if test="factory != null and factory != ''">AND r.factory = #{factory}</if>
+            <if test="storageRoomType != null and storageRoomType != ''">AND r.room_type = #{storageRoomType}</if>
+        </where>
+        ORDER BY daysSinceLastRecord IS NULL ASC, daysSinceLastRecord DESC, r.id, ii.id
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countCoverageGaps" resultType="long">
+        SELECT COUNT(1)
+        FROM cps_room r
+        CROSS JOIN cps_inspection_item ii
+        LEFT JOIN (
+          SELECT room_id, MAX(submitted_at) AS last_record_at
+          FROM cps_room_check_record
+          WHERE submitted_at IS NOT NULL
+          GROUP BY room_id
+        ) last_rc ON last_rc.room_id = r.id
+        <where>
+            ii.enabled = 1
+            AND r.enabled = 1
+            AND (last_rc.last_record_at IS NULL
+                 OR last_rc.last_record_at &lt; DATE_SUB(NOW(), INTERVAL #{gapDays} DAY))
+            <if test="factory != null and factory != ''">AND r.factory = #{factory}</if>
+            <if test="storageRoomType != null and storageRoomType != ''">AND r.room_type = #{storageRoomType}</if>
+        </where>
+    </select>
+
+</mapper>
