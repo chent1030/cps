@@ -236,4 +236,37 @@
           AND close_time &lt; DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
     </select>
 
+    <!--
+      I 线记忆体系消费：问题分页。
+      字段集对齐 CpsIssueListItemResponse（adminIssueColumns 已含 FROM + 4 路分类 JOIN）。
+      过滤维度：factory / category_l1_id / category_l2_id / status / submit_time 区间。
+      与 listForAdmin 共用 adminIssueColumns 列集合，保证契约一致（CpsIssueMapperContractTest）。
+    -->
+    <select id="findMemoryPage" resultType="com.company.cps.dto.CpsIssueListItemResponse">
+        SELECT <include refid="adminIssueColumns"/>
+        <where>
+            <if test="factory != null and factory != ''">AND i.factory = #{factory}</if>
+            <if test="categoryL1Id != null">AND i.category_l1_id = #{categoryL1Id}</if>
+            <if test="categoryL2Id != null">AND i.category_l2_id = #{categoryL2Id}</if>
+            <if test="status != null">AND i.status = #{status}</if>
+            <if test="startTime != null and startTime != ''">AND i.submit_time &gt;= #{startTime}</if>
+            <if test="endTime != null and endTime != ''">AND i.submit_time &lt;= #{endTime}</if>
+        </where>
+        ORDER BY i.submit_time DESC, i.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countMemory" resultType="long">
+        SELECT COUNT(1)
+        FROM cps_issue i
+        <where>
+            <if test="factory != null and factory != ''">AND i.factory = #{factory}</if>
+            <if test="categoryL1Id != null">AND i.category_l1_id = #{categoryL1Id}</if>
+            <if test="categoryL2Id != null">AND i.category_l2_id = #{categoryL2Id}</if>
+            <if test="status != null">AND i.status = #{status}</if>
+            <if test="startTime != null and startTime != ''">AND i.submit_time &gt;= #{startTime}</if>
+            <if test="endTime != null and endTime != ''">AND i.submit_time &lt;= #{endTime}</if>
+        </where>
+    </select>
+
 </mapper>

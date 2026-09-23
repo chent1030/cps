@@ -108,4 +108,28 @@ public interface CpsIssueMapper {
     long countOverdueIssues();
 
     long countClosedThisMonth();
+
+    /**
+     * I 线记忆体系消费：分页查询问题全集（与 listForAdmin 共用 adminIssueColumns/adminIssueFilter）。
+     * 字段集对齐 CpsIssueListItemResponse，用于记忆体系构建"问题上下文"。
+     */
+    List<CpsIssueListItemResponse> findMemoryPage(
+            @Param("factory") String factory,
+            @Param("categoryL1Id") Long categoryL1Id,
+            @Param("categoryL2Id") Long categoryL2Id,
+            @Param("status") CpsIssueStatus status,
+            @Param("startTime") String startTime,
+            @Param("endTime") String endTime,
+            @Param("limit") int limit,
+            @Param("offset") int offset
+    );
+
+    long countMemory(
+            @Param("factory") String factory,
+            @Param("categoryL1Id") Long categoryL1Id,
+            @Param("categoryL2Id") Long categoryL2Id,
+            @Param("status") CpsIssueStatus status,
+            @Param("startTime") String startTime,
+            @Param("endTime") String endTime
+    );
 }

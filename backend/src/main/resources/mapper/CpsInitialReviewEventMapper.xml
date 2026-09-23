@@ -19,4 +19,47 @@
     <select id="findByIssueId" resultType="com.company.cps.domain.CpsInitialReviewEvent">
         SELECT * FROM cps_initial_review_event WHERE issue_id = #{issueId} ORDER BY id ASC
     </select>
+
+    <!--
+      I 线记忆体系消费：AI 初审事件分页。
+      工厂/区域/分类需 JOIN cps_issue（事件 issue_id 必非空，否则视作脏数据被 INNER JOIN 过滤）。
+      排序按 created_at DESC，id DESC 兜底稳定。
+    -->
+    <select id="findMemoryPage" resultType="com.company.cps.domain.CpsInitialReviewEvent">
+        SELECT e.id, e.task_id, e.issue_id, e.version_no,
+               e.event_type, e.detail, e.operator_emp_no, e.created_at
+        FROM cps_initial_review_event e
+        INNER JOIN cps_issue i ON i.id = e.issue_id
+        <where>
+            <if test="issueId != null">AND e.issue_id = #{issueId}</if>
+            <if test="eventType != null and eventType != ''">AND e.event_type = #{eventType}</if>
+            <if test="taskId != null">AND e.task_id = #{taskId}</if>
+            <if test="factory != null and factory != ''">AND i.factory = #{factory}</if>
+            <if test="area != null and area != ''">AND i.area = #{area}</if>
+            <if test="categoryL1Id != null">AND i.category_l1_id = #{categoryL1Id}</if>
+            <if test="categoryL2Id != null">AND i.category_l2_id = #{categoryL2Id}</if>
+            <if test="startTime != null and startTime != ''">AND e.created_at &gt;= #{startTime}</if>
+            <if test="endTime != null and endTime != ''">AND e.created_at &lt;= #{endTime}</if>
+        </where>
+        ORDER BY e.created_at DESC, e.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countMemory" resultType="long">
+        SELECT COUNT(1)
+        FROM cps_initial_review_event e
+        INNER JOIN cps_issue i ON i.id = e.issue_id
+        <where>
+            <if test="issueId != null">AND e.issue_id = #{issueId}</if>
+            <if test="eventType != null and eventType != ''">AND e.event_type = #{eventType}</if>
+            <if test="taskId != null">AND e.task_id = #{taskId}</if>
+            <if test="factory != null and factory != ''">AND i.factory = #{factory}</if>
+            <if test="area != null and area != ''">AND i.area = #{area}</if>
+            <if test="categoryL1Id != null">AND i.category_l1_id = #{categoryL1Id}</if>
+            <if test="categoryL2Id != null">AND i.category_l2_id = #{categoryL2Id}</if>
+            <if test="startTime != null and startTime != ''">AND e.created_at &gt;= #{startTime}</if>
+            <if test="endTime != null and endTime != ''">AND e.created_at &lt;= #{endTime}</if>
+        </where>
+    </select>
+
 </mapper>
