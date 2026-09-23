@@ -36,6 +36,13 @@ cps:
       base-url: ${CPS_ROOM_CHECK_JUDGE_BASE_URL:http://127.0.0.1:8010}
       path: ${CPS_ROOM_CHECK_JUDGE_PATH:/api/agent/room-checks/judge}
       timeout-ms: ${CPS_ROOM_CHECK_JUDGE_TIMEOUT_MS:60000}
+  speech:
+    # F3 语音转写（Python C-06 speech-to-text，同步 240s 量级可配）；未配置/失败降级文案不阻塞表单
+    enabled: ${CPS_SPEECH_ENABLED:true}
+    base-url: ${CPS_SPEECH_BASE_URL:http://127.0.0.1:8000}
+    path: ${CPS_SPEECH_PATH:/api/v1/agent/speech-to-text}
+    timeout-ms: ${CPS_SPEECH_TIMEOUT_MS:240000}
+    max-audio-bytes: ${CPS_SPEECH_MAX_AUDIO_BYTES:20971520}
   initial-review:
     # 初审超时扫描（PRD §28.4）：RUNNING 且超 timeout-at 判 TIMEOUT_OPEN（可接管），30s 一轮
     scan-enabled: ${CPS_INITIAL_REVIEW_SCAN_ENABLED:true}

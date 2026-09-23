@@ -28,12 +28,19 @@ const emit = defineEmits<{
 }>()
 
 const labels: Record<CpsIssueAction, string> = {
+  SUBMIT: '提交问题',
   REPLY_ASSIGN: '回复并指派',
   RECTIFY: '完成整改',
   UPLOAD_PROOF: '上传整改照片',
   REVIEW_CLOSE: '审核关闭',
   REVIEW_REJECT: '审核退回',
   TRANSFER: '转办',
+  SUBMIT_RECTIFICATION: '提交整改（AI 初审）',
+  SAVE_DRAFT: '暂存',
+  AI_REVIEW_ADVANCE: 'AI 初审推进',
+  REVIEWER_CONFIGURED: '配置审核人',
+  REVIEWER_REASSIGN: '改派审核人',
+  AI_REVIEW_RETRIGGER: '重触发初审',
 }
 
 const statusLabels: Record<CpsIssueStatus, string> = {
@@ -41,6 +48,8 @@ const statusLabels: Record<CpsIssueStatus, string> = {
   PENDING_RECTIFY: '待整改',
   PENDING_UPLOAD_PROOF: '待传图',
   PENDING_REVIEW: '待审核',
+  PENDING_AI_REVIEW: 'AI 初审中',
+  PENDING_REVIEWER_CONFIG: '待审核裁决',
   CLOSED: '已关闭',
 }
 </script>

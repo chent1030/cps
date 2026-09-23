@@ -25,7 +25,8 @@
           <h2>处理责任</h2>
         </div>
       </div>
-      <div class="cps-info-grid">
+      <!-- §31 精简：基础信息仅留稽查人姓名+稽查时间；其余 6 字段隐藏不删除（?legacy=1 可达） -->
+      <div v-if="legacyDetailVisible" class="cps-info-grid">
         <div><span>提交人</span><strong>{{ detail.creatorEmpNo || '-' }}</strong></div>
         <div><span>当前处理人</span><strong>{{ detail.currentHandlerEmpName || detail.currentHandlerEmpNo || '-' }}</strong></div>
         <div><span>反馈人</span><strong>{{ detail.feedbackEmpNo || '-' }}</strong></div>
@@ -33,9 +34,12 @@
         <div><span>上传人</span><strong>{{ detail.proofEmpNo || '-' }}</strong></div>
         <div><span>审核人</span><strong>{{ detail.reviewerEmpNo || '-' }}</strong></div>
       </div>
+      <div v-else class="cps-info-grid">
+        <div><span>稽查人</span><strong>{{ detail.creatorEmpNo || '-' }}</strong></div>
+      </div>
       <div class="cps-detail-time">
-        <span>提交时间 {{ detail.submitTime || '-' }}</span>
-        <span v-if="detail.closeTime">关闭时间 {{ detail.closeTime }}</span>
+        <span>稽查时间 {{ detail.submitTime || '-' }}</span>
+        <span v-if="legacyDetailVisible && detail.closeTime">关闭时间 {{ detail.closeTime }}</span>
       </div>
     </section>
 
@@ -64,7 +68,8 @@
       <div v-else class="cps-empty-proof">当前问题还没有现场照片</div>
     </section>
 
-    <section class="cps-detail-card">
+    <!-- §31 精简：复核照片卡片隐藏不删除（?legacy=1 可达） -->
+    <section v-if="legacyDetailVisible" class="cps-detail-card">
       <div class="cps-card-title">
         <div>
           <p>整改凭证</p>
@@ -88,26 +93,30 @@
       <div v-else class="cps-empty-proof">当前节点还没有上传整改照片</div>
     </section>
 
+    <!-- §31 精简：AI 原因+AI 措施合并为「AI 整改建议」；AI 分类/人工分类/人工原因/人工措施隐藏不删除 -->
     <section class="cps-detail-card">
       <div class="cps-card-title">
         <div>
-          <p>AI 与分类</p>
-          <h2>原因措施</h2>
+          <p>AI 初审</p>
+          <h2>AI 整改建议</h2>
         </div>
       </div>
       <div class="cps-ai-panel">
-        <div>
-          <span>AI 分类</span>
-          <strong>{{ aiCategory }}</strong>
-        </div>
-        <div>
-          <span>人工分类</span>
-          <strong>{{ issueCategory }}</strong>
-        </div>
-        <p><b>AI 原因</b>{{ detail.aiSuggestion?.reasonSuggestion || '-' }}</p>
-        <p><b>AI 措施</b>{{ detail.aiSuggestion?.measureSuggestion || '-' }}</p>
-        <p><b>人工原因</b>{{ detail.reasonAnalysis || '-' }}</p>
-        <p><b>人工措施</b>{{ detail.correctiveMeasure || '-' }}</p>
+        <p><b>AI 整改建议</b>{{ aiMergedSuggestion }}</p>
+        <template v-if="legacyDetailVisible">
+          <div>
+            <span>AI 分类</span>
+            <strong>{{ aiCategory }}</strong>
+          </div>
+          <div>
+            <span>人工分类</span>
+            <strong>{{ issueCategory }}</strong>
+          </div>
+          <p><b>AI 原因</b>{{ detail.aiSuggestion?.reasonSuggestion || '-' }}</p>
+          <p><b>AI 措施</b>{{ detail.aiSuggestion?.measureSuggestion || '-' }}</p>
+          <p><b>人工原因</b>{{ detail.reasonAnalysis || '-' }}</p>
+          <p><b>人工措施</b>{{ detail.correctiveMeasure || '-' }}</p>
+        </template>
       </div>
     </section>
 
@@ -127,15 +136,25 @@
           <van-field data-testid="responsible-employee-field" :model-value="personLabel(actionForm.responsibleEmpNo)" label="责任员工" placeholder="选择责任员工" readonly is-link @click="openPersonPicker('responsibleEmpNo', '选择责任员工')" />
         </template>
 
-        <template v-if="showRectifyFields">
+        <!-- V2 整改流程（§28）：三字段支持语音回填（§20.2/D-03，语音仅回填文本不作证据） -->
+        <template v-if="showRectificationFields">
+          <p class="cps-rectify-intro">填写整改内容后提交将触发 AI 初审；支持按住麦克风语音录入（转写文本回填后可编辑，不作点检证据）。</p>
+          <VoiceInput field="reason" label="原因分析" :model-value="actionForm.reasonAnalysis" :submission-id="String(issueId)" @update:model-value="(value: string) => { actionForm.reasonAnalysis = value }" />
+          <VoiceInput field="short_term" label="短期措施" :model-value="actionForm.shortTermMeasure" :submission-id="String(issueId)" @update:model-value="(value: string) => { actionForm.shortTermMeasure = value }" />
+          <VoiceInput field="long_term" label="长期措施" :model-value="actionForm.longTermMeasure" :submission-id="String(issueId)" @update:model-value="(value: string) => { actionForm.longTermMeasure = value }" />
+          <van-field data-testid="rectification-responsible-field" :model-value="personLabel(actionForm.responsibleEmpNo)" label="责任员工" placeholder="选择责任员工" readonly is-link @click="openPersonPicker('responsibleEmpNo', '选择责任员工')" />
+          <van-field v-model="actionForm.rectifyRemark" rows="2" autosize type="textarea" label="整改备注" placeholder="选填备注" />
+        </template>
+
+        <template v-if="showRectifyFields && !showRectificationFields">
           <van-field v-model="actionForm.rectifyRemark" rows="3" autosize type="textarea" label="整改说明" placeholder="填写整改说明" />
           <van-field data-testid="proof-employee-field" :model-value="personLabel(actionForm.proofEmpNo)" label="上传人" placeholder="选择上传人" readonly is-link @click="openPersonPicker('proofEmpNo', '选择上传人')" />
         </template>
 
-        <template v-if="showProofFields">
-          <van-field data-testid="reviewer-employee-field" :model-value="personLabel(actionForm.reviewerEmpNo)" label="审核人" placeholder="选择审核人" readonly is-link @click="openPersonPicker('reviewerEmpNo', '选择审核人')" />
+        <template v-if="showPhotoUpload">
+          <van-field v-if="showProofFields" data-testid="reviewer-employee-field" :model-value="personLabel(actionForm.reviewerEmpNo)" label="审核人" placeholder="选择审核人" readonly is-link @click="openPersonPicker('reviewerEmpNo', '选择审核人')" />
           <div class="cps-proof-upload">
-            <p>整改照片</p>
+            <p>{{ showRectificationFields ? '整改照片（§28 提交将随整改内容触发 AI 初审）' : '整改照片' }}</p>
             <div class="cps-proof-uploader">
               <button
                 v-for="(image, index) in proofImages"
@@ -187,7 +206,8 @@
       </div>
     </section>
 
-    <section class="cps-detail-card">
+    <!-- §31 精简：底部节点卡片（流转记录）隐藏不删除（?legacy=1 可达） -->
+    <section v-if="legacyDetailVisible" class="cps-detail-card">
       <div class="cps-card-title">
         <div>
           <p>流转记录</p>
@@ -250,6 +270,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import { uploadCpsAttachment, type CpsAttachmentUploadSource } from '@/api/cps/attachment'
 import { executeCpsIssueAction, getCpsIssueDetail } from '@/api/cps/issue'
 import { searchCpsEmployees, type CpsEmployeeOption } from '@/api/cps/master'
+import VoiceInput from '@/components/cps/VoiceInput.vue'
 import type {
   CpsAttachment,
   CpsIssueAction,
@@ -301,6 +322,8 @@ const personPicker = ref({
 const actionForm = ref({
   reasonAnalysis: '',
   correctiveMeasure: '',
+  shortTermMeasure: '',
+  longTermMeasure: '',
   responsibleEmpNo: '',
   proofEmpNo: '',
   reviewerEmpNo: '',
@@ -314,6 +337,12 @@ const showFeedbackFields = computed<boolean>(() => detail.value?.status === 'PEN
 const showRectifyFields = computed<boolean>(() => detail.value?.status === 'PENDING_RECTIFY')
 const showProofFields = computed<boolean>(() => detail.value?.status === 'PENDING_UPLOAD_PROOF')
 const showReviewFields = computed<boolean>(() => detail.value?.status === 'PENDING_REVIEW')
+/** V2 整改流程（PRD §28）：原因/短期/长期措施 + 责任员工 + 整改照片；提交触发 AI 初审。 */
+const showRectificationFields = computed<boolean>(() =>
+  workflowActions.value.some((action) => action === 'SUBMIT_RECTIFICATION' || action === 'SAVE_DRAFT'),
+)
+/** 整改照片上传同时用于旧流程 UPLOAD_PROOF 与 V2 SUBMIT_RECTIFICATION/SAVE_DRAFT（§28 暂存/提交均带整改照片）。 */
+const showPhotoUpload = computed<boolean>(() => showProofFields.value || showRectificationFields.value)
 const workflowActions = computed<CpsIssueAction[]>(() => {
   if (!detail.value) return []
   return detail.value.availableActions.length ? detail.value.availableActions : statusDefaultActions[detail.value.status]
@@ -325,16 +354,26 @@ const statusMeta: Record<CpsIssueStatus, DetailStatusMeta> = {
   PENDING_RECTIFY: { label: '待整改', tone: 'cps-status-pill--orange' },
   PENDING_UPLOAD_PROOF: { label: '待传图', tone: 'cps-status-pill--orange' },
   PENDING_REVIEW: { label: '待审核', tone: 'cps-status-pill--teal' },
+  PENDING_AI_REVIEW: { label: 'AI 初审中', tone: 'cps-status-pill--blue' },
+  PENDING_REVIEWER_CONFIG: { label: '待审核裁决', tone: 'cps-status-pill--teal' },
   CLOSED: { label: '已关闭', tone: 'cps-status-pill--green' },
 }
 
+/** 系统/管理事件（AI_REVIEW_ADVANCE 等）不出现在整改人员按钮上，仅保证枚举完备供流转留痕展示。 */
 const actionLabels: Record<CpsIssueAction, string> = {
+  SUBMIT: '提交',
   REPLY_ASSIGN: '回复并指派',
   RECTIFY: '完成整改',
   UPLOAD_PROOF: '上传凭证',
   REVIEW_CLOSE: '审核通过',
   REVIEW_REJECT: '审核退回',
   TRANSFER: '转办',
+  SUBMIT_RECTIFICATION: '提交整改（AI 初审）',
+  SAVE_DRAFT: '暂存',
+  AI_REVIEW_ADVANCE: 'AI 初审推进',
+  REVIEWER_CONFIGURED: '审核员配置',
+  REVIEWER_REASSIGN: '改派审核员',
+  AI_REVIEW_RETRIGGER: '重触发 AI 初审',
 }
 
 const statusDefaultActions: Record<CpsIssueStatus, CpsIssueAction[]> = {
@@ -342,6 +381,8 @@ const statusDefaultActions: Record<CpsIssueStatus, CpsIssueAction[]> = {
   PENDING_RECTIFY: ['RECTIFY', 'TRANSFER'],
   PENDING_UPLOAD_PROOF: ['UPLOAD_PROOF', 'TRANSFER'],
   PENDING_REVIEW: ['REVIEW_CLOSE', 'REVIEW_REJECT', 'TRANSFER'],
+  PENDING_AI_REVIEW: [],
+  PENDING_REVIEWER_CONFIG: [],
   CLOSED: [],
 }
 
@@ -350,6 +391,8 @@ const flowStatusLabels: Record<CpsIssueStatus, string> = {
   PENDING_RECTIFY: '待整改',
   PENDING_UPLOAD_PROOF: '待传图',
   PENDING_REVIEW: '待审核',
+  PENDING_AI_REVIEW: 'AI 初审中',
+  PENDING_REVIEWER_CONFIG: '待审核裁决',
   CLOSED: '已关闭',
 }
 
@@ -429,6 +472,8 @@ const buildActionPayload = (action: CpsIssueAction) => {
     action,
     reasonAnalysis: actionForm.value.reasonAnalysis || undefined,
     correctiveMeasure: actionForm.value.correctiveMeasure || undefined,
+    shortTermMeasure: actionForm.value.shortTermMeasure || undefined,
+    longTermMeasure: actionForm.value.longTermMeasure || undefined,
     responsibleEmpNo: actionForm.value.responsibleEmpNo || undefined,
     responsibleEmpName: personName(actionForm.value.responsibleEmpNo),
     proofEmpNo: actionForm.value.proofEmpNo || undefined,
@@ -437,7 +482,9 @@ const buildActionPayload = (action: CpsIssueAction) => {
     reviewerEmpName: personName(actionForm.value.reviewerEmpNo),
     rectifyRemark: actionForm.value.rectifyRemark || undefined,
     reviewOpinion: actionForm.value.reviewOpinion || undefined,
-    proofAttachmentIds: action === 'UPLOAD_PROOF' ? proofImages.value.map((image) => image.id) : undefined,
+    proofAttachmentIds: action === 'UPLOAD_PROOF' || action === 'SUBMIT_RECTIFICATION' || action === 'SAVE_DRAFT'
+      ? proofImages.value.map((image) => image.id)
+      : undefined,
     targetEmpNo: actionForm.value.targetEmpNo || undefined,
     targetEmpName: personName(actionForm.value.targetEmpNo),
     comment: actionForm.value.comment || undefined,
@@ -591,14 +638,33 @@ const actionLabel = (action: string) => actionLabels[action as CpsIssueAction] ?
 
 const flowStatusLabel = (status: CpsIssueStatus | null) => (status ? flowStatusLabels[status] : '开始')
 
+/**
+ * §31 页面精简开关：默认隐藏旧区块（隐藏不删除），URL 带 ?legacy=1 时恢复完整展示，
+ * 保证历史数据可达（代码与数据路径均保留）。
+ */
+const legacyDetailVisible = ref(false)
+
+const aiMergedSuggestion = computed<string>(() => {
+  const suggestion = detail.value?.aiSuggestion
+  if (!suggestion) return '-'
+  return [suggestion.reasonSuggestion, suggestion.measureSuggestion].filter(Boolean).join('；') || '-'
+})
+
 onLoad((query?: Record<string, string | string[] | undefined>) => {
   const rawId = Array.isArray(query?.id) ? query?.id[0] : query?.id
   issueId.value = Number(rawId)
+  const legacy = Array.isArray(query?.legacy) ? query?.legacy[0] : query?.legacy
+  legacyDetailVisible.value = legacy === '1'
   void load()
 })
 </script>
 
 <style scoped>
+.cps-rectify-intro {
+  margin: 8px 16px;
+  font-size: 12px;
+  color: #6b7280;
+}
 .cps-page,
 .cps-page *,
 .cps-page *::before,

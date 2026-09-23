@@ -17,6 +17,24 @@
       "style": {
         "navigationBarTitleText": "问题详情"
       }
+    },
+    {
+      "path": "views/cps/RoomCheckListView",
+      "style": {
+        "navigationBarTitleText": "我的点检任务"
+      }
+    },
+    {
+      "path": "views/cps/RoomCheckExecuteView",
+      "style": {
+        "navigationBarTitleText": "点检执行"
+      }
+    },
+    {
+      "path": "views/cps/InitialReviewView",
+      "style": {
+        "navigationBarTitleText": "AI 初审裁决"
+      }
     }
   ],
   "globalStyle": {

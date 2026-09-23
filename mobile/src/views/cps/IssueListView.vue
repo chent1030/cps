@@ -9,9 +9,19 @@
           <span>超时 {{ overdueCount }}</span>
         </div>
       </div>
-      <button type="button" class="cps-list-hero__action" @click="navigateToCreate">
-        新建
-      </button>
+      <div class="cps-list-hero__entries">
+        <button type="button" class="cps-list-hero__entry" @click="navigateToCreate">
+          新建
+        </button>
+        <!-- 波次6 B5①：点检执行入口 -->
+        <button type="button" class="cps-list-hero__entry" @click="navigateToRoomChecks">
+          点检任务
+        </button>
+        <!-- 波次6 B5②：初审三态/接管/裁决入口（审核专员） -->
+        <button type="button" class="cps-list-hero__entry" @click="navigateToInitialReview">
+          初审裁决
+        </button>
+      </div>
     </header>
 
     <section class="cps-list-tabs">
@@ -116,6 +126,16 @@ const statusMeta: Record<CpsIssueStatus, StatusMeta> = {
     tone: 'cps-status-pill--teal',
     rail: 'cps-issue-card--teal',
   },
+  PENDING_AI_REVIEW: {
+    label: 'AI 初审中',
+    tone: 'cps-status-pill--blue',
+    rail: 'cps-issue-card--blue',
+  },
+  PENDING_REVIEWER_CONFIG: {
+    label: '待审核裁决',
+    tone: 'cps-status-pill--teal',
+    rail: 'cps-issue-card--teal',
+  },
   CLOSED: {
     label: '已关闭',
     tone: 'cps-status-pill--green',
@@ -125,6 +145,12 @@ const statusMeta: Record<CpsIssueStatus, StatusMeta> = {
 
 const todoCount = computed<number>(() => items.value.filter((item) => item.status !== 'CLOSED').length)
 const overdueCount = computed<number>(() => items.value.filter((item) => item.overdue).length)
+// 初审裁决入口默认跳转最近一条待 AI 初审/待裁决的问题；无则直接进入视图由其自提示
+const pendingReviewIssueId = computed<number | null>(
+  () =>
+    items.value.find((item) => item.status === 'PENDING_AI_REVIEW' || item.status === 'PENDING_REVIEWER_CONFIG')?.id ??
+    null,
+)
 
 const issueStatus = (item: CpsIssueListItem) => {
   return statusMeta[item.status]
@@ -142,6 +168,20 @@ const issueCategory = (item: CpsIssueListItem) => {
 
 const navigateToCreate = () => {
   uni.navigateTo({ url: '/views/cps/IssueCreateView' })
+}
+
+const navigateToRoomChecks = () => {
+  uni.navigateTo({ url: '/views/cps/RoomCheckListView' })
+}
+
+const navigateToInitialReview = () => {
+  // 审核专员从问题列表点进具体问题的初审视图；此处提供直达最近待裁决问题的占位入口
+  const target = pendingReviewIssueId.value
+  if (target) {
+    uni.navigateTo({ url: `/views/cps/InitialReviewView?issueId=${target}` })
+  } else {
+    uni.navigateTo({ url: '/views/cps/InitialReviewView' })
+  }
 }
 
 const navigateToDetail = (id: number) => {
@@ -271,8 +311,12 @@ watch(tab, load, { immediate: true })
   white-space: nowrap;
 }
 
-.cps-list-hero__action {
+.cps-list-hero__entries {
   flex: 0 0 auto;
+  display: flex;
+  gap: 12rpx;
+}
+.cps-list-hero__entry {
   min-height: 84rpx;
   border: 0;
   border-radius: 999rpx;
@@ -282,6 +326,10 @@ watch(tab, load, { immediate: true })
   font-size: 32rpx;
   font-weight: 950;
   box-shadow: 0 14rpx 34rpx rgba(15, 23, 42, 0.14);
+}
+.cps-list-hero__entry + .cps-list-hero__entry {
+  background: #0f766e;
+  color: #ffffff;
 }
 
 .cps-list-tabs {
