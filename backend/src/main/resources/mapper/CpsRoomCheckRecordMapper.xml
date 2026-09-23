@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsRoomCheckRecordMapper">
+
+    <sql id="BaseColumns">
+        id, plan_task_id, plan_id, room_id, room_code, room_name,
+        check_emp_no, check_emp_name, record_status, judge_status, score,
+        started_at, submitted_at, created_at, updated_at
+    </sql>
+
+    <resultMap id="recordMap" type="com.company.cps.domain.CpsRoomCheckRecord">
+        <id column="id" property="id"/>
+        <result column="plan_task_id" property="planTaskId"/>
+        <result column="plan_id" property="planId"/>
+        <result column="room_id" property="roomId"/>
+        <result column="room_code" property="roomCode"/>
+        <result column="room_name" property="roomName"/>
+        <result column="check_emp_no" property="checkEmpNo"/>
+        <result column="check_emp_name" property="checkEmpName"/>
+        <result column="record_status" property="recordStatus"/>
+        <result column="judge_status" property="judgeStatus"/>
+        <result column="score" property="score"/>
+        <result column="started_at" property="startedAt"/>
+        <result column="submitted_at" property="submittedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsRoomCheckRecord" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_room_check_record (
+            plan_task_id, plan_id, room_id, room_code, room_name,
+            check_emp_no, check_emp_name, record_status, judge_status, score,
+            started_at, submitted_at
+        ) VALUES (
+            #{planTaskId}, #{planId}, #{roomId}, #{roomCode}, #{roomName},
+            #{checkEmpNo}, #{checkEmpName}, #{recordStatus}, #{judgeStatus}, #{score},
+            #{startedAt}, #{submittedAt}
+        )
+    </insert>
+
+    <select id="findById" resultMap="recordMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_room_check_record
+        WHERE id = #{id}
+    </select>
+
+    <select id="findActiveByTaskAndRoom" resultMap="recordMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_room_check_record
+        WHERE plan_task_id = #{planTaskId} AND room_id = #{roomId}
+          AND record_status IN ('PENDING', 'IN_PROGRESS')
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
+
+    <select id="findByPlanTaskId" resultMap="recordMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_room_check_record
+        WHERE plan_task_id = #{planTaskId}
+        ORDER BY id ASC
+    </select>
+
+    <select id="findByRoomAndSubmittedBetween" resultMap="recordMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_room_check_record
+        WHERE room_id = #{roomId}
+          AND submitted_at &gt;= #{from} AND submitted_at &lt; #{to}
+        ORDER BY submitted_at ASC
+    </select>
+
+    <select id="findJudgedByRoomAndSubmittedBetween" resultMap="recordMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_room_check_record
+        WHERE room_id = #{roomId}
+          AND submitted_at &gt;= #{from} AND submitted_at &lt; #{to}
+          AND record_status = 'JUDGED' AND judge_status = 'SUCCESS' AND score IS NOT NULL
+        ORDER BY submitted_at ASC
+    </select>
+
+    <update id="updateJudgeResult" parameterType="com.company.cps.domain.CpsRoomCheckRecord">
+        UPDATE cps_room_check_record
+        SET record_status = #{recordStatus},
+            judge_status = #{judgeStatus},
+            score = #{score},
+            submitted_at = #{submittedAt}
+        WHERE id = #{id} AND record_status IN ('PENDING', 'IN_PROGRESS')
+    </update>
+
+    <update id="updateStatusFields">
+        UPDATE cps_room_check_record
+        SET record_status = #{recordStatus},
+            started_at = COALESCE(#{startedAt}, started_at)
+        WHERE id = #{id} AND record_status IN ('PENDING', 'IN_PROGRESS')
+    </update>
+
+    <!-- B4（PRD 24.3 + D-08）：周期总分=自然周内已判定成功记录 SUM(score)；同分按完成时间（最早提交）升序。 -->
+    <select id="aggregateWeeklyScores" resultType="java.util.HashMap">
+        SELECT room_id            AS roomId,
+               room_code          AS roomCode,
+               room_name          AS roomName,
+               COUNT(*)           AS checkCount,
+               SUM(score)         AS totalScore,
+               MIN(submitted_at)  AS firstSubmittedAt
+        FROM cps_room_check_record
+        WHERE submitted_at &gt;= #{from} AND submitted_at &lt; #{to}
+          AND record_status = 'JUDGED'
+          AND judge_status = 'SUCCESS'
+          AND score IS NOT NULL
+        GROUP BY room_id, room_code, room_name
+        ORDER BY totalScore DESC, firstSubmittedAt ASC, roomCode ASC
+    </select>
+
+</mapper>

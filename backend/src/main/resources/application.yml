@@ -29,6 +29,13 @@ cps:
     base-url: http://127.0.0.1:8000/api/v1
     tenant-id: local-factory
     timeout-ms: 10000
+  room-check:
+    # B3 辅房点检判定（Python C-04 room-checks/judge，同步）；未起/超时降级 PENDING 不阻塞提交
+    judge:
+      enabled: ${CPS_ROOM_CHECK_JUDGE_ENABLED:true}
+      base-url: ${CPS_ROOM_CHECK_JUDGE_BASE_URL:http://127.0.0.1:8010}
+      path: ${CPS_ROOM_CHECK_JUDGE_PATH:/api/agent/room-checks/judge}
+      timeout-ms: ${CPS_ROOM_CHECK_JUDGE_TIMEOUT_MS:60000}
   initial-review:
     # 初审超时扫描（PRD §28.4）：RUNNING 且超 timeout-at 判 TIMEOUT_OPEN（可接管），30s 一轮
     scan-enabled: ${CPS_INITIAL_REVIEW_SCAN_ENABLED:true}
