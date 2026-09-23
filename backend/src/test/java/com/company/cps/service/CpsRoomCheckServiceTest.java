@@ -7,6 +7,7 @@ import com.company.cps.domain.CpsRoom;
 import com.company.cps.domain.CpsRoomCheckRecord;
 import com.company.cps.domain.CpsRoomCheckRecordItem;
 import com.company.cps.dto.CpsRoomCheckRecordResponse;
+import com.company.cps.dto.CpsRoomCheckRejudgeResponse;
 import com.company.cps.dto.CpsRoomCheckStartRequest;
 import com.company.cps.mapper.CpsCheckItemMapper;
 import com.company.cps.mapper.CpsInspectionPlanTaskMapper;
@@ -29,7 +30,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -209,7 +212,7 @@ class CpsRoomCheckServiceTest {
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                 () -> service.submit(9L, "E001"));
         assertTrue(error.getMessage().contains("photo evidence missing"));
-        verify(judgeClient, never()).judge(any(), anyList());
+        verify(judgeClient, never()).judge(any(), anyList(), anyInt());
     }
 
     @Test
@@ -218,7 +221,7 @@ class CpsRoomCheckServiceTest {
         when(recordMapper.findById(9L)).thenReturn(record);
         when(itemMapper.findByRecordId(9L)).thenReturn(new ArrayList<>(
                 Arrays.asList(itemRow(77L, 1, "a.jpg"))));
-        when(judgeClient.judge(any(), anyList())).thenReturn(null); // Python 未起
+        when(judgeClient.judge(any(), anyList(), anyInt())).thenReturn(null); // Python 未起
         when(taskMapper.findById(11L)).thenReturn(task(11L, "E001", "R-01"));
         when(recordMapper.findByPlanTaskId(11L))
                 .thenReturn(new ArrayList<>(Arrays.asList(record)));
@@ -243,7 +246,7 @@ class CpsRoomCheckServiceTest {
         rows.add(itemRow(78L, 2, "b.jpg"));
         rows.add(itemRow(79L, 3, "c.jpg"));
         when(itemMapper.findByRecordId(9L)).thenReturn(rows);
-        when(judgeClient.judge(any(), anyList())).thenReturn(Arrays.asList(
+        when(judgeClient.judge(any(), anyList(), anyInt())).thenReturn(Arrays.asList(
                 new CpsRoomCheckJudgeClient.ItemJudge(1L, "PASS", null),
                 new CpsRoomCheckJudgeClient.ItemJudge(2L, "FAIL", "积水"),
                 new CpsRoomCheckJudgeClient.ItemJudge(3L, "FAIL", "堆物")));
@@ -263,7 +266,7 @@ class CpsRoomCheckServiceTest {
         when(recordMapper.findById(9L)).thenReturn(record(9L, "IN_PROGRESS"));
         when(itemMapper.findByRecordId(9L)).thenReturn(new ArrayList<>(
                 Arrays.asList(itemRow(77L, 1, "a.jpg"))));
-        when(judgeClient.judge(any(), anyList())).thenReturn(Arrays.asList(
+        when(judgeClient.judge(any(), anyList(), anyInt())).thenReturn(Arrays.asList(
                 new CpsRoomCheckJudgeClient.ItemJudge(1L, "TYPE_MISMATCH", "拍到桌面")));
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
@@ -286,5 +289,97 @@ class CpsRoomCheckServiceTest {
         record.setCheckEmpNo("E002");
         when(recordMapper.findById(9L)).thenReturn(record);
         assertThrows(IllegalArgumentException.class, () -> service.getRecord(9L, "E001"));
+    }
+
+    @Test
+    void submitDegradesRecordWhenAnyItemPending() {
+        CpsRoomCheckRecord record = record(9L, "IN_PROGRESS");
+        record.setPlanTaskId(null);
+        when(recordMapper.findById(9L)).thenReturn(record);
+        List<CpsRoomCheckRecordItem> rows = new ArrayList<>();
+        rows.add(itemRow(77L, 1, "a.jpg"));
+        rows.add(itemRow(78L, 2, "b.jpg"));
+        when(itemMapper.findByRecordId(9L)).thenReturn(rows);
+        when(judgeClient.judge(any(), anyList(), anyInt())).thenReturn(Arrays.asList(
+                new CpsRoomCheckJudgeClient.ItemJudge(1L, "PASS", null),
+                new CpsRoomCheckJudgeClient.ItemJudge(2L, "PENDING", "judge skipped by python side")));
+
+        CpsRoomCheckRecordResponse response = service.submit(9L, "E001");
+
+        ArgumentCaptor<CpsRoomCheckRecord> captor = ArgumentCaptor.forClass(CpsRoomCheckRecord.class);
+        verify(recordMapper).updateJudgeResult(captor.capture());
+        assertEquals("PENDING", captor.getValue().getJudgeStatus()); // 部分 SKIPPED ⇒ 不计分不阻塞
+        assertNull(captor.getValue().getScore());
+        assertEquals("JUDGED", response.getRecordStatus());
+        verify(itemMapper).updateJudgeResult(eq(78L), eq("PENDING"), contains("skipped"), eq("PENDING"), any());
+    }
+
+    @Test
+    void rejudgeWritesBackScoreAndSuccess() {
+        CpsRoomCheckRecord record = record(9L, "JUDGED");
+        record.setJudgeStatus("PENDING");
+        record.setJudgeAttempt(1);
+        record.setPlanTaskId(null);
+        when(recordMapper.findById(9L)).thenReturn(record);
+        when(itemMapper.findByRecordId(9L)).thenReturn(new ArrayList<>(
+                Arrays.asList(itemRow(77L, 1, "a.jpg"), itemRow(78L, 2, "b.jpg"))));
+        when(judgeClient.judge(any(), anyList(), eq(2))).thenReturn(Arrays.asList(
+                new CpsRoomCheckJudgeClient.ItemJudge(1L, "PASS", null),
+                new CpsRoomCheckJudgeClient.ItemJudge(2L, "FAIL", "积水")));
+
+        CpsRoomCheckRejudgeResponse response = service.rejudge(9L);
+
+        ArgumentCaptor<CpsRoomCheckRecord> rejudgeCaptor = ArgumentCaptor.forClass(CpsRoomCheckRecord.class);
+        verify(recordMapper).updateRejudgeResult(rejudgeCaptor.capture());
+        assertEquals(Integer.valueOf(90), rejudgeCaptor.getValue().getScore());
+        assertEquals("SUCCESS", response.getJudgeStatus());
+        assertEquals(Integer.valueOf(90), response.getScore());
+        assertEquals(Integer.valueOf(2), response.getAttempt()); // 新幂等键轮数
+        assertEquals(2, response.getResults().size());
+        assertTrue(response.getRetakeRequired().isEmpty());
+    }
+
+    @Test
+    void rejudgeStillDegradedKeepsPendingWithoutError() {
+        CpsRoomCheckRecord record = record(9L, "JUDGED");
+        record.setJudgeStatus("PENDING");
+        record.setPlanTaskId(null);
+        when(recordMapper.findById(9L)).thenReturn(record);
+        when(itemMapper.findByRecordId(9L)).thenReturn(new ArrayList<>(
+                Arrays.asList(itemRow(77L, 1, "a.jpg"))));
+        when(judgeClient.judge(any(), anyList(), anyInt())).thenReturn(null); // 服务仍未起
+
+        CpsRoomCheckRejudgeResponse response = service.rejudge(9L);
+
+        assertEquals("PENDING", response.getJudgeStatus());
+        assertNull(response.getScore());
+        verify(recordMapper).updateRejudgeResult(any(CpsRoomCheckRecord.class));
+    }
+
+    @Test
+    void rejudgeRetakeOutcomeKeepsPendingAndReports() {
+        CpsRoomCheckRecord record = record(9L, "JUDGED");
+        record.setJudgeStatus("PENDING");
+        record.setPlanTaskId(null);
+        when(recordMapper.findById(9L)).thenReturn(record);
+        when(itemMapper.findByRecordId(9L)).thenReturn(new ArrayList<>(
+                Arrays.asList(itemRow(77L, 1, "a.jpg"))));
+        when(judgeClient.judge(any(), anyList(), anyInt())).thenReturn(Arrays.asList(
+                new CpsRoomCheckJudgeClient.ItemJudge(1L, "TYPE_MISMATCH", "拍到桌面")));
+
+        CpsRoomCheckRejudgeResponse response = service.rejudge(9L);
+
+        assertEquals("PENDING", response.getJudgeStatus()); // 单已锁定，不抛错；保持待判定由 admin 决策
+        assertNull(response.getScore());
+        assertEquals(Arrays.asList("C1:TYPE_MISMATCH"), response.getRetakeRequired());
+    }
+
+    @Test
+    void rejudgeRejectsNonPendingRecord() {
+        CpsRoomCheckRecord record = record(9L, "JUDGED");
+        record.setJudgeStatus("SUCCESS");
+        when(recordMapper.findById(9L)).thenReturn(record);
+        assertThrows(IllegalArgumentException.class, () -> service.rejudge(9L));
+        verify(judgeClient, never()).judge(any(), anyList(), anyInt());
     }
 }

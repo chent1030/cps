@@ -181,10 +181,9 @@ public class CpsInitialReviewService {
                         .orElseThrow(() -> new IllegalStateException("Issue not found: " + task.getIssueId()));
                 List<CpsIssueAttachment> beforeImages = attachmentMapper.findByIssueAndStage(issue.getId(), "ISSUE");
                 List<CpsIssueAttachment> afterImages = attachmentMapper.findByIssueAndStage(issue.getId(), "PROOF");
-                String callbackUrl = properties.getCallbackBaseUrl().replaceAll("/+$", "")
-                        + "/api/callbacks/initial-review/result";
+                // 波次7 J线（C7 冻结 schema）：回调地址由 Python 配置，请求体不再携带 callback 字段
                 String reviewTaskRef = agentFrameworkClient.triggerInitialReview(
-                        submission, issue, beforeImages, afterImages, callbackUrl, task.getId());
+                        submission, issue, beforeImages, afterImages);
                 if (reviewTaskRef != null) {
                     taskMapper.updateReviewTaskRef(task.getId(), reviewTaskRef);
                 }
@@ -757,8 +756,10 @@ public class CpsInitialReviewService {
         log.setFromHandlerEmpName(fromHandler);
         log.setToHandlerEmpNo(toHandler);
         log.setToHandlerEmpName(toHandler);
-        log.setComment(comment);
-        log.setSnapshotJson(snapshotJson(action, comment, fromStatus, toStatus));
+        // bug#3（J线）：comment 列 varchar(1000)，AI 审阅意见/错误详情可能超长——超长截断留痕，避免 MysqlDataTruncation 阻断流转
+        String safeComment = comment != null && comment.length() > 1000 ? comment.substring(0, 1000) : comment;
+        log.setComment(safeComment);
+        log.setSnapshotJson(snapshotJson(action, safeComment, fromStatus, toStatus));
         log.setCreatedAt(LocalDateTime.now());
         flowLogMapper.insert(log);
     }

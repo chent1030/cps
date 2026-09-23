@@ -9,6 +9,7 @@ import com.company.cps.domain.CpsRoomCheckRecord;
 import com.company.cps.domain.CpsRoomCheckRecordItem;
 import com.company.cps.domain.CpsRoomCheckRecordStatus;
 import com.company.cps.dto.CpsRoomCheckRecordResponse;
+import com.company.cps.dto.CpsRoomCheckRejudgeResponse;
 import com.company.cps.dto.CpsRoomCheckStartRequest;
 import com.company.cps.dto.CpsRoomCheckTaskResponse;
 import com.company.cps.mapper.CpsCheckItemMapper;
@@ -212,25 +213,18 @@ public class CpsRoomCheckService {
         requireOwner(record, empNo);
         requireNotJudged(record);
         List<CpsRoomCheckRecordItem> items = itemMapper.findByRecordId(recordId);
-        List<String> missingPhoto = new ArrayList<>();
-        for (CpsRoomCheckRecordItem item : items) {
-            if (item.getPhotoObjectKey() == null || item.getPhotoObjectKey().isEmpty()) {
-                missingPhoto.add(item.getItemCode());
-            }
-        }
-        if (!missingPhoto.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "photo evidence missing for items (retake required, cannot bypass): " + String.join(",", missingPhoto));
-        }
+        requirePhotos(items);
 
-        List<CpsRoomCheckJudgeClient.ItemJudge> judged = judgeClient.judge(record, items);
+        int attempt = nextAttempt(record);
+        record.setJudgeAttempt(attempt);
+        List<CpsRoomCheckJudgeClient.ItemJudge> judged = judgeClient.judge(record, items, attempt);
         LocalDateTime now = LocalDateTime.now();
         if (judged == null) {
-            // 降级：PENDING 回写明细与单，不阻塞流程（联调留 J 线补判定）
+            // 降级：PENDING 回写明细与单，不阻塞流程（清单⑤：admin rejudge 入口补判定）
             for (CpsRoomCheckRecordItem item : items) {
                 itemMapper.updateJudgeResult(item.getId(),
                         CpsRoomCheckJudgeOutcome.PENDING.name(),
-                        "judge service unavailable: degraded to PENDING (J-line will re-judge)",
+                        "judge service unavailable: degraded to PENDING (admin rejudge will retry)",
                         CpsRoomCheckJudgeOutcome.PENDING.name(), now);
             }
             record.setRecordStatus(CpsRoomCheckRecordStatus.JUDGED.name());
@@ -243,6 +237,7 @@ public class CpsRoomCheckService {
         }
 
         List<String> retake = new ArrayList<>();
+        boolean hasPending = false;
         int deduct = 0;
         for (CpsRoomCheckJudgeClient.ItemJudge result : judged) {
             CpsRoomCheckRecordItem item = items.stream()
@@ -251,6 +246,9 @@ public class CpsRoomCheckService {
                 continue;
             }
             String outcome = result.outcome == null ? CpsRoomCheckJudgeOutcome.UNJUDGEABLE.name() : result.outcome;
+            if (CpsRoomCheckJudgeOutcome.PENDING.name().equals(outcome)) {
+                hasPending = true; // 单 item 降级（SKIPPED/技术失败）：不阻塞、不计分，留 rejudge 补判
+            }
             if (CpsRoomCheckJudgeOutcome.TYPE_MISMATCH.name().equals(outcome)
                     || CpsRoomCheckJudgeOutcome.UNJUDGEABLE.name().equals(outcome)) {
                 retake.add(item.getItemCode() + ":" + outcome);
@@ -264,6 +262,16 @@ public class CpsRoomCheckService {
             throw new IllegalArgumentException(
                     "retake required (not scored as unqualified, PRD 24.2.3): " + String.join(",", retake));
         }
+        if (hasPending) {
+            // 部分/全部明细暂无判定（SKIPPED 或单 item 技术失败）：状态推进但 judge_status=PENDING、不计分
+            record.setRecordStatus(CpsRoomCheckRecordStatus.JUDGED.name());
+            record.setJudgeStatus("PENDING");
+            record.setScore(null);
+            record.setSubmittedAt(now);
+            recordMapper.updateJudgeResult(record);
+            refreshPlanTaskStatus(record.getPlanTaskId());
+            return toResponse(requireRecord(recordId));
+        }
         int score = Math.max(0, 100 - deduct);
         record.setRecordStatus(CpsRoomCheckRecordStatus.JUDGED.name());
         record.setJudgeStatus("SUCCESS");
@@ -272,6 +280,104 @@ public class CpsRoomCheckService {
         recordMapper.updateJudgeResult(record);
         refreshPlanTaskStatus(record.getPlanTaskId());
         return toResponse(requireRecord(recordId));
+    }
+
+    /**
+     * 清单⑤（波次7 J线联调）：PENDING 降级单补判定重跑入口（admin）。
+     * 仅限 record_status=JUDGED 且 judge_status=PENDING 的单；重调 C-04（attempt 递增 ⇒ 新幂等键，
+     * 绕过 Python 侧 SKIPPED/业务结果的缓存重放）→ 回写明细/分数/状态；重拍类结果不抛错（单已锁定，
+     * 由 admin 决策），仍降级则保持 PENDING 待下轮。
+     */
+    public CpsRoomCheckRejudgeResponse rejudge(Long recordId) {
+        CpsRoomCheckRecord record = requireRecord(recordId);
+        if (!CpsRoomCheckRecordStatus.JUDGED.name().equals(record.getRecordStatus())) {
+            throw new IllegalArgumentException("record not in JUDGED state: " + record.getRecordStatus());
+        }
+        if (!"PENDING".equals(record.getJudgeStatus())) {
+            throw new IllegalArgumentException("record judge_status is not PENDING: " + record.getJudgeStatus());
+        }
+        List<CpsRoomCheckRecordItem> items = itemMapper.findByRecordId(recordId);
+        requirePhotos(items);
+
+        int attempt = nextAttempt(record);
+        record.setJudgeAttempt(attempt);
+        List<CpsRoomCheckJudgeClient.ItemJudge> judged = judgeClient.judge(record, items, attempt);
+        LocalDateTime now = LocalDateTime.now();
+
+        List<CpsRoomCheckRejudgeResponse.ItemResult> results = new ArrayList<>();
+        List<String> retake = new ArrayList<>();
+        boolean degraded = judged == null;
+        int deduct = 0;
+        if (judged == null) {
+            for (CpsRoomCheckRecordItem item : items) {
+                itemMapper.updateJudgeResult(item.getId(), CpsRoomCheckJudgeOutcome.PENDING.name(),
+                        "judge service unavailable: still degraded after rejudge",
+                        CpsRoomCheckJudgeOutcome.PENDING.name(), now);
+                results.add(new CpsRoomCheckRejudgeResponse.ItemResult(
+                        item.getItemCode(), CpsRoomCheckJudgeOutcome.PENDING.name(),
+                        "judge service unavailable: still degraded after rejudge"));
+            }
+        } else {
+            for (CpsRoomCheckJudgeClient.ItemJudge result : judged) {
+                CpsRoomCheckRecordItem item = items.stream()
+                        .filter(i -> Objects.equals(i.getCheckItemId(), result.itemId)).findFirst().orElse(null);
+                if (item == null) {
+                    continue;
+                }
+                String outcome = result.outcome == null ? CpsRoomCheckJudgeOutcome.UNJUDGEABLE.name() : result.outcome;
+                if (CpsRoomCheckJudgeOutcome.PENDING.name().equals(outcome)) {
+                    degraded = true;
+                }
+                if (CpsRoomCheckJudgeOutcome.TYPE_MISMATCH.name().equals(outcome)
+                        || CpsRoomCheckJudgeOutcome.UNJUDGEABLE.name().equals(outcome)) {
+                    retake.add(item.getItemCode() + ":" + outcome);
+                }
+                if (CpsRoomCheckJudgeOutcome.FAIL.name().equals(outcome)) {
+                    deduct += item.getDeductScore() == null ? 0 : item.getDeductScore();
+                }
+                itemMapper.updateJudgeResult(item.getId(), outcome, result.reason, outcome, now);
+                results.add(new CpsRoomCheckRejudgeResponse.ItemResult(item.getItemCode(), outcome, result.reason));
+            }
+        }
+        if (!degraded && retake.isEmpty()) {
+            record.setJudgeStatus("SUCCESS");
+            record.setScore(Math.max(0, 100 - deduct));
+        } else {
+            record.setJudgeStatus("PENDING"); // 仍降级或出现重拍类结果：保持待判定，可再次重跑
+            record.setScore(null);
+        }
+        recordMapper.updateRejudgeResult(record);
+        refreshPlanTaskStatus(record.getPlanTaskId());
+
+        CpsRoomCheckRejudgeResponse response = new CpsRoomCheckRejudgeResponse();
+        response.setRecordId(recordId);
+        response.setAttempt(attempt);
+        response.setJudgeStatus(record.getJudgeStatus());
+        response.setScore(record.getScore());
+        response.setRetakeRequired(retake);
+        response.setResults(results);
+        return response;
+    }
+
+    /** 全部明细必须有照片（证据要求，不许绕过，PRD 24.2）。 */
+    private void requirePhotos(List<CpsRoomCheckRecordItem> items) {
+        List<String> missingPhoto = new ArrayList<>();
+        for (CpsRoomCheckRecordItem item : items) {
+            if (item.getPhotoObjectKey() == null || item.getPhotoObjectKey().isEmpty()) {
+                missingPhoto.add(item.getItemCode());
+            }
+        }
+        if (!missingPhoto.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "photo evidence missing for items (retake required, cannot bypass): " + String.join(",", missingPhoto));
+        }
+    }
+
+    /** 下一判定轮数：先落库占位（judge_attempt 只增），重拍/重跑后必然换新幂等键。 */
+    private int nextAttempt(CpsRoomCheckRecord record) {
+        int attempt = (record.getJudgeAttempt() == null ? 0 : record.getJudgeAttempt()) + 1;
+        recordMapper.updateJudgeAttempt(record.getId(), attempt);
+        return attempt;
     }
 
     /** 任务完成度：reference_object_key 覆盖房间全部 JUDGED ⇒ COMPLETED（未列房间则任一 JUDGED 即完成）。 */

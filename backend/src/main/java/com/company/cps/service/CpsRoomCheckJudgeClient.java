@@ -14,29 +14,30 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * C-04 辅房点检同步判定客户端（Java→Python，POST {base}/api/agent/room-checks/judge）。
+ * C-04 辅房点检同步判定客户端（Java→Python，POST {base}/api/v1/agent/room-checks/judge，波次7 J线联调对齐）。
  *
- * 契约（basic-project 后端架构文档）：Body=点检项（内容/类型/扣分/配置版本）+照片；
- * 返回 per-item 两阶段结果 TYPE_MISMATCH（须重拍）/ JUDGED(PASS|FAIL+理由) / UNJUDGEABLE（须补拍）；
- * 幂等键 room-judge-{submissionId}-{itemId}-{attempt}。
+ * 契约（basic-project 波次4 B6C04 设计 §1 + C7 冻结 schema）：**单 item 一次调用**，snake_case：
+ * {submission_id, item_id, attempt, item_content, item_type, photo_object_keys[1..8], deduction,
+ *  config_version, room_name, idempotency_key=room-judge-{submissionId}-{itemId}-{attempt}}；
+ * 200 响应 {status: TYPE_MISMATCH|JUDGED|UNJUDGEABLE|SKIPPED, verdict: PASS|FAIL, reason, evidence, ...}。
+ * Python 侧自带 RustFS 取图，Java 不再回传 photoBase64（清单④：大图 payload 切 object_key 模式）。
+ * 错误语义：403/422/502（detail.error_code）⇒ 该 item 按 PENDING 降级（清单③：非 200 一律降级不报错）。
  *
- * 降级约定：服务未启用 / 连接失败 / 超时 / 非 2xx / 响应不可解析 ⇒ 返回 null（不抛异常），
- * 上层记 judge_result=PENDING、不阻塞提交流程（联调留 J 线）。
+ * 降级约定：服务未启用 / 无明细 ⇒ 返回 null（整单降级）；单 item 调用失败 / SKIPPED ⇒ 该 item
+ * outcome=PENDING（不伪造判定），上层不阻塞流程、由 admin rejudge 入口补判（清单⑤）。
  */
 @Component
 public class CpsRoomCheckJudgeClient {
 
-    /** 单条判定结果（归一化后）。 */
+    /** 单条判定结果（归一化后）：TYPE_MISMATCH/UNJUDGEABLE/PASS/FAIL，PENDING=该 item 暂无判定（降级）。 */
     public static class ItemJudge {
         public final Long itemId;
-        public final String outcome;   // CpsRoomCheckJudgeOutcome 名：TYPE_MISMATCH/UNJUDGEABLE/PASS/FAIL
+        public final String outcome;
         public final String reason;
 
         public ItemJudge(Long itemId, String outcome, String reason) {
@@ -47,15 +48,12 @@ public class CpsRoomCheckJudgeClient {
     }
 
     private final CpsRoomCheckJudgeProperties properties;
-    private final RustFsStorageService storage;
     private final RestTemplate client;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private int attemptSeq = 0;
 
     @Autowired
-    public CpsRoomCheckJudgeClient(CpsRoomCheckJudgeProperties properties, RustFsStorageService storage) {
+    public CpsRoomCheckJudgeClient(CpsRoomCheckJudgeProperties properties) {
         this.properties = properties;
-        this.storage = storage;
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(properties.getTimeoutMs());
         factory.setReadTimeout(properties.getTimeoutMs());
@@ -63,41 +61,45 @@ public class CpsRoomCheckJudgeClient {
     }
 
     /** 测试专用：注入预绑定 MockRestServiceServer 的 RestTemplate（包级可见）。 */
-    CpsRoomCheckJudgeClient(CpsRoomCheckJudgeProperties properties, RustFsStorageService storage, RestTemplate restTemplate) {
+    CpsRoomCheckJudgeClient(CpsRoomCheckJudgeProperties properties, RestTemplate restTemplate) {
         this.properties = properties;
-        this.storage = storage;
         this.client = restTemplate;
     }
 
     /**
-     * 同步判定整单明细。降级返回 null；成功返回 per-item 结果（与入参明细一一对应，缺失项按 UNJUDGEABLE 处理）。
+     * 同步判定整单明细（逐 item 调用 C-04）。服务未启用 / 无明细 ⇒ null（整单降级）；
+     * 否则返回与入参一一对应的结果，单 item 技术失败 / SKIPPED ⇒ 该项 PENDING（降级待补判）。
+     *
+     * @param attempt 判定轮数（幂等键组成部分，submit/rejudge 各取新值，见 CpsRoomCheckService）
      */
-    public List<ItemJudge> judge(CpsRoomCheckRecord record, List<CpsRoomCheckRecordItem> items) {
+    public List<ItemJudge> judge(CpsRoomCheckRecord record, List<CpsRoomCheckRecordItem> items, int attempt) {
         if (!properties.isEnabled() || items.isEmpty()) {
             return null;
         }
         String submissionId = String.valueOf(record.getId());
-        int attempt = ++attemptSeq;
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("submissionId", submissionId);
-        payload.put("attempt", attempt);
-        payload.put("roomCode", record.getRoomCode());
-        payload.put("roomName", record.getRoomName());
-        payload.put("checkEmpNo", record.getCheckEmpNo());
-        List<Map<String, Object>> itemPayloads = new ArrayList<>();
+        List<ItemJudge> results = new ArrayList<>();
         for (CpsRoomCheckRecordItem item : items) {
-            Map<String, Object> p = new LinkedHashMap<>();
-            p.put("itemId", item.getCheckItemId());
-            p.put("itemCode", item.getItemCode());
-            p.put("content", item.getContent());
-            p.put("photoCategory", item.getPhotoCategory());
-            p.put("deductScore", item.getDeductScore());
-            p.put("configVersion", item.getConfigVersion());
-            p.put("photoUrl", storage.publicObjectUrl(item.getPhotoObjectKey()));
-            p.put("photoBase64", readPhotoBase64(item.getPhotoObjectKey()));
-            itemPayloads.add(p);
+            results.add(judgeItem(record, item, submissionId, attempt));
         }
-        payload.put("items", itemPayloads);
+        return results;
+    }
+
+    /** 单 item 判定：任何技术失败（连接/超时/非 200/不可解析）⇒ PENDING 降级，不抛异常。 */
+    private ItemJudge judgeItem(CpsRoomCheckRecord record, CpsRoomCheckRecordItem item,
+                                String submissionId, int attempt) {
+        String itemId = String.valueOf(item.getCheckItemId());
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("submission_id", submissionId);
+        payload.put("item_id", itemId);
+        payload.put("attempt", attempt);
+        payload.put("item_content", item.getContent());
+        payload.put("item_type", item.getPhotoCategory());
+        payload.put("photo_object_keys", item.getPhotoObjectKey() == null
+                ? List.of() : List.of(item.getPhotoObjectKey()));
+        payload.put("deduction", item.getDeductScore());
+        payload.put("config_version", item.getConfigVersion() == null ? null : String.valueOf(item.getConfigVersion()));
+        payload.put("room_name", record.getRoomCode() + "-" + record.getRoomName());
+        payload.put("idempotency_key", "room-judge-" + submissionId + "-" + itemId + "-" + attempt);
 
         String body;
         try {
@@ -106,76 +108,50 @@ public class CpsRoomCheckJudgeClient {
             body = client.postForObject(properties.getBaseUrl() + properties.getPath(),
                     new HttpEntity<>(payload, headers), String.class);
         } catch (Exception error) {
-            return null; // 服务未起/超时/网络异常 ⇒ 降级 PENDING
+            return new ItemJudge(item.getCheckItemId(), "PENDING",
+                    "judge service call failed (degraded): " + error.getClass().getSimpleName());
         }
-        return parse(body, items);
+        return parse(body, item);
     }
 
-    /** 响应不可解析 ⇒ null（降级）；可解析但缺某项 ⇒ 该项 UNJUDGEABLE（宁补拍不误判）。 */
-    private List<ItemJudge> parse(String body, List<CpsRoomCheckRecordItem> items) {
+    /** 200 响应解析：status=JUDGED 按 verdict 取 PASS/FAIL；SKIPPED / 不可解析 ⇒ PENDING（不伪造）。 */
+    private ItemJudge parse(String body, CpsRoomCheckRecordItem item) {
         if (body == null || body.trim().isEmpty()) {
-            return null;
+            return pending(item, "judge service returned empty body");
         }
         JsonNode root;
         try {
             root = objectMapper.readTree(body);
         } catch (Exception error) {
-            return null;
+            return pending(item, "judge response unparsable");
         }
-        JsonNode results = root.path("results");
-        if (!results.isArray() || results.size() == 0) {
-            return null;
-        }
-        Map<Long, ItemJudge> byItemId = new HashMap<>();
-        for (JsonNode node : results) {
-            Long itemId = node.path("itemId").asLong(0);
-            if (itemId == 0) {
-                String code = node.path("itemCode").asText(null);
-                itemId = items.stream()
-                        .filter(i -> code != null && code.equals(i.getItemCode()))
-                        .map(CpsRoomCheckRecordItem::getCheckItemId).findFirst().orElse(0L);
+        String status = root.path("status").asText("");
+        String reason = root.path("reason").asText(null);
+        if ("JUDGED".equalsIgnoreCase(status)) {
+            String verdict = root.path("verdict").asText("");
+            if ("PASS".equalsIgnoreCase(verdict)) {
+                return new ItemJudge(item.getCheckItemId(), "PASS", reason);
             }
-            if (itemId == 0) {
-                continue;
+            if ("FAIL".equalsIgnoreCase(verdict)) {
+                return new ItemJudge(item.getCheckItemId(), "FAIL", reason);
             }
-            byItemId.put(itemId, new ItemJudge(itemId, normalize(node), node.path("reason").asText(null)));
+            return new ItemJudge(item.getCheckItemId(), "UNJUDGEABLE",
+                    "verdict missing for JUDGED status (treated as unjudgeable): " + reason);
         }
-        List<ItemJudge> ordered = new ArrayList<>();
-        for (CpsRoomCheckRecordItem item : items) {
-            ItemJudge judged = byItemId.get(item.getCheckItemId());
-            ordered.add(judged != null ? judged
-                    : new ItemJudge(item.getCheckItemId(), "UNJUDGEABLE", "判定服务未返回该项结果，须补拍"));
+        if ("TYPE_MISMATCH".equalsIgnoreCase(status)) {
+            return new ItemJudge(item.getCheckItemId(), "TYPE_MISMATCH", reason);
         }
-        return ordered;
+        if ("UNJUDGEABLE".equalsIgnoreCase(status)) {
+            return new ItemJudge(item.getCheckItemId(), "UNJUDGEABLE", reason);
+        }
+        if ("SKIPPED".equalsIgnoreCase(status)) {
+            return pending(item, "judge skipped by python side (model/provider/rustfs not configured): "
+                    + root.path("reason").asText(""));
+        }
+        return pending(item, "unknown judge status: " + status);
     }
 
-    /** 两阶段归一化：TYPE_MISMATCH / UNJUDGEABLE / PASS / FAIL；其余未知值按 UNJUDGEABLE。 */
-    private String normalize(JsonNode node) {
-        String judge = node.path("judge").asText("");
-        if ("TYPE_MISMATCH".equalsIgnoreCase(judge)) {
-            return "TYPE_MISMATCH";
-        }
-        if ("UNJUDGEABLE".equalsIgnoreCase(judge)) {
-            return "UNJUDGEABLE";
-        }
-        String outcome = node.path("outcome").asText("");
-        if ("PASS".equalsIgnoreCase(outcome)) {
-            return "PASS";
-        }
-        if ("FAIL".equalsIgnoreCase(outcome)) {
-            return "FAIL";
-        }
-        return "UNJUDGEABLE";
-    }
-
-    private String readPhotoBase64(String objectKey) {
-        if (objectKey == null || objectKey.isEmpty()) {
-            return null;
-        }
-        try {
-            return Base64.getEncoder().encodeToString(storage.read(objectKey));
-        } catch (Exception error) {
-            return null; // 读不到照片交给 Python 侧按证据无效处理；Java 不在此处阻塞
-        }
+    private ItemJudge pending(CpsRoomCheckRecordItem item, String reason) {
+        return new ItemJudge(item.getCheckItemId(), "PENDING", reason);
     }
 }

@@ -59,10 +59,11 @@ class CpsAgentFrameworkClientWave3Test {
 
     @Test
     void listWeeklyReportRunsBuildsQueryString() {
+        // 波次7 J线：Python C-05 契约 GET /agent/weekly-reports（report_type/status，响应 {"items":[...]}）
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(
-                "http://agent.test/api/v1/agent/weekly-report-runs?inspection_type=RECTIFY&status=ARCHIVED")))
+                "http://agent.test/api/v1/agent/weekly-reports?report_type=RECTIFY&status=ARCHIVED&limit=200")))
                 .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators
-                        .withSuccess("[{\"run_id\":\"u1\"}]", MediaType.APPLICATION_JSON));
+                        .withSuccess("{\"items\":[{\"run_id\":\"u1\"}],\"total\":1}", MediaType.APPLICATION_JSON));
 
         java.util.List<java.util.Map<String, Object>> runs =
                 client.listWeeklyReportRuns("RECTIFY", "ARCHIVED", null, null);
@@ -72,15 +73,23 @@ class CpsAgentFrameworkClientWave3Test {
 
     @Test
     void listWeeklyReportRunsEmptyPathOnNoFilters() {
-        server.expect(requestTo("http://agent.test/api/v1/agent/weekly-report-runs"))
+        server.expect(requestTo("http://agent.test/api/v1/agent/weekly-reports?limit=200"))
                 .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators
-                        .withSuccess("[]", MediaType.APPLICATION_JSON));
+                        .withSuccess("{\"items\":[],\"total\":0}", MediaType.APPLICATION_JSON));
+        assertEquals(0, client.listWeeklyReportRuns(null, null, null, null).size());
+    }
+
+    @Test
+    void listWeeklyReportRunsMissingItemsYieldsEmpty() {
+        server.expect(requestTo("http://agent.test/api/v1/agent/weekly-reports?limit=200"))
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators
+                        .withSuccess("{\"total\":0}", MediaType.APPLICATION_JSON));
         assertEquals(0, client.listWeeklyReportRuns(null, null, null, null).size());
     }
 
     @Test
     void downloadWeeklyReportFileReturnsBytes() {
-        server.expect(requestTo("http://agent.test/api/v1/agent/weekly-report-runs/uuid-1/file"))
+        server.expect(requestTo("http://agent.test/api/v1/agent/weekly-reports/uuid-1/download"))
                 .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators
                         .withSuccess(new byte[]{1, 2, 3, 4}, MediaType.APPLICATION_PDF));
         // mock server 不会镜像 ResponseEntity.exchange 的 headers；只验证 body 路径可达

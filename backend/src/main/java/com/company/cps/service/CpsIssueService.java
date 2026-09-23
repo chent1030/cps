@@ -138,6 +138,8 @@ public class CpsIssueService {
         issue.setFeedbackEmpName(empName(feedbackEmpNo));
         issue.setCurrentHandlerEmpNo(feedbackEmpNo);
         issue.setCurrentHandlerEmpName(empName(feedbackEmpNo));
+        // V2 整改流（V20260923）：current_submission_version NOT NULL DEFAULT 0，insert 显式列 NULL 会绕过列默认——建单即 0
+        issue.setCurrentSubmissionVersion(0);
         issue.setSubmitTime(now);
         issue.setCreatedAt(now);
         issue.setUpdatedAt(now);

@@ -26,6 +26,12 @@ public interface CpsRoomCheckRecordMapper {
     /** 提交判定：状态机推进 + judge_status + score + submitted_at。 */
     int updateJudgeResult(CpsRoomCheckRecord record);
 
+    /** 波次7 清单⑤：PENDING 降级单补判定重跑（JUDGED 后仅更新 judge_status/judge_attempt/score）。 */
+    int updateRejudgeResult(CpsRoomCheckRecord record);
+
+    /** 判定轮数只增推进（每轮判定前落库占位，保证补拍/重跑换新幂等键 room-judge-{sub}-{item}-{attempt}）。 */
+    int updateJudgeAttempt(@Param("id") Long id, @Param("attempt") int attempt);
+
     /** start/首张照片推进状态机与时间戳。 */
     int updateStatusFields(@Param("id") Long id,
                            @Param("recordStatus") String recordStatus,

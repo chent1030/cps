@@ -14,6 +14,7 @@ public class CpsRoomCheckRecord {
     private String checkEmpName;
     private String recordStatus;
     private String judgeStatus;
+    private Integer judgeAttempt;
     private Integer score;
     private LocalDateTime startedAt;
     private LocalDateTime submittedAt;
@@ -40,6 +41,8 @@ public class CpsRoomCheckRecord {
     public void setRecordStatus(String recordStatus) { this.recordStatus = recordStatus; }
     public String getJudgeStatus() { return judgeStatus; }
     public void setJudgeStatus(String judgeStatus) { this.judgeStatus = judgeStatus; }
+    public Integer getJudgeAttempt() { return judgeAttempt; }
+    public void setJudgeAttempt(Integer judgeAttempt) { this.judgeAttempt = judgeAttempt; }
     public Integer getScore() { return score; }
     public void setScore(Integer score) { this.score = score; }
     public LocalDateTime getStartedAt() { return startedAt; }

@@ -28,14 +28,15 @@ cps:
     enabled: ${CPS_AGENT_FRAMEWORK_ENABLED:true}
     base-url: http://127.0.0.1:8000/api/v1
     tenant-id: local-factory
-    timeout-ms: 10000
+    timeout-ms: 180000
   room-check:
-    # B3 辅房点检判定（Python C-04 room-checks/judge，同步）；未起/超时降级 PENDING 不阻塞提交
+    # B3 辅房点检判定（Python C-04 /api/v1/agent/room-checks/judge，单item同步，模型推理240s量级）
+    # 波次7 J线对齐：端口8010→8000、路径对齐 C7 冻结 schema、超时 240s（清单①⑧）；未起/超时降级 PENDING 不阻塞提交
     judge:
       enabled: ${CPS_ROOM_CHECK_JUDGE_ENABLED:true}
-      base-url: ${CPS_ROOM_CHECK_JUDGE_BASE_URL:http://127.0.0.1:8010}
-      path: ${CPS_ROOM_CHECK_JUDGE_PATH:/api/agent/room-checks/judge}
-      timeout-ms: ${CPS_ROOM_CHECK_JUDGE_TIMEOUT_MS:60000}
+      base-url: ${CPS_ROOM_CHECK_JUDGE_BASE_URL:http://127.0.0.1:8000}
+      path: ${CPS_ROOM_CHECK_JUDGE_PATH:/api/v1/agent/room-checks/judge}
+      timeout-ms: ${CPS_ROOM_CHECK_JUDGE_TIMEOUT_MS:240000}
   speech:
     # F3 语音转写（Python C-06 speech-to-text，同步 240s 量级可配）；未配置/失败降级文案不阻塞表单
     enabled: ${CPS_SPEECH_ENABLED:true}

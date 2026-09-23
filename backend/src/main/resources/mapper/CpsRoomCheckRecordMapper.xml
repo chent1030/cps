@@ -6,7 +6,7 @@
 
     <sql id="BaseColumns">
         id, plan_task_id, plan_id, room_id, room_code, room_name,
-        check_emp_no, check_emp_name, record_status, judge_status, score,
+        check_emp_no, check_emp_name, record_status, judge_status, judge_attempt, score,
         started_at, submitted_at, created_at, updated_at
     </sql>
 
@@ -21,6 +21,7 @@
         <result column="check_emp_name" property="checkEmpName"/>
         <result column="record_status" property="recordStatus"/>
         <result column="judge_status" property="judgeStatus"/>
+        <result column="judge_attempt" property="judgeAttempt"/>
         <result column="score" property="score"/>
         <result column="started_at" property="startedAt"/>
         <result column="submitted_at" property="submittedAt"/>
@@ -83,9 +84,26 @@
         UPDATE cps_room_check_record
         SET record_status = #{recordStatus},
             judge_status = #{judgeStatus},
+            judge_attempt = #{judgeAttempt},
             score = #{score},
             submitted_at = #{submittedAt}
         WHERE id = #{id} AND record_status IN ('PENDING', 'IN_PROGRESS')
+    </update>
+
+    <!-- 波次7 清单⑤：PENDING 降级单补判定重跑（JUDGED 后解锁 judge_status/score，record_status 与照片不变）。 -->
+    <update id="updateRejudgeResult" parameterType="com.company.cps.domain.CpsRoomCheckRecord">
+        UPDATE cps_room_check_record
+        SET judge_status = #{judgeStatus},
+            judge_attempt = #{judgeAttempt},
+            score = #{score}
+        WHERE id = #{id} AND record_status = 'JUDGED'
+    </update>
+
+    <!-- 判定轮数只增占位：每轮判定（含以重拍告终的轮次）前先占 attempt，重拍换照片后重提交拿新幂等键。 -->
+    <update id="updateJudgeAttempt">
+        UPDATE cps_room_check_record
+        SET judge_attempt = #{attempt}
+        WHERE id = #{id} AND judge_attempt &lt; #{attempt}
     </update>
 
     <update id="updateStatusFields">

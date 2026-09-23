@@ -2,6 +2,7 @@ package com.company.cps.controller;
 
 import com.company.cps.dto.CpsRoomCheckRankingResponse;
 import com.company.cps.dto.CpsRoomCheckRecordResponse;
+import com.company.cps.dto.CpsRoomCheckRejudgeResponse;
 import com.company.cps.dto.CpsRoomCheckRoomWeekDetailResponse;
 import com.company.cps.service.CpsRoomCheckRankingService;
 import com.company.cps.service.CpsRoomCheckService;
@@ -10,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -49,6 +51,15 @@ public class CpsAdminRoomCheckController {
     @GetMapping("/room-check-records/{recordId}")
     public CpsRoomCheckRecordResponse recordDetail(@PathVariable Long recordId) {
         return roomCheckService.getRecordForAdmin(recordId);
+    }
+
+    /**
+     * 波次7 J线（C-04 清单⑤）：PENDING 降级单补判定重跑——重调 Python C-04（新幂等键）→ 回写分数/状态。
+     * 仅限 record_status=JUDGED 且 judge_status=PENDING 的单；业务结果（重拍/仍降级）不报错，以响应回告。
+     */
+    @PostMapping("/room-check-records/{recordId}/rejudge")
+    public CpsRoomCheckRejudgeResponse rejudge(@PathVariable Long recordId) {
+        return roomCheckService.rejudge(recordId);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

@@ -16,6 +16,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 /** C-06 语音转写客户端：契约解析 + 降级路径（UNAVAILABLE 不抛异常）。 */
@@ -88,6 +89,20 @@ class CpsSpeechTranscribeClientTest {
     void serverErrorDegradesToUnavailable() {
         server.expect(requestTo("http://asr.example/api/v1/agent/speech-to-text"))
                 .andRespond(withServerError());
+        CpsSpeechTranscribeClient.Transcription result = client.transcribe(
+                "sub-1", "reason", 1, "cps/speech/20260926/a.webm", null);
+        assertTrue(result.degraded);
+        assertEquals("UNAVAILABLE", result.status);
+        assertNull(result.text);
+    }
+
+    /** 波次7 清单③：502+detail.error_code（ASR 技术失败）⇒ 一律降级 UNAVAILABLE，不抛错不伪造文本。 */
+    @Test
+    void badGatewayWithErrorCodeDegradesToUnavailable() {
+        server.expect(requestTo("http://asr.example/api/v1/agent/speech-to-text"))
+                .andRespond(withStatus(org.springframework.http.HttpStatus.BAD_GATEWAY)
+                        .body("{\"detail\":{\"error_code\":\"ASR_CALL_FAILED\"}}")
+                        .contentType(MediaType.APPLICATION_JSON));
         CpsSpeechTranscribeClient.Transcription result = client.transcribe(
                 "sub-1", "reason", 1, "cps/speech/20260926/a.webm", null);
         assertTrue(result.degraded);

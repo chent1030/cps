@@ -323,7 +323,7 @@ class CpsInitialReviewServiceTest {
         when(issueMapper.findById(101L)).thenReturn(Optional.of(issue(CpsIssueStatus.PENDING_AI_REVIEW, "R001")));
         when(attachmentMapper.findByIssueAndStage(101L, "ISSUE")).thenReturn(Collections.emptyList());
         when(attachmentMapper.findByIssueAndStage(101L, "PROOF")).thenReturn(Collections.emptyList());
-        when(agentFrameworkClient.triggerInitialReview(any(), any(), any(), any(), anyString(), eq(9L)))
+        when(agentFrameworkClient.triggerInitialReview(any(), any(), any(), any()))
                 .thenReturn("rr-90");
 
         service.dispatchAfterCommit(9L);
@@ -349,7 +349,7 @@ class CpsInitialReviewServiceTest {
     void dispatchSkipsTerminalTasks() {
         when(taskMapper.findById(9L)).thenReturn(task(9L, 101L, 2, CpsInitialReviewTaskStatus.TAKEN_OVER));
         service.dispatchAfterCommit(9L);
-        verify(agentFrameworkClient, never()).triggerInitialReview(any(), any(), any(), any(), anyString(), anyLong());
+        verify(agentFrameworkClient, never()).triggerInitialReview(any(), any(), any(), any());
     }
 
     // ---------- fixtures ----------

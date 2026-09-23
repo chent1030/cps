@@ -103,56 +103,70 @@ class CpsAgentFrameworkClientTest {
     }
 
     @Test
-    void triggerInitialReviewPostsContractPayloadWithIdempotencyKey() {
+    void triggerInitialReviewPostsFrozenContractPayloadWithObjectKeys() {
+        // 波次7 J线（C7 冻结 schema，additionalProperties=false）：issue_id/submission_id/version_no 必填；
+        // 附件 AttachmentRef.object_key 优先（file_url 即 RustFS key），无 object_key 才回退 content_base64
         CpsRectificationSubmission submission = submission();
         CpsIssue issue = issue();
         CpsIssueAttachment before = attachment(31L, "cps/before-1.png");
         CpsIssueAttachment after = attachment(32L, "cps/after-1.png");
-        when(contentResolver.resolve(before)).thenReturn("before-img".getBytes(StandardCharsets.UTF_8));
-        when(contentResolver.resolve(after)).thenReturn("after-img".getBytes(StandardCharsets.UTF_8));
 
-        server.expect(requestTo(BASE_URL + "/api/agent/rectifications"))
+        server.expect(requestTo(BASE_URL + "/agent/rectifications"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.idempotency_key").value("cps-rectify-101-v2"))
-                .andExpect(jsonPath("$.issue.issue_id").value(101))
-                .andExpect(jsonPath("$.issue.factory").value("F1"))
-                .andExpect(jsonPath("$.submission_id").value(55))
+                .andExpect(jsonPath("$.issue_id").value("101"))
+                .andExpect(jsonPath("$.submission_id").value("55"))
                 .andExpect(jsonPath("$.version_no").value(2))
                 .andExpect(jsonPath("$.reason").value("root cause"))
                 .andExpect(jsonPath("$.short_term_measure").value("short"))
                 .andExpect(jsonPath("$.long_term_measure").value("long"))
-                .andExpect(jsonPath("$.responsible_emp_no").value("E777"))
-                .andExpect(jsonPath("$.before_images[0].attachment_id").value(31))
-                .andExpect(jsonPath("$.before_images[0].content_base64")
-                        .value(Base64.getEncoder().encodeToString("before-img".getBytes(StandardCharsets.UTF_8))))
-                .andExpect(jsonPath("$.after_images[0].content_base64")
-                        .value(Base64.getEncoder().encodeToString("after-img".getBytes(StandardCharsets.UTF_8))))
-                .andExpect(jsonPath("$.callback.url").value("http://java.test/api/callbacks/initial-review/result"))
-                .andExpect(jsonPath("$.callback.task_id").value(9001))
-                .andExpect(jsonPath("$.callback.idempotency_key").value("initial-review-result-9001"))
-                .andRespond(withSuccess("{\"review_task_ref\":\"rr-77\"}", MediaType.APPLICATION_JSON));
+                .andExpect(jsonPath("$.before_attachments[0].attachment_id").value("31"))
+                .andExpect(jsonPath("$.before_attachments[0].object_key").value("cps/before-1.png"))
+                .andExpect(jsonPath("$.before_attachments[0].file_name").value("before-1.png"))
+                .andExpect(jsonPath("$.after_attachments[0].object_key").value("cps/after-1.png"))
+                .andExpect(jsonPath("$.issue_snapshot.issue_id").value("101"))
+                .andExpect(jsonPath("$.issue_snapshot.factory").value("F1"))
+                .andExpect(jsonPath("$.issue_snapshot.description").value("desc"))
+                .andExpect(jsonPath("$.idempotency_key").doesNotExist())
+                .andExpect(jsonPath("$.callback").doesNotExist())
+                .andExpect(jsonPath("$.responsible_emp_no").doesNotExist())
+                .andExpect(jsonPath("$.before_images").doesNotExist())
+                .andRespond(withSuccess("{\"review_task_ref\":\"rr-77\",\"task_id\":\"cps-rectify-101-v2\"}",
+                        MediaType.APPLICATION_JSON));
 
         String reviewTaskRef = client.triggerInitialReview(submission, issue,
-                Collections.singletonList(before), Collections.singletonList(after),
-                "http://java.test/api/callbacks/initial-review/result", 9001L);
+                Collections.singletonList(before), Collections.singletonList(after));
         assertEquals("rr-77", reviewTaskRef);
         server.verify();
     }
 
     @Test
-    void triggerInitialReviewAcceptsIdFieldAsRefFallback() {
-        server.expect(requestTo(BASE_URL + "/api/agent/rectifications"))
-                .andRespond(withSuccess("{\"id\":\"alt-48\"}", MediaType.APPLICATION_JSON));
-        String reviewTaskRef = client.triggerInitialReview(submission(), issue(),
-                null, null, "http://java.test/api/callbacks/initial-review/result", 9002L);
+    void triggerInitialReviewFallsBackToBase64WhenObjectKeyMissing() {
+        CpsIssueAttachment legacy = attachment(33L, null);
+        when(contentResolver.resolve(legacy)).thenReturn("legacy-img".getBytes(StandardCharsets.UTF_8));
+        server.expect(requestTo(BASE_URL + "/agent/rectifications"))
+                .andExpect(jsonPath("$.before_attachments[0].content_base64")
+                        .value(Base64.getEncoder().encodeToString("legacy-img".getBytes(StandardCharsets.UTF_8))))
+                .andExpect(jsonPath("$.before_attachments[0].object_key").doesNotExist())
+                .andRespond(withSuccess("{\"review_task_ref\":\"rr-78\"}", MediaType.APPLICATION_JSON));
+        String ref = client.triggerInitialReview(submission(), issue(),
+                Collections.singletonList(legacy), null);
+        assertEquals("rr-78", ref);
+        server.verify();
+    }
+
+    @Test
+    void triggerInitialReviewAcceptsTaskIdFieldAsRefFallback() {
+        server.expect(requestTo(BASE_URL + "/agent/rectifications"))
+                .andRespond(withSuccess("{\"task_id\":\"alt-48\"}", MediaType.APPLICATION_JSON));
+        String reviewTaskRef = client.triggerInitialReview(submission(), issue(), null, null);
         assertEquals("alt-48", reviewTaskRef);
         server.verify();
     }
 
     @Test
     void initialReviewStatusQueriesRemoteRef() {
-        server.expect(requestTo(BASE_URL + "/api/agent/rectifications/rr-77"))
+        server.expect(requestTo(BASE_URL + "/agent/rectifications/rr-77"))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("{\"state\":\"running\"}", MediaType.APPLICATION_JSON));
         Map<String, Object> status = client.initialReviewStatus("rr-77");
@@ -165,8 +179,7 @@ class CpsAgentFrameworkClientTest {
         CpsAgentFrameworkProperties properties = new CpsAgentFrameworkProperties();
         properties.setEnabled(false);
         CpsAgentFrameworkClient disabled = new CpsAgentFrameworkClient(properties, contentResolver, restTemplate);
-        assertEquals(null, disabled.triggerInitialReview(submission(), issue(),
-                null, null, "http://cb", 1L));
+        assertEquals(null, disabled.triggerInitialReview(submission(), issue(), null, null));
         assertEquals(Boolean.FALSE, disabled.initialReviewStatus("rr-1").get("enabled"));
         server.verify();
     }
@@ -208,7 +221,8 @@ class CpsAgentFrameworkClientTest {
     private CpsIssueAttachment attachment(Long id, String objectKey) {
         CpsIssueAttachment attachment = new CpsIssueAttachment();
         attachment.setId(id);
-        attachment.setFileName(objectKey.substring(objectKey.lastIndexOf('/') + 1));
+        attachment.setFileName(objectKey == null ? "legacy-" + id + ".png"
+                : objectKey.substring(objectKey.lastIndexOf('/') + 1));
         attachment.setFileType("image/png");
         attachment.setFileUrl(objectKey);
         attachment.setContent(null);

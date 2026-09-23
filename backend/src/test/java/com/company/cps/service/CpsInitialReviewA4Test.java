@@ -259,7 +259,7 @@ class CpsInitialReviewA4Test {
 
         assertEquals(CpsInitialReviewTaskStatus.PENDING_DISPATCH, created.getStatus(),
                 "自动触发关闭：仅建任务不投递，等待 admin 手动重触发");
-        verify(agentFrameworkClient, never()).triggerInitialReview(any(), any(), any(), any(), any(), anyLong());
+        verify(agentFrameworkClient, never()).triggerInitialReview(any(), any(), any(), any());
     }
 
     /** 测试内联配置构造（避免反射设置 Boolean）。 */
