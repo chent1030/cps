@@ -15,6 +15,7 @@ import java.util.Map;
  * - /api/cps/admin/coverage/region-supervisor    区域处理人监控
  * - /api/cps/admin/coverage/recurrence           复发分析
  * - /api/cps/admin/coverage/gaps                 覆盖缺口
+ * - /api/cps/admin/coverage/effect               效果评估四 metric（FR-12）
  *
  * 仅 cps_admin 角色使用；鉴权由部署层 SSO 注入（沿用波次 1/9 admin 弱鉴权注释）。
  */
@@ -72,5 +73,18 @@ public class CpsCoverageController {
             @RequestParam(required = false, defaultValue = "1") Integer page,
             @RequestParam(required = false, defaultValue = "200") Integer size) {
         return service.coverageGaps(factory, area, storageRoomType, gapDays, page, size);
+    }
+
+    /**
+     * FR-12 效果评估指标查询：四 metric（ai_pass_rate / human_override_rate / avg_close_duration_hours / recurrence_rate_30d）。
+     * periodStart/periodEnd 默认 30 天窗口；recurrence_rate_30d 实际按 90 天窗口计算（与 Wave 10 recurrenceGroupBy 对齐）。
+     */
+    @GetMapping("/effect")
+    public CpsPageResponse<Map<String, Object>> effect(
+            @RequestParam(required = false) String periodStart,
+            @RequestParam(required = false) String periodEnd,
+            @RequestParam(required = false) String metricKey,
+            @RequestParam(required = false) String scopeKey) {
+        return service.effect(periodStart, periodEnd, metricKey, scopeKey);
     }
 }

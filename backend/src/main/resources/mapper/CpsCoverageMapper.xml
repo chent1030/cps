@@ -230,4 +230,63 @@
         </where>
     </select>
 
+    <!--
+      FR-11 /dispatcher：procedural 调度记忆消费端（波次11）。
+      复用 cps_review_adjudication JOIN cps_issue 聚合（与 CpsReviewAdjudicationMapper.findMemoryPage 同源 JOIN）。
+      维度：(category_l1_id, area, decision, ai_relation) — 供 agent 在做"转派/分类/裁决"等调度动作前查询。
+      每聚合组取最近 5 条样例裁决（reviewer_emp_no, reviewer_emp_name, created_at, reason 取前 200 字）。
+      LEFT JOIN cps_problem_category（task 默认 categoryL2Id 已隐含在 issue 上，此处仅 LEFT JOIN 透出 category_l1_name）。
+    -->
+    <sql id="dispatcherMemoryFilter">
+        <where>
+            <if test="categoryL1Id != null">AND i.category_l1_id = #{categoryL1Id}</if>
+            <if test="categoryL2Id != null">AND i.category_l2_id = #{categoryL2Id}</if>
+            <if test="factory != null and factory != ''">AND i.factory = #{factory}</if>
+            <if test="area != null and area != ''">AND i.area = #{area}</if>
+            <if test="decision != null and decision != ''">AND a.decision = #{decision}</if>
+            <if test="aiRelation != null and aiRelation != ''">AND a.ai_relation = #{aiRelation}</if>
+            <if test="startTime != null and startTime != ''">AND a.created_at &gt;= #{startTime}</if>
+            <if test="endTime != null and endTime != ''">AND a.created_at &lt;= #{endTime}</if>
+        </where>
+    </sql>
+
+    <select id="dispatcherMemoryGroupBy" resultType="java.util.LinkedHashMap">
+        SELECT i.category_l1_id  AS categoryL1Id,
+               i.area            AS area,
+               a.decision        AS decision,
+               a.ai_relation     AS aiRelation,
+               COUNT(1)          AS sampleCount,
+               MAX(a.created_at) AS lastAt,
+               SUBSTRING_INDEX(
+                 GROUP_CONCAT(
+                   CONCAT_WS('||',
+                     COALESCE(a.reviewer_emp_no, ''),
+                     COALESCE(a.reviewer_emp_name, ''),
+                     DATE_FORMAT(a.created_at, '%Y-%m-%dT%H:%i:%s'),
+                     SUBSTRING(COALESCE(a.reason, ''), 1, 200)
+                   )
+                   ORDER BY a.created_at DESC, a.id DESC
+                   SEPARATOR ';;'
+                 ),
+                 ';;', 5
+               )                  AS sampleReasons
+        FROM cps_review_adjudication a
+        INNER JOIN cps_issue i ON i.id = a.issue_id
+        <include refid="dispatcherMemoryFilter"/>
+        GROUP BY i.category_l1_id, i.area, a.decision, a.ai_relation
+        ORDER BY sampleCount DESC, lastAt DESC, i.category_l1_id, i.area
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countDispatcherMemoryGroupBy" resultType="long">
+        SELECT COUNT(1)
+        FROM (
+          SELECT 1
+          FROM cps_review_adjudication a
+          INNER JOIN cps_issue i ON i.id = a.issue_id
+          <include refid="dispatcherMemoryFilter"/>
+          GROUP BY i.category_l1_id, i.area, a.decision, a.ai_relation
+        ) g
+    </select>
+
 </mapper>

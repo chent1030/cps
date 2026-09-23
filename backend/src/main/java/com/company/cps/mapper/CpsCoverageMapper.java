@@ -88,4 +88,31 @@ public interface CpsCoverageMapper {
             @Param("area") String area,
             @Param("storageRoomType") String storageRoomType,
             @Param("gapDays") Integer gapDays);
+
+    /**
+     * FR-11 procedural 调度记忆消费端：按 (category_l1_id, area, decision, ai_relation) 维度聚合历史裁决。
+     * 每聚合组 sampleReasons 字段携带最近 5 条样例（reviewer/created_at/reason 200 字截断）以 ';;' 分隔，
+     * 解析由 service 层负责。
+     */
+    List<Map<String, Object>> dispatcherMemoryGroupBy(
+            @Param("categoryL1Id") Long categoryL1Id,
+            @Param("categoryL2Id") Long categoryL2Id,
+            @Param("factory") String factory,
+            @Param("area") String area,
+            @Param("decision") String decision,
+            @Param("aiRelation") String aiRelation,
+            @Param("startTime") String startTime,
+            @Param("endTime") String endTime,
+            @Param("limit") int limit,
+            @Param("offset") int offset);
+
+    long countDispatcherMemoryGroupBy(
+            @Param("categoryL1Id") Long categoryL1Id,
+            @Param("categoryL2Id") Long categoryL2Id,
+            @Param("factory") String factory,
+            @Param("area") String area,
+            @Param("decision") String decision,
+            @Param("aiRelation") String aiRelation,
+            @Param("startTime") String startTime,
+            @Param("endTime") String endTime);
 }
