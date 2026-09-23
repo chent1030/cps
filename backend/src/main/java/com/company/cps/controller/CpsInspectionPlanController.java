@@ -85,7 +85,26 @@ public class CpsInspectionPlanController {
         return CpsInspectionPlanResponse.from(plan, planService.listTasks(id));
     }
 
-    /** 强制 LocalDateTime 解析为 ISO_LOCAL_DATE_TIME 格式（前端传入）。 */
+    /** D4：建单记录状态聚合视图（计划→建单结果→任务状态；AC-06/30 可查/可追溯）。 */
+    @GetMapping("/{id}/record-status")
+    public com.company.cps.dto.CpsPlanRecordStatusResponse recordStatus(@PathVariable Long id) {
+        return planService.recordStatus(id);
+    }
+
+    /** D4：补建（仅 APPROVED 可调；仅补 CREATE_FAILED/缺失类型，已成功项不重复创建，AC-30）。 */
+    @PostMapping("/{id}/rebuild-tasks")
+    public Map<String, Object> rebuildTasks(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "admin") String operatorEmpNo) {
+        List<com.company.cps.domain.CpsInspectionPlanTask> created = planService.rebuildTasks(id, operatorEmpNo);
+        Map<String, Object> body = new HashMap<>();
+        body.put("createdTasks", created);
+        body.put("recordStatus", planService.recordStatus(id));
+        body.put("operator", operatorEmpNo);
+        return body;
+    }
+
+    /** 强制 LocalDateTime 解析为 ISO_LOCAL_DATETIME 格式（前端传入）。 */
     @SuppressWarnings("unused")
     private static class ParamBindHelper {
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)

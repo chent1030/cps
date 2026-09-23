@@ -4,6 +4,7 @@ import { getAdminOperator, setAdminOperator } from './api'
 import { AppShell } from './components/AppShell'
 import { CategoriesPage } from './pages/CategoriesPage'
 import { IssuesPage } from './pages/IssuesPage'
+import { InventoryPage } from './pages/InventoryPage'
 import { KnowledgePage } from './pages/KnowledgePage'
 import { OverviewPage } from './pages/OverviewPage'
 import { PeoplePage } from './pages/PeoplePage'
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="categories" element={<CategoriesPage />} />
           <Route path="people" element={<PeoplePage />} />
           <Route path="knowledge" element={<KnowledgePage />} />
+          <Route path="inventory" element={<InventoryPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>}

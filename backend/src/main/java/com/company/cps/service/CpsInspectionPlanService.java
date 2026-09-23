@@ -4,11 +4,14 @@ import com.company.cps.domain.CpsInspectionPlan;
 import com.company.cps.domain.CpsInspectionPlanStatus;
 import com.company.cps.domain.CpsInspectionPlanTask;
 import com.company.cps.domain.CpsInspectionPlanTaskType;
+import com.company.cps.domain.CpsPlanBuildRecord;
 import com.company.cps.dto.CpsInspectionPlanApproveRequest;
 import com.company.cps.dto.CpsInspectionPlanRejectRequest;
 import com.company.cps.dto.CpsInspectionPlanRequest;
+import com.company.cps.dto.CpsPlanRecordStatusResponse;
 import com.company.cps.mapper.CpsInspectionPlanMapper;
 import com.company.cps.mapper.CpsInspectionPlanTaskMapper;
+import com.company.cps.mapper.CpsPlanBuildRecordMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,16 +44,19 @@ public class CpsInspectionPlanService {
 
     private final CpsInspectionPlanMapper planMapper;
     private final CpsInspectionPlanTaskMapper taskMapper;
+    private final CpsPlanBuildRecordMapper buildRecordMapper;
     private final CpsAgentFrameworkClient agentFrameworkClient;
     private final ObjectMapper objectMapper;
 
     public CpsInspectionPlanService(
             CpsInspectionPlanMapper planMapper,
             CpsInspectionPlanTaskMapper taskMapper,
+            CpsPlanBuildRecordMapper buildRecordMapper,
             CpsAgentFrameworkClient agentFrameworkClient,
             ObjectMapper objectMapper) {
         this.planMapper = planMapper;
         this.taskMapper = taskMapper;
+        this.buildRecordMapper = buildRecordMapper;
         this.agentFrameworkClient = agentFrameworkClient;
         this.objectMapper = objectMapper;
     }
@@ -164,7 +170,8 @@ public class CpsInspectionPlanService {
             throw new IllegalStateException("Inspection plan approve CAS failed for id " + id
                     + " (lockVersion mismatch or status changed)");
         }
-        List<CpsInspectionPlanTask> created = createPlanTasks(id, request.getComment());
+        List<CpsInspectionPlanTask> created = createPlanTasks(id, request.getComment(),
+                request.getApprover(), CpsPlanBuildRecord.SOURCE_APPROVE);
         return new ApproveResult(reload(id), created);
     }
 
@@ -195,17 +202,19 @@ public class CpsInspectionPlanService {
     }
 
     /**
-     * D3 建单引擎（C-09 内部事务；AC-30）：
-     * 1) 查询已有 task_type 集合；
-     * 2) 缺失项按固定三类顺序 INSPECT_RECTIFY → INSPECT_PATROL → INSPECT_CHECK 创建；
+     * D3 建单引擎（C-09 内部事务；AC-30；D4 建单留痕）：
+     * 1) 查询已有 task_type 集合，已存在跳过（记 SKIPPED_EXISTING）；
+     * 2) 缺失项按固定三类顺序 INSPECT_RECTIFY → INSPECT_PATROL → INSPECT_CHECK 创建（记 CREATED）；
      * 3) 单项 INSERT 失败被 UNIQUE 唯一键兜底（DuplicateKeyException 视为已建，跳过）；
-     * 4) 同 plan 重复执行（重启/重试）只会产出 3 个任务——UNIQUE 拦截重复。
+     * 4) 其余失败不阻断批准：记 CREATE_FAILED 后继续其余类型——失败仅补建（AC-30）；
+     * 5) 每次尝试 append 落 cps_plan_build_record，重启/重试/补建可追溯（D4）。
      *
      * <p>任务明细从 plan.draft_content_json 提取（按 task_type 维度，缺则落空任务）。
      * Draft 字段语义：每类任务含 title/target_emp_no/target_emp_name/scheduled_at 等可选字段；
      * 空 draft 时任务 title=plan.title，targetEmpNo 由 approver 兜底，确保至少一行任务留痕。
      */
-    private List<CpsInspectionPlanTask> createPlanTasks(Long planId, String approverComment) {
+    private List<CpsInspectionPlanTask> createPlanTasks(
+            Long planId, String approverComment, String builtBy, String buildSource) {
         CpsInspectionPlan plan = getDetail(planId);
         List<CpsInspectionPlanTaskType> existing = taskMapper.findExistingTaskTypes(planId);
         List<CpsInspectionPlanTaskType> want = Arrays.asList(
@@ -218,6 +227,7 @@ public class CpsInspectionPlanService {
         for (CpsInspectionPlanTaskType taskType : want) {
             if (existing.contains(taskType)) {
                 log.debug("Plan task already exists: planId={} type={}, skip (idempotent)", planId, taskType);
+                recordBuild(planId, taskType, CpsPlanBuildRecord.RESULT_SKIPPED_EXISTING, null, builtBy, buildSource);
                 continue;
             }
             Map<String, Object> taskSpec = planDraftTasks.getOrDefault(taskType.name(), Collections.emptyMap());
@@ -239,12 +249,114 @@ public class CpsInspectionPlanService {
             try {
                 taskMapper.insert(task);
                 created.add(task);
+                recordBuild(planId, taskType, CpsPlanBuildRecord.RESULT_CREATED, null, builtBy, buildSource);
             } catch (org.springframework.dao.DuplicateKeyException dup) {
                 log.info("Plan task UNIQUE conflict (concurrent create): planId={} type={}, treat as already-created",
                         planId, taskType);
+                recordBuild(planId, taskType, CpsPlanBuildRecord.RESULT_SKIPPED_EXISTING, null, builtBy, buildSource);
+            } catch (RuntimeException failure) {
+                // 部分失败不阻断批准（AC-30 失败仅补建）：留痕后继续其余类型
+                log.warn("Plan task create failed: planId={} type={}", planId, taskType, failure);
+                recordBuild(planId, taskType, CpsPlanBuildRecord.RESULT_CREATE_FAILED,
+                        truncate(failure.getMessage(), 500), builtBy, buildSource);
             }
         }
         return created;
+    }
+
+    /** D4：append 落建单尝试记录（cps_plan_build_record）。 */
+    private void recordBuild(Long planId, CpsInspectionPlanTaskType taskType, String result,
+                             String errorMsg, String builtBy, String buildSource) {
+        CpsPlanBuildRecord record = new CpsPlanBuildRecord();
+        record.setPlanId(planId);
+        record.setTaskType(taskType.name());
+        record.setResult(result);
+        record.setErrorMsg(errorMsg);
+        record.setBuiltBy(builtBy);
+        record.setBuildSource(buildSource);
+        buildRecordMapper.insert(record);
+    }
+
+    private static String truncate(String value, int max) {
+        if (value == null) return null;
+        return value.length() <= max ? value : value.substring(0, max);
+    }
+
+    /**
+     * D4：补建（AC-30 失败仅补建）。仅 APPROVED 计划可调；createPlanTasks 内部
+     * 已按"已存在跳过"幂等——仅 CREATE_FAILED/缺失类型会实际重试，已成功项不重复创建。
+     */
+    @Transactional
+    public List<CpsInspectionPlanTask> rebuildTasks(Long planId, String operatorEmpNo) {
+        CpsInspectionPlan plan = getDetail(planId);
+        if (plan.getStatus() != CpsInspectionPlanStatus.APPROVED) {
+            throw new IllegalStateException("Only APPROVED plan can rebuild tasks: id=" + planId
+                    + ", status=" + plan.getStatus());
+        }
+        if (operatorEmpNo == null || operatorEmpNo.trim().isEmpty()) {
+            throw new IllegalArgumentException("operatorEmpNo is required");
+        }
+        return createPlanTasks(planId, null, operatorEmpNo, CpsPlanBuildRecord.SOURCE_REBUILD);
+    }
+
+    /**
+     * D4：计划→建单结果→任务状态聚合视图（AC-06/30 可查/可追溯）。
+     * perType=三类任务维度：任务是否存在/任务状态/最近一次建单结果与来源；summary=created/failed/missing。
+     */
+    public CpsPlanRecordStatusResponse recordStatus(Long planId) {
+        CpsInspectionPlan plan = getDetail(planId);
+        List<CpsInspectionPlanTask> tasks = taskMapper.findByPlanId(planId);
+        List<CpsPlanBuildRecord> records = buildRecordMapper.findByPlanId(planId);
+
+        Map<String, CpsInspectionPlanTask> taskByType = new java.util.HashMap<>();
+        for (CpsInspectionPlanTask task : tasks) {
+            taskByType.put(task.getTaskType().name(), task);
+        }
+        Map<String, CpsPlanBuildRecord> lastBuildByType = new java.util.HashMap<>();
+        for (CpsPlanBuildRecord record : records) {
+            lastBuildByType.put(record.getTaskType(), record); // findByPlanId 按 id ASC——后者覆盖前者
+        }
+
+        List<CpsPlanRecordStatusResponse.TypeRecordStatus> perType = new ArrayList<>();
+        CpsPlanRecordStatusResponse.Summary summary = new CpsPlanRecordStatusResponse.Summary();
+        for (CpsInspectionPlanTaskType type : new CpsInspectionPlanTaskType[]{
+                CpsInspectionPlanTaskType.INSPECT_RECTIFY,
+                CpsInspectionPlanTaskType.INSPECT_PATROL,
+                CpsInspectionPlanTaskType.INSPECT_CHECK}) {
+            CpsPlanRecordStatusResponse.TypeRecordStatus status = new CpsPlanRecordStatusResponse.TypeRecordStatus();
+            status.setTaskType(type.name());
+            CpsInspectionPlanTask task = taskByType.get(type.name());
+            status.setTaskExists(task != null);
+            if (task != null) {
+                status.setTaskId(task.getId());
+                status.setTaskStatus(task.getTaskStatus());
+            }
+            CpsPlanBuildRecord lastBuild = lastBuildByType.get(type.name());
+            if (lastBuild != null) {
+                status.setLastBuildResult(lastBuild.getResult());
+                status.setLastBuildErrorMsg(lastBuild.getErrorMsg());
+                status.setLastBuildAt(lastBuild.getCreatedAt());
+                status.setLastBuildSource(lastBuild.getBuildSource());
+            }
+            if (task == null) {
+                summary.setTypesMissing(summary.getTypesMissing() + 1);
+            } else if (lastBuild != null
+                    && CpsPlanBuildRecord.RESULT_CREATE_FAILED.equals(lastBuild.getResult())) {
+                summary.setTypesFailed(summary.getTypesFailed() + 1);
+            } else {
+                summary.setTypesCreated(summary.getTypesCreated() + 1);
+            }
+            perType.add(status);
+        }
+
+        CpsPlanRecordStatusResponse response = new CpsPlanRecordStatusResponse();
+        response.setPlanId(plan.getId());
+        response.setPlanTitle(plan.getTitle());
+        response.setPlanStatus(plan.getStatus().name());
+        response.setApprovedAt(plan.getApprovedAt());
+        response.setPerType(perType);
+        response.setSummary(summary);
+        return response;
     }
 
     /** 解析 draft_content_json 内的任务映射（{INSPECT_RECTIFY: {...}}）。非法 JSON 视为空 draft。 */

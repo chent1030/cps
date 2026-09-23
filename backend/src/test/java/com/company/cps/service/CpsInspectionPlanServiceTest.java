@@ -9,6 +9,7 @@ import com.company.cps.dto.CpsInspectionPlanRejectRequest;
 import com.company.cps.dto.CpsInspectionPlanRequest;
 import com.company.cps.mapper.CpsInspectionPlanMapper;
 import com.company.cps.mapper.CpsInspectionPlanTaskMapper;
+import com.company.cps.mapper.CpsPlanBuildRecordMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,6 +29,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,13 +48,14 @@ class CpsInspectionPlanServiceTest {
 
     @Mock private CpsInspectionPlanMapper planMapper;
     @Mock private CpsInspectionPlanTaskMapper taskMapper;
+    @Mock private CpsPlanBuildRecordMapper buildRecordMapper;
     @Mock private CpsAgentFrameworkClient agentClient;
 
     private CpsInspectionPlanService service;
 
     @BeforeEach
     void setUp() {
-        service = new CpsInspectionPlanService(planMapper, taskMapper, agentClient, new ObjectMapper());
+        service = new CpsInspectionPlanService(planMapper, taskMapper, buildRecordMapper, agentClient, new ObjectMapper());
     }
 
     private static CpsInspectionPlanRequest baseDraft(String sourceRunId) {
@@ -358,7 +361,7 @@ class CpsInspectionPlanServiceTest {
     }
 
     @Test
-    void applyDraftUpdateCasFailureThrows() {
+    void applyDraftUpdatesCasFailureThrows() {
         CpsInspectionPlanRequest r = baseDraft("weekly-CHECK-CASFAIL");
         r.setPlanType("WEEKLY_CHECK");
         r.setDraftContentJson("{\"tasks\":{}}");
@@ -368,5 +371,193 @@ class CpsInspectionPlanServiceTest {
                 .thenReturn(java.util.Optional.of(existing));
         when(planMapper.updateDraftCas(any(CpsInspectionPlan.class))).thenReturn(0);
         assertThrows(IllegalStateException.class, () -> service.applyDraft(r));
+    }
+
+    // ---------- D4/D5：建单留痕（cps_plan_build_record）+ recordStatus 聚合 + 补建 ----------
+
+    /** 批准建单：3 条 CREATED 留痕，builtBy=approver，source=APPROVE。 */
+    @Test
+    void approveRecordsBuildRecordsPerType() {
+        long planId = 61L;
+        CpsInspectionPlan pending = plan(planId, "x", CpsInspectionPlanStatus.PENDING_REVIEW, 0, 1);
+        CpsInspectionPlan approved = plan(planId, "x", CpsInspectionPlanStatus.APPROVED, 1, 1);
+        when(planMapper.findById(planId)).thenReturn(pending, approved);
+        when(planMapper.approveCas(any(CpsInspectionPlan.class))).thenReturn(1);
+        when(taskMapper.findExistingTaskTypes(planId)).thenReturn(Collections.emptyList());
+
+        CpsInspectionPlanApproveRequest req = new CpsInspectionPlanApproveRequest();
+        req.setApprover("E61");
+        req.setLockVersion(0);
+        service.approve(planId, req);
+
+        ArgumentCaptor<com.company.cps.domain.CpsPlanBuildRecord> captor =
+                ArgumentCaptor.forClass(com.company.cps.domain.CpsPlanBuildRecord.class);
+        verify(buildRecordMapper, times(3)).insert(captor.capture());
+        assertEquals(3, captor.getAllValues().stream()
+                .map(com.company.cps.domain.CpsPlanBuildRecord::getTaskType)
+                .distinct().count(), "三类 task_type 各落一条留痕");
+        for (com.company.cps.domain.CpsPlanBuildRecord rec : captor.getAllValues()) {
+            assertEquals(com.company.cps.domain.CpsPlanBuildRecord.RESULT_CREATED, rec.getResult());
+            assertEquals("E61", rec.getBuiltBy());
+            assertEquals(com.company.cps.domain.CpsPlanBuildRecord.SOURCE_APPROVE, rec.getBuildSource());
+            assertEquals(planId, rec.getPlanId());
+        }
+    }
+
+    /** 单类建单失败（非 DuplicateKey）不阻断批准：记 CREATE_FAILED 后继续其余类型（AC-30 失败仅补建）。 */
+    @Test
+    void createTaskFailureRecordsCreateFailedAndContinues() {
+        long planId = 62L;
+        CpsInspectionPlan pending = plan(planId, "x", CpsInspectionPlanStatus.PENDING_REVIEW, 0, 1);
+        CpsInspectionPlan approved = plan(planId, "x", CpsInspectionPlanStatus.APPROVED, 1, 1);
+        when(planMapper.findById(planId)).thenReturn(pending, approved);
+        when(planMapper.approveCas(any(CpsInspectionPlan.class))).thenReturn(1);
+        when(taskMapper.findExistingTaskTypes(planId)).thenReturn(Collections.emptyList());
+        when(taskMapper.insert(any(CpsInspectionPlanTask.class))).thenAnswer(inv -> {
+            CpsInspectionPlanTask t = inv.getArgument(0);
+            if (t.getTaskType() == CpsInspectionPlanTaskType.INSPECT_PATROL) {
+                throw new org.springframework.dao.DataIntegrityViolationException("mock insert failure");
+            }
+            return 1;
+        });
+
+        CpsInspectionPlanService.ApproveResult result = service.approve(planId,
+                new CpsInspectionPlanApproveRequest() {{ setApprover("E62"); setLockVersion(0); }});
+
+        assertEquals(2, result.getCreatedTasks().size()); // 失败类不进 createdTasks，但不阻断
+        ArgumentCaptor<com.company.cps.domain.CpsPlanBuildRecord> captor =
+                ArgumentCaptor.forClass(com.company.cps.domain.CpsPlanBuildRecord.class);
+        verify(buildRecordMapper, times(3)).insert(captor.capture());
+        Map<String, String> resultByType = captor.getAllValues().stream().collect(
+                java.util.stream.Collectors.toMap(
+                        com.company.cps.domain.CpsPlanBuildRecord::getTaskType,
+                        com.company.cps.domain.CpsPlanBuildRecord::getResult));
+        assertEquals(com.company.cps.domain.CpsPlanBuildRecord.RESULT_CREATE_FAILED,
+                resultByType.get("INSPECT_PATROL"));
+        assertEquals(com.company.cps.domain.CpsPlanBuildRecord.RESULT_CREATED,
+                resultByType.get("INSPECT_RECTIFY"));
+        assertEquals(com.company.cps.domain.CpsPlanBuildRecord.RESULT_CREATED,
+                resultByType.get("INSPECT_CHECK"));
+        // CREATE_FAILED 留有错误信息可追溯
+        assertTrue(captor.getAllValues().stream().anyMatch(
+                r -> r.getErrorMsg() != null && r.getErrorMsg().contains("mock insert failure")));
+    }
+
+    /** 并发 UNIQUE 冲突（DuplicateKeyException）视为已建：记 SKIPPED_EXISTING。 */
+    @Test
+    void createTaskDuplicateKeyRecordsSkippedExisting() {
+        long planId = 63L;
+        CpsInspectionPlan pending = plan(planId, "x", CpsInspectionPlanStatus.PENDING_REVIEW, 0, 1);
+        CpsInspectionPlan approved = plan(planId, "x", CpsInspectionPlanStatus.APPROVED, 1, 1);
+        when(planMapper.findById(planId)).thenReturn(pending, approved);
+        when(planMapper.approveCas(any(CpsInspectionPlan.class))).thenReturn(1);
+        when(taskMapper.findExistingTaskTypes(planId)).thenReturn(Collections.emptyList());
+        when(taskMapper.insert(any(CpsInspectionPlanTask.class))).thenAnswer(inv -> {
+            CpsInspectionPlanTask t = inv.getArgument(0);
+            if (t.getTaskType() == CpsInspectionPlanTaskType.INSPECT_RECTIFY) {
+                throw new org.springframework.dao.DuplicateKeyException("uk conflict");
+            }
+            return 1;
+        });
+
+        CpsInspectionPlanService.ApproveResult result = service.approve(planId,
+                new CpsInspectionPlanApproveRequest() {{ setApprover("E63"); setLockVersion(0); }});
+
+        assertEquals(2, result.getCreatedTasks().size());
+        ArgumentCaptor<com.company.cps.domain.CpsPlanBuildRecord> captor =
+                ArgumentCaptor.forClass(com.company.cps.domain.CpsPlanBuildRecord.class);
+        verify(buildRecordMapper, times(3)).insert(captor.capture());
+        assertTrue(captor.getAllValues().stream().anyMatch(r ->
+                "INSPECT_RECTIFY".equals(r.getTaskType())
+                        && com.company.cps.domain.CpsPlanBuildRecord.RESULT_SKIPPED_EXISTING.equals(r.getResult())));
+    }
+
+    /** D4 recordStatus 聚合：任务存在性 × 最近建单结果 → missing/failed/created 计数。 */
+    @Test
+    void recordStatusAggregatesTasksAndBuildRecords() {
+        long planId = 64L;
+        when(planMapper.findById(planId)).thenReturn(plan(planId, "聚合测试",
+                CpsInspectionPlanStatus.APPROVED, 1, 1));
+        // RECTIFY 任务在且建单成功；PATROL 任务在但最近建单失败；CHECK 任务缺失（从未建成）
+        CpsInspectionPlanTask rectify = new CpsInspectionPlanTask();
+        rectify.setId(901L); rectify.setPlanId(planId);
+        rectify.setTaskType(CpsInspectionPlanTaskType.INSPECT_RECTIFY); rectify.setTaskStatus("PENDING");
+        CpsInspectionPlanTask patrol = new CpsInspectionPlanTask();
+        patrol.setId(902L); patrol.setPlanId(planId);
+        patrol.setTaskType(CpsInspectionPlanTaskType.INSPECT_PATROL); patrol.setTaskStatus("PENDING");
+        when(taskMapper.findByPlanId(planId)).thenReturn(Arrays.asList(rectify, patrol));
+
+        com.company.cps.domain.CpsPlanBuildRecord recOk = new com.company.cps.domain.CpsPlanBuildRecord();
+        recOk.setPlanId(planId); recOk.setTaskType("INSPECT_RECTIFY");
+        recOk.setResult(com.company.cps.domain.CpsPlanBuildRecord.RESULT_CREATED);
+        recOk.setBuildSource(com.company.cps.domain.CpsPlanBuildRecord.SOURCE_APPROVE);
+        com.company.cps.domain.CpsPlanBuildRecord recFail = new com.company.cps.domain.CpsPlanBuildRecord();
+        recFail.setPlanId(planId); recFail.setTaskType("INSPECT_PATROL");
+        recFail.setResult(com.company.cps.domain.CpsPlanBuildRecord.RESULT_CREATE_FAILED);
+        recFail.setErrorMsg("boom");
+        when(buildRecordMapper.findByPlanId(planId)).thenReturn(Arrays.asList(recOk, recFail));
+
+        com.company.cps.dto.CpsPlanRecordStatusResponse status = service.recordStatus(planId);
+
+        assertEquals("APPROVED", status.getPlanStatus());
+        assertEquals(3, status.getPerType().size());
+        Map<String, com.company.cps.dto.CpsPlanRecordStatusResponse.TypeRecordStatus> byType =
+                status.getPerType().stream().collect(
+                        java.util.stream.Collectors.toMap(
+                                com.company.cps.dto.CpsPlanRecordStatusResponse.TypeRecordStatus::getTaskType, s -> s));
+        assertTrue(byType.get("INSPECT_RECTIFY").isTaskExists());
+        assertEquals(901L, byType.get("INSPECT_RECTIFY").getTaskId());
+        assertEquals(com.company.cps.domain.CpsPlanBuildRecord.RESULT_CREATED,
+                byType.get("INSPECT_RECTIFY").getLastBuildResult());
+        assertTrue(byType.get("INSPECT_PATROL").isTaskExists());
+        assertEquals("boom", byType.get("INSPECT_PATROL").getLastBuildErrorMsg());
+        assertFalse(byType.get("INSPECT_CHECK").isTaskExists());
+        assertNull(byType.get("INSPECT_CHECK").getLastBuildResult());
+        assertEquals(1, status.getSummary().getTypesCreated());
+        assertEquals(1, status.getSummary().getTypesFailed());
+        assertEquals(1, status.getSummary().getTypesMissing());
+        assertFalse(status.getSummary().isAllBuilt());
+    }
+
+    /** D4 补建：仅 APPROVED 可调；已存在类型记 SKIPPED_EXISTING 不重复建，缺失类型补建记 CREATED+REBUILD。 */
+    @Test
+    void rebuildTasksOnlyCreatesMissingWithRebuildSource() {
+        long planId = 65L;
+        CpsInspectionPlan approved = plan(planId, "x", CpsInspectionPlanStatus.APPROVED, 1, 1);
+        approved.setDraftContentJson("{\"tasks\":{}}");
+        when(planMapper.findById(planId)).thenReturn(approved);
+        when(taskMapper.findExistingTaskTypes(planId))
+                .thenReturn(Collections.singletonList(CpsInspectionPlanTaskType.INSPECT_RECTIFY));
+
+        List<CpsInspectionPlanTask> created = service.rebuildTasks(planId, "E65");
+
+        assertEquals(2, created.size());
+        assertFalse(created.stream().anyMatch(t -> t.getTaskType() == CpsInspectionPlanTaskType.INSPECT_RECTIFY));
+        ArgumentCaptor<com.company.cps.domain.CpsPlanBuildRecord> captor =
+                ArgumentCaptor.forClass(com.company.cps.domain.CpsPlanBuildRecord.class);
+        verify(buildRecordMapper, times(3)).insert(captor.capture());
+        Map<String, String> resultByType = captor.getAllValues().stream().collect(
+                java.util.stream.Collectors.toMap(
+                        com.company.cps.domain.CpsPlanBuildRecord::getTaskType,
+                        com.company.cps.domain.CpsPlanBuildRecord::getResult));
+        assertEquals(com.company.cps.domain.CpsPlanBuildRecord.RESULT_SKIPPED_EXISTING,
+                resultByType.get("INSPECT_RECTIFY"));
+        assertEquals(com.company.cps.domain.CpsPlanBuildRecord.RESULT_CREATED, resultByType.get("INSPECT_PATROL"));
+        assertTrue(captor.getAllValues().stream().allMatch(
+                r -> com.company.cps.domain.CpsPlanBuildRecord.SOURCE_REBUILD.equals(r.getBuildSource())
+                        && "E65".equals(r.getBuiltBy())));
+    }
+
+    /** D4 补建前置校验：非 APPROVED 拒绝；operator 缺失拒绝。 */
+    @Test
+    void rebuildTasksRejectsNonApprovedOrBlankOperator() {
+        when(planMapper.findById(66L)).thenReturn(
+                plan(66L, "x", CpsInspectionPlanStatus.PENDING_REVIEW, 0, 1));
+        assertThrows(IllegalStateException.class, () -> service.rebuildTasks(66L, "E66"));
+
+        when(planMapper.findById(67L)).thenReturn(
+                plan(67L, "x", CpsInspectionPlanStatus.APPROVED, 1, 1));
+        assertThrows(IllegalArgumentException.class, () -> service.rebuildTasks(67L, "  "));
+        verify(taskMapper, never()).findExistingTaskTypes(anyLong());
     }
 }

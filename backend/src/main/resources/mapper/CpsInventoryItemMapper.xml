@@ -78,4 +78,19 @@
         SET enabled = #{enabled}, updated_by = #{updatedBy}
         WHERE id = #{id}
     </update>
+
+    <!-- E2：出入库事务内悲观行锁（同件多次操作串行化；AC-33） -->
+    <select id="selectForUpdate" resultType="com.company.cps.domain.CpsInventoryItem">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_inventory_item
+        WHERE id = #{id}
+        FOR UPDATE
+    </select>
+
+    <!-- E2：行锁内更新库存（悲观锁已串行化；DB CHECK stock_qty>=0 兜底禁负库存） -->
+    <update id="updateStockQty">
+        UPDATE cps_inventory_item
+        SET stock_qty = #{stockQty}, updated_by = #{updatedBy}
+        WHERE id = #{id}
+    </update>
 </mapper>

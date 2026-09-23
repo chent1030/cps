@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsInventoryTxnMapper">
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsInventoryTxn" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_inventory_txn (
+            item_id, txn_type, qty, before_qty, after_qty, unit,
+            operator_emp_no, operator_name, remark
+        ) VALUES (
+            #{itemId}, #{txnType}, #{qty}, #{beforeQty}, #{afterQty}, #{unit},
+            #{operatorEmpNo}, #{operatorName}, #{remark}
+        )
+    </insert>
+
+    <select id="page" resultType="com.company.cps.domain.CpsInventoryTxn">
+        SELECT t.id, t.item_id, t.txn_type, t.qty, t.before_qty, t.after_qty, t.unit,
+               t.operator_emp_no, t.operator_name, t.remark, t.created_at,
+               i.item_code, i.item_name
+        FROM cps_inventory_txn t
+        JOIN cps_inventory_item i ON i.id = t.item_id
+        WHERE 1 = 1
+        <if test="itemId != null">
+          AND t.item_id = #{itemId}
+        </if>
+        <if test="txnType != null and txnType != ''">
+          AND t.txn_type = #{txnType}
+        </if>
+        ORDER BY t.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM cps_inventory_txn t
+        WHERE 1 = 1
+        <if test="itemId != null">
+          AND t.item_id = #{itemId}
+        </if>
+        <if test="txnType != null and txnType != ''">
+          AND t.txn_type = #{txnType}
+        </if>
+    </select>
+</mapper>

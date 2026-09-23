@@ -27,4 +27,10 @@ public interface CpsInventoryItemMapper {
     int update(CpsInventoryItem item);
 
     int setEnabled(@Param("id") Long id, @Param("enabled") Boolean enabled, @Param("updatedBy") String updatedBy);
+
+    /** E2：SELECT ... FOR UPDATE 悲观行锁（出入库事务内，同件串行化）。 */
+    Optional<CpsInventoryItem> selectForUpdate(@Param("id") Long id);
+
+    /** E2：行锁内更新库存（DB CHECK stock_qty>=0 兜底禁负库存）。 */
+    int updateStockQty(@Param("id") Long id, @Param("stockQty") int stockQty, @Param("updatedBy") String updatedBy);
 }
