@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { Avatar, Button, Layout, Menu, Space, Typography } from '@arco-design/web-react'
-import { IconApps, IconBook, IconDashboard, IconRefresh, IconSettings, IconStorage, IconUnorderedList, IconUserGroup } from '@arco-design/web-react/icon'
+import { IconApps, IconBook, IconDashboard, IconExclamationCircle, IconRefresh, IconSettings, IconStorage, IconUnorderedList, IconUserGroup } from '@arco-design/web-react/icon'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { getAdminOperator } from '../api'
 
@@ -10,7 +10,10 @@ const navigation = [
   { path: '/categories', label: '问题分类', icon: <IconApps /> },
   { path: '/people', label: '区域人员', icon: <IconUserGroup /> },
   { path: '/knowledge', label: '案例知识库', icon: <IconBook /> },
-  { path: '/inventory', label: '物品台账', icon: <IconStorage /> },
+  // 库存管理分组（波次 14 E4 收尾，3 页面分离）
+  { path: '/admin/inventory/items', label: '物品台账', icon: <IconStorage /> },
+  { path: '/admin/inventory/transactions', label: '出入库流水', icon: <IconUnorderedList /> },
+  { path: '/admin/inventory/alerts', label: '库存预警', icon: <IconExclamationCircle /> },
 ]
 const titles = new Map(navigation.map((item) => [item.path, item.label]))
 
