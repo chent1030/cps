@@ -1,5 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 
+import { setCurrentRole } from '@/api/cps/userStore'
 import type { CpsUploadedImage } from '@/types/cps'
 import IssueCreateView from '../IssueCreateView.vue'
 
@@ -26,6 +27,8 @@ describe('IssueCreateView', () => {
     mocks.inspectImage.mockReset()
     mocks.transcribeVoice.mockReset()
     mocks.transcribeVoice.mockResolvedValue('')
+    // 波次14 B5：默认 admin 角色（表单可见）
+    setCurrentRole('admin')
   })
 
   it('shows submit disabled when no issue image exists', () => {

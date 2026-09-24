@@ -11,6 +11,7 @@
       </div>
       <div class="cps-list-hero__entries">
         <button
+          v-if="isAdmin"
           type="button"
           class="cps-list-hero__entry"
           @click="navigateToCreate"
@@ -22,11 +23,21 @@
           点检任务
         </button>
         <!-- 波次6 B5②：初审三态/接管/裁决入口（审核专员） -->
-        <button type="button" class="cps-list-hero__entry" @click="navigateToInitialReview">
+        <button
+          v-if="isAdmin"
+          type="button"
+          class="cps-list-hero__entry"
+          @click="navigateToInitialReview"
+        >
           初审裁决
         </button>
-        <!-- 波次14 B3：周评分排名入口 -->
-        <button type="button" class="cps-list-hero__entry" @click="navigateToScoreRanking">
+        <!-- 波次14 B3：周评分排名入口（B5 阶段会被 v-if 控制） -->
+        <button
+          v-if="isAdmin"
+          type="button"
+          class="cps-list-hero__entry"
+          @click="navigateToScoreRanking"
+        >
           评分排名
         </button>
       </div>
@@ -89,6 +100,7 @@
 import { computed, ref, watch } from 'vue'
 
 import { listCpsIssues } from '@/api/cps/issue'
+import { getCurrentUser } from '@/api/cps/userStore'
 import type { CpsIssueListItem, CpsIssueStatus, CpsIssueTab } from '@/types/cps'
 
 interface TabItem {
@@ -199,6 +211,8 @@ const navigateToDetail = (id: number) => {
 const navigateToScoreRanking = () => {
   uni.navigateTo({ url: '/views/cps/ScoreRankingView' })
 }
+
+const isAdmin = computed<boolean>(() => getCurrentUser().role === 'admin')
 
 const load = async () => {
   loading.value = true

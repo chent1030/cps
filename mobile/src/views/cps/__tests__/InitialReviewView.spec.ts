@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import { setCurrentRole } from '@/api/cps/userStore'
 import InitialReviewView from '../InitialReviewView.vue'
 
 const mocks = vi.hoisted(() => ({
@@ -124,6 +125,8 @@ describe('InitialReviewView', () => {
     mocks.getInitialReviewView.mockReset()
     mocks.takeOverInitialReview.mockReset()
     mocks.adjudicateReview.mockReset()
+    // 波次14 B5：默认 admin 角色（三态卡片可见）
+    setCurrentRole('admin')
   })
 
   it('distinguishes running state with countdown and hides takeover', async () => {

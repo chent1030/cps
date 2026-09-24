@@ -1,5 +1,12 @@
 <template>
-  <main class="cps-page cps-review-page">
+  <main v-if="!isAdmin" class="cps-page cps-review-page">
+    <header class="cps-review-hero">
+      <p class="cps-review-hero__eyebrow">无权访问</p>
+      <h1 class="cps-review-hero__title">仅审核员可访问</h1>
+      <p class="cps-review-hero__hint">AI 初审裁决需要审核员角色；巡检员请返回问题列表。</p>
+    </header>
+  </main>
+  <main v-else class="cps-page cps-review-page">
     <header class="cps-review-hero">
       <p class="cps-review-hero__eyebrow">AI 初审 · 人工裁决</p>
       <h1 class="cps-review-hero__title">{{ issueId ? `问题 #${issueId} 初审` : 'AI 初审裁决' }}</h1>
@@ -176,6 +183,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
+import { getCurrentUser } from '@/api/cps/userStore'
 import {
   adjudicateReview,
   getInitialReviewView,
@@ -184,6 +192,8 @@ import {
 import type { CpsInitialReviewView } from '@/types/cps'
 
 defineOptions({ name: 'InitialReviewView' })
+
+const isAdmin = computed<boolean>(() => getCurrentUser().role === 'admin')
 
 const issueId = ref(0)
 const view = ref<CpsInitialReviewView | null>(null)

@@ -1,5 +1,12 @@
 <template>
-  <main class="cps-page cps-create-page">
+  <main v-if="!isAdmin" class="cps-page cps-create-page">
+    <header class="cps-create-hero">
+      <p class="cps-create-hero__eyebrow">无权访问</p>
+      <h1>仅审核员可创建</h1>
+    </header>
+    <p class="cps-create-card__hint">新建问题入口仅向审核员开放；巡检员请返回问题列表。</p>
+  </main>
+  <main v-else class="cps-page cps-create-page">
     <header class="cps-create-hero">
       <div class="cps-create-hero__main">
         <p class="cps-create-hero__eyebrow">CPS 现场巡检</p>
@@ -281,6 +288,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 
 import { inspectCpsImage, transcribeIssueVoice } from '@/api/cps/ai'
+import { getCurrentUser } from '@/api/cps/userStore'
 import { uploadCpsAttachment, type CpsAttachmentUploadSource } from '@/api/cps/attachment'
 import { createCpsIssue } from '@/api/cps/issue'
 import {
@@ -307,6 +315,8 @@ interface UniTempFileLike {
 }
 
 type TempFileCandidate = File | UniTempFileLike
+
+const isAdmin = computed<boolean>(() => getCurrentUser().role === 'admin')
 
 const location = ref({
   factory: '',
@@ -436,6 +446,10 @@ const selectFeedbackPerson = (person: CpsEmployeeOption) => {
 watch(
   () => category.value.categoryL1Id,
   async (parentId) => {
+    if (!isAdmin.value) {
+      level2Categories.value = []
+      return
+    }
     level2Categories.value = parentId ? await getCategories(parentId) : []
   },
 )
@@ -614,6 +628,8 @@ const submit = async () => {
 }
 
 onMounted(async () => {
+  // 非审核员：v-if 已隐藏表单，skip 数据加载避免对 mock 不可用的接口发起调用
+  if (!isAdmin.value) return
   factories.value = await getFactories()
   level1Categories.value = await getCategories()
 })

@@ -1,5 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 
+import { setCurrentRole } from '@/api/cps/userStore'
 import IssueListView from '../IssueListView.vue'
 
 const mocks = vi.hoisted(() => ({
@@ -18,6 +19,8 @@ describe('IssueListView', () => {
     ;(globalThis as unknown as { uni: Pick<UniApp.Uni, 'navigateTo'> }).uni = {
       navigateTo: mocks.navigateTo,
     }
+    // 波次14 B5：admin 角色下 admin-only 入口全部可见
+    setCurrentRole('admin')
   })
 
   it('renders redesigned issue cards with Chinese status labels', async () => {
