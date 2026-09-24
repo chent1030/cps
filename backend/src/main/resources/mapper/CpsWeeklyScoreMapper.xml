@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsWeeklyScoreMapper">
+
+    <resultMap id="CpsWeeklyScoreMap" type="com.company.cps.domain.CpsWeeklyScore">
+        <id property="id" column="id"/>
+        <result property="weekStartDate" column="week_start_date"/>
+        <result property="empNo" column="emp_no"/>
+        <result property="empName" column="emp_name"/>
+        <result property="regionSupervisorId" column="region_supervisor_id"/>
+        <result property="regionSupervisorName" column="region_supervisor_name"/>
+        <result property="totalScore" column="total_score"/>
+        <result property="roomCheckCount" column="room_check_count"/>
+        <result property="photoCount" column="photo_count"/>
+        <result property="naturalWeekFlag" column="natural_week_flag"/>
+        <result property="updatedBy" column="updated_by"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <resultMap id="CpsWeeklyScoreLineMap" type="com.company.cps.domain.CpsWeeklyScoreLine">
+        <id property="id" column="id"/>
+        <result property="weeklyScoreId" column="weekly_score_id"/>
+        <result property="itemId" column="item_id"/>
+        <result property="scoreDelta" column="score_delta"/>
+        <result property="reason" column="reason"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insertHeader" parameterType="com.company.cps.domain.CpsWeeklyScore"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_weekly_score (
+            week_start_date, emp_no, emp_name,
+            region_supervisor_id, region_supervisor_name,
+            total_score, room_check_count, photo_count,
+            natural_week_flag, updated_by
+        ) VALUES (
+            #{weekStartDate}, #{empNo}, #{empName},
+            #{regionSupervisorId}, #{regionSupervisorName},
+            #{totalScore}, #{roomCheckCount}, #{photoCount},
+            #{naturalWeekFlag}, #{updatedBy}
+        )
+    </insert>
+
+    <update id="updateHeader" parameterType="com.company.cps.domain.CpsWeeklyScore">
+        UPDATE cps_weekly_score
+        SET emp_name = #{empName},
+            region_supervisor_id = #{regionSupervisorId},
+            region_supervisor_name = #{regionSupervisorName},
+            total_score = #{totalScore},
+            room_check_count = #{roomCheckCount},
+            photo_count = #{photoCount},
+            natural_week_flag = #{naturalWeekFlag},
+            updated_by = #{updatedBy}
+        WHERE id = #{id}
+    </update>
+
+    <insert id="insertLine" parameterType="com.company.cps.domain.CpsWeeklyScoreLine"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_weekly_score_line (
+            weekly_score_id, item_id, score_delta, reason
+        ) VALUES (
+            #{weeklyScoreId}, #{itemId}, #{scoreDelta}, #{reason}
+        )
+    </insert>
+
+    <delete id="deleteLinesByHeader">
+        DELETE FROM cps_weekly_score_line WHERE weekly_score_id = #{weeklyScoreId}
+    </delete>
+
+    <select id="findByWeekAndEmp" resultMap="CpsWeeklyScoreMap">
+        SELECT * FROM cps_weekly_score
+        WHERE week_start_date = #{weekStartDate} AND emp_no = #{empNo}
+        LIMIT 1
+    </select>
+
+    <select id="listByFilters" resultMap="CpsWeeklyScoreMap">
+        SELECT * FROM cps_weekly_score
+        WHERE week_start_date = #{weekStartDate}
+        <if test="regionSupervisorId != null">
+            AND region_supervisor_id = #{regionSupervisorId}
+        </if>
+        ORDER BY total_score DESC, room_check_count DESC, emp_no ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByFilters" resultType="long">
+        SELECT COUNT(*) FROM cps_weekly_score
+        WHERE week_start_date = #{weekStartDate}
+        <if test="regionSupervisorId != null">
+            AND region_supervisor_id = #{regionSupervisorId}
+        </if>
+    </select>
+
+    <select id="findAllByWeek" resultMap="CpsWeeklyScoreMap">
+        SELECT * FROM cps_weekly_score WHERE week_start_date = #{weekStartDate}
+    </select>
+
+    <select id="findLinesByHeader" resultMap="CpsWeeklyScoreLineMap">
+        SELECT * FROM cps_weekly_score_line WHERE weekly_score_id = #{weeklyScoreId}
+        ORDER BY id ASC
+    </select>
+
+</mapper>

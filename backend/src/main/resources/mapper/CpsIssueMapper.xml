@@ -66,6 +66,17 @@
         WHERE id = #{id}
     </select>
 
+    <!-- B4 周评分：created_at 落在 [weekStart, weekEnd+1day) 之间的 issue 全量。
+         weekEnd 已在 service 层转为周日，limit 防爆。 -->
+    <select id="findForWeeklyScore" resultType="com.company.cps.domain.CpsIssue">
+        SELECT *
+        FROM cps_issue
+        WHERE created_at &gt;= #{weekStart}
+          AND created_at &lt; DATE_ADD(#{weekEnd}, INTERVAL 1 DAY)
+        ORDER BY created_at ASC
+        LIMIT #{limit}
+    </select>
+
     <update id="updateWorkflowFields" parameterType="com.company.cps.domain.CpsIssue">
         UPDATE cps_issue
         SET status = #{status},

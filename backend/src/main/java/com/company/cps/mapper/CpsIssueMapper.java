@@ -23,6 +23,14 @@ public interface CpsIssueMapper {
     Optional<CpsIssue> findById(@Param("id") Long id);
 
     /**
+     * B4 周评分数据源：自然周内（created_at 落在 [weekStart, weekEnd+1)）的 issue 行，
+     * 上限 limit 防爆。返回字段为 CpsIssue 全量（service 仅用 status/factory/area/empNo/empName）。
+     */
+    List<CpsIssue> findForWeeklyScore(@Param("weekStart") java.time.LocalDate weekStart,
+                                      @Param("weekEnd") java.time.LocalDate weekEnd,
+                                      @Param("limit") int limit);
+
+    /**
      * 更新问题流程相关字段，包括状态、处理人、原因措施、审核意见和关闭时间。
      *
      * <p>A2 乐观锁（AC-24）：WHERE 追加 lock_version CAS 校验并自增；
