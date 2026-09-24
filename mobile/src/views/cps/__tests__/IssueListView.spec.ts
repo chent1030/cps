@@ -85,9 +85,9 @@ describe('IssueListView', () => {
     const wrapper = mount(IssueListView)
     await flushPromises()
 
-    // 波次6：hero 入口改为三按钮（新建/点检任务/初审裁决），新建仍为第一个
+    // 波次14 B3：hero 入口改为四按钮（新建/点检任务/初审裁决/评分排名），新建仍为第一个
     const entryButtons = wrapper.findAll('.cps-list-hero__entry')
-    expect(entryButtons).toHaveLength(3)
+    expect(entryButtons).toHaveLength(4)
     await entryButtons[0].trigger('click')
     expect(mocks.navigateTo).toHaveBeenCalledWith({ url: '/views/cps/IssueCreateView' })
 

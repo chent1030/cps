@@ -10,7 +10,11 @@
         </div>
       </div>
       <div class="cps-list-hero__entries">
-        <button type="button" class="cps-list-hero__entry" @click="navigateToCreate">
+        <button
+          type="button"
+          class="cps-list-hero__entry"
+          @click="navigateToCreate"
+        >
           新建
         </button>
         <!-- 波次6 B5①：点检执行入口 -->
@@ -20,6 +24,10 @@
         <!-- 波次6 B5②：初审三态/接管/裁决入口（审核专员） -->
         <button type="button" class="cps-list-hero__entry" @click="navigateToInitialReview">
           初审裁决
+        </button>
+        <!-- 波次14 B3：周评分排名入口 -->
+        <button type="button" class="cps-list-hero__entry" @click="navigateToScoreRanking">
+          评分排名
         </button>
       </div>
     </header>
@@ -186,6 +194,10 @@ const navigateToInitialReview = () => {
 
 const navigateToDetail = (id: number) => {
   uni.navigateTo({ url: `/views/cps/IssueDetailView?id=${id}` })
+}
+
+const navigateToScoreRanking = () => {
+  uni.navigateTo({ url: '/views/cps/ScoreRankingView' })
 }
 
 const load = async () => {

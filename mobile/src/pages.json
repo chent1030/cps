@@ -35,6 +35,18 @@
       "style": {
         "navigationBarTitleText": "AI 初审裁决"
       }
+    },
+    {
+      "path": "views/cps/RoomCheckPhotoUploadView",
+      "style": {
+        "navigationBarTitleText": "点检照片上传"
+      }
+    },
+    {
+      "path": "views/cps/ScoreRankingView",
+      "style": {
+        "navigationBarTitleText": "本周评分排名"
+      }
     }
   ],
   "globalStyle": {
