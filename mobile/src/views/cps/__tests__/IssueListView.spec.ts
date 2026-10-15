@@ -1,5 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 
+import { setCurrentRole } from '@/api/cps/userStore'
 import IssueListView from '../IssueListView.vue'
 
 const mocks = vi.hoisted(() => ({
@@ -18,6 +19,8 @@ describe('IssueListView', () => {
     ;(globalThis as unknown as { uni: Pick<UniApp.Uni, 'navigateTo'> }).uni = {
       navigateTo: mocks.navigateTo,
     }
+    // 波次14 B5：admin 角色下 admin-only 入口全部可见
+    setCurrentRole('admin')
   })
 
   it('renders redesigned issue cards with Chinese status labels', async () => {
@@ -85,7 +88,10 @@ describe('IssueListView', () => {
     const wrapper = mount(IssueListView)
     await flushPromises()
 
-    await wrapper.get('.cps-list-hero__action').trigger('click')
+    // 波次14 B3：hero 入口改为四按钮（新建/点检任务/初审裁决/评分排名），新建仍为第一个
+    const entryButtons = wrapper.findAll('.cps-list-hero__entry')
+    expect(entryButtons).toHaveLength(4)
+    await entryButtons[0].trigger('click')
     expect(mocks.navigateTo).toHaveBeenCalledWith({ url: '/views/cps/IssueCreateView' })
 
     await wrapper.get('.cps-issue-card').trigger('click')

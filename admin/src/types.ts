@@ -47,3 +47,52 @@ export interface AgentRuntime {
   tenantId: string
   metrics?: Record<string, unknown>
 }
+
+// ---- 波次 8 E 线：物品台账 / 出入库流水 / 库存预警 ----
+export interface InventoryItem {
+  id: number
+  itemCode: string
+  itemName: string
+  unit?: string
+  stockQty: number
+  alertThreshold: number
+  baseCode?: string
+  factory?: string
+  storageRoom?: string
+  roomKeeperEmpNo?: string
+  roomKeeperEmpName?: string
+  remark?: string
+  enabled: boolean
+}
+export interface InventoryTxn {
+  id: number
+  itemId: number
+  itemCode?: string
+  itemName?: string
+  txnType: 'IN' | 'OUT' | 'ADJUST'
+  qty: number
+  beforeQty: number
+  afterQty: number
+  unit?: string
+  operatorEmpNo?: string
+  operatorName?: string
+  remark?: string
+  createdAt: string
+}
+export type InventoryAlertStatus = 'OPEN' | 'RESOLVED_AUTO' | 'RESOLVED_MANUAL' | 'IGNORED'
+export interface InventoryAlertEvent {
+  id: number
+  itemId: number
+  itemCode?: string
+  itemName?: string
+  status: InventoryAlertStatus
+  firstTriggeredAt: string
+  lastEvalAt: string
+  lastEvalQty: number
+  thresholdSnapshot: number
+  closedAt?: string
+  closedBy?: string
+  closeReason?: string
+}
+/** 后端 CpsPageResponse：total + rows（与 PageResult 的 records 形态不同） */
+export interface RowsPage<T> { total: number; rows: T[] }

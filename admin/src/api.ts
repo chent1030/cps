@@ -1,4 +1,4 @@
-import type { AdminOperator, AgentRuntime, AreaPersonConfig, Category, Issue, KnowledgeCase, KnowledgeMaterial, Overview, PageResult } from './types'
+import type { AdminOperator, AgentRuntime, AreaPersonConfig, Category, InventoryAlertEvent, InventoryItem, InventoryTxn, Issue, KnowledgeCase, KnowledgeMaterial, Overview, PageResult, RowsPage } from './types'
 
 const baseUrl = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
 
@@ -82,6 +82,26 @@ export const api = {
   syncCaseVectors: (caseId: number) => request<{ synced: number }>(`/cps/admin/knowledge/cases/${caseId}/sync-vectors`, { method: 'POST' }),
   setCaseEnabled: (id: number, enabled: boolean) => request<void>(`/cps/admin/knowledge/cases/${id}/enabled${query({ enabled })}`, { method: 'PATCH' }),
   agentRuntime: () => request<AgentRuntime>('/cps/admin/agent/runtime'),
+  // ---- 波次 8 E 线：物品台账 / 出入库 / 库存预警 ----
+  inventoryItems: (params: Record<string, string | number | boolean | undefined>) => request<InventoryItem[]>(`/cps/admin/inventory-items${query(params)}`),
+  saveInventoryItem: (body: Partial<InventoryItem>) => {
+    const operator = getAdminOperator()
+    return request<InventoryItem>(`/cps/admin/inventory-items${query({ id: body.id, operatorEmpNo: operator?.empNo })}`, { method: 'POST', body: JSON.stringify(body) })
+  },
+  setInventoryItemEnabled: (id: number, enabled: boolean) => {
+    const operator = getAdminOperator()
+    return request<void>(`/cps/admin/inventory-items/${id}/enabled`, { method: 'PATCH', body: JSON.stringify({ enabled, empNo: operator?.empNo }) })
+  },
+  createInventoryTxn: (body: { itemId: number; txnType: string; qty: number; remark?: string }) => {
+    const operator = getAdminOperator()
+    return request<{ txn: InventoryTxn; item: InventoryItem; alertAction?: string }>('/cps/admin/inventory-txns', { method: 'POST', body: JSON.stringify({ ...body, operatorEmpNo: operator?.empNo, operatorName: operator?.empName }) })
+  },
+  inventoryTxns: (params: Record<string, string | number | undefined>) => request<RowsPage<InventoryTxn>>(`/cps/admin/inventory-txns${query(params)}`),
+  inventoryAlerts: (params: Record<string, string | number | undefined>) => request<RowsPage<InventoryAlertEvent>>(`/cps/admin/inventory-alerts${query(params)}`),
+  handleInventoryAlert: (id: number, body: { action: 'IGNORE' | 'CLOSE'; reason?: string }) => {
+    const operator = getAdminOperator()
+    return request<InventoryAlertEvent>(`/cps/admin/inventory-alerts/${id}/handle`, { method: 'POST', body: JSON.stringify({ ...body, operatorEmpNo: operator?.empNo }) })
+  },
 }
 
 async function download(path: string, fallbackFileName: string) {
