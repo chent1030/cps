@@ -17,6 +17,36 @@
       "style": {
         "navigationBarTitleText": "问题详情"
       }
+    },
+    {
+      "path": "views/cps/InitialReviewView",
+      "style": {
+        "navigationBarTitleText": "初审裁决"
+      }
+    },
+    {
+      "path": "views/cps/ScoreRankingView",
+      "style": {
+        "navigationBarTitleText": "评分排名"
+      }
+    },
+    {
+      "path": "views/cps/RoomCheckListView",
+      "style": {
+        "navigationBarTitleText": "点检任务"
+      }
+    },
+    {
+      "path": "views/cps/RoomCheckExecuteView",
+      "style": {
+        "navigationBarTitleText": "点检执行"
+      }
+    },
+    {
+      "path": "views/cps/RoomCheckPhotoUploadView",
+      "style": {
+        "navigationBarTitleText": "照片上传"
+      }
     }
   ],
   "globalStyle": {

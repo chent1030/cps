@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsRoomCheckRecordItemMapper">
+
+    <sql id="BaseColumns">
+        id, record_id, room_id, check_item_id, item_code, content, photo_category,
+        deduct_score, config_version, photo_object_key, photo_file_name,
+        judge_result, judge_reason, final_result, judged_at, created_at, updated_at
+    </sql>
+
+    <resultMap id="itemMap" type="com.company.cps.domain.CpsRoomCheckRecordItem">
+        <id column="id" property="id"/>
+        <result column="record_id" property="recordId"/>
+        <result column="room_id" property="roomId"/>
+        <result column="check_item_id" property="checkItemId"/>
+        <result column="item_code" property="itemCode"/>
+        <result column="content" property="content"/>
+        <result column="photo_category" property="photoCategory"/>
+        <result column="deduct_score" property="deductScore"/>
+        <result column="config_version" property="configVersion"/>
+        <result column="photo_object_key" property="photoObjectKey"/>
+        <result column="photo_file_name" property="photoFileName"/>
+        <result column="judge_result" property="judgeResult"/>
+        <result column="judge_reason" property="judgeReason"/>
+        <result column="final_result" property="finalResult"/>
+        <result column="judged_at" property="judgedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insertBatch" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_room_check_record_item (
+            record_id, room_id, check_item_id, item_code, content, photo_category,
+            deduct_score, config_version, photo_object_key, photo_file_name
+        ) VALUES
+        <foreach collection="items" item="item" separator=",">
+            (#{item.recordId}, #{item.roomId}, #{item.checkItemId}, #{item.itemCode}, #{item.content},
+             #{item.photoCategory}, #{item.deductScore}, #{item.configVersion},
+             #{item.photoObjectKey}, #{item.photoFileName})
+        </foreach>
+    </insert>
+
+    <select id="findByRecordId" resultMap="itemMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_room_check_record_item
+        WHERE record_id = #{recordId}
+        ORDER BY id ASC
+    </select>
+
+    <select id="findById" resultMap="itemMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_room_check_record_item
+        WHERE id = #{id}
+    </select>
+
+    <update id="updatePhoto">
+        UPDATE cps_room_check_record_item
+        SET photo_object_key = #{photoObjectKey},
+            photo_file_name = #{photoFileName}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateJudgeResult">
+        UPDATE cps_room_check_record_item
+        SET judge_result = #{judgeResult},
+            judge_reason = #{judgeReason},
+            final_result = #{finalResult},
+            judged_at = #{judgedAt}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

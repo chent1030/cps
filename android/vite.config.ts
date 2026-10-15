@@ -22,6 +22,13 @@ export default defineConfig(async () => {
   const plugins = await buildPlugins()
   return {
     plugins,
+    server: {
+      port: 5175,
+      proxy: {
+        // H5 开发联调：/api 代理到本机 Java 后端，避免跨域
+        '/api': { target: 'http://127.0.0.1:8080', changeOrigin: true },
+      },
+    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

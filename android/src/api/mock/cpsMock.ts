@@ -81,7 +81,6 @@ const categories: Record<number, CpsOption[]> = {
 const issues: CpsIssueListItem[] = [
   {
     id: 1,
-    issueNo: 'CPS20260627001',
     status: 'PENDING_FEEDBACK',
     factory: 'Factory A',
     area: 'Injection Area',
@@ -97,7 +96,6 @@ const issues: CpsIssueListItem[] = [
   },
   {
     id: 2,
-    issueNo: 'CPS20260626018',
     status: 'PENDING_UPLOAD_PROOF',
     factory: 'Factory B',
     area: 'Packaging Area',

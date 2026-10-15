@@ -39,16 +39,18 @@ class CpsWeeklyReportServiceTest {
 
     @Test
     void listRunsPassesFiltersAndNormalizesResponse() {
+        // 波次7 J线（C7 冻结 schema）：Python 行字段 report_type/window_start/window_end/archive_object_key/archive_bytes
         Map<String, Object> row = new HashMap<>();
         row.put("run_id", "uuid-1");
         row.put("run_no", "WR-2026-W39-001");
-        row.put("inspection_type", "RECTIFY");
+        row.put("report_type", "RECTIFY");
         row.put("status", "ARCHIVED");
-        row.put("file_size", 12345L);
-        row.put("period_start", "2026-09-21T00:00:00");
-        row.put("period_end", "2026-09-28T00:00:00");
+        row.put("archive_bytes", 12345L);
+        row.put("archive_object_key", "weekly-reports/2026-W39/uuid-1.pdf");
+        row.put("window_start", "2026-09-21T00:00:00+00:00");
+        row.put("window_end", "2026-09-28T00:00:00+00:00");
         row.put("push_status", "UNCONFIGURED");
-        row.put("retry_count", 0);
+        row.put("error_code", null);
         when(agentClient.listWeeklyReportRuns(eq("RECTIFY"), eq("ARCHIVED"), anyString(), anyString()))
                 .thenReturn(Collections.singletonList(row));
 
@@ -63,8 +65,27 @@ class CpsWeeklyReportServiceTest {
         assertEquals("ARCHIVED", r.getStatus());
         assertEquals(Long.valueOf(12345L), r.getFileSize());
         assertEquals("UNCONFIGURED", r.getPushStatus());
+        assertEquals("weekly-reports/2026-W39/uuid-1.pdf", r.getFileKey());
+        assertEquals("uuid-1.pdf", r.getFileName());
         assertNotNull(r.getPeriodStart());
         verify(agentClient, times(1)).listWeeklyReportRuns(eq("RECTIFY"), eq("ARCHIVED"), anyString(), anyString());
+    }
+
+    @Test
+    void listRunsFiltersByPeriodWindowJavaSide() {
+        Map<String, Object> inWindow = new HashMap<>();
+        inWindow.put("run_id", "in-1");
+        inWindow.put("window_start", "2026-09-22T00:00:00");
+        Map<String, Object> outWindow = new HashMap<>();
+        outWindow.put("run_id", "out-1");
+        outWindow.put("window_start", "2026-09-15T00:00:00");
+        when(agentClient.listWeeklyReportRuns(any(), any(), anyString(), anyString()))
+                .thenReturn(Arrays.asList(inWindow, outWindow));
+
+        List<CpsWeeklyReportRun> runs = service.listRuns(null, null,
+                LocalDateTime.of(2026, 9, 21, 0, 0), LocalDateTime.of(2026, 9, 28, 0, 0));
+        assertEquals(1, runs.size());
+        assertEquals("in-1", runs.get(0).getRunId());
     }
 
     @Test

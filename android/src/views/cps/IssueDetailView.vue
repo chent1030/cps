@@ -4,7 +4,7 @@
       <div class="cps-hero__top">
         <div class="cps-hero__identity">
           <p class="cps-hero__eyebrow">巡检问题档案</p>
-          <h1>{{ detail.issueNo }}</h1>
+          <h1>巡检问题</h1>
         </div>
         <div class="cps-hero__badges">
           <a-tag :color="detailStatus.color" class="cps-pill">{{ detailStatus.label }}</a-tag>

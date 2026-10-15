@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsVisionCheckJudgeEventMapper">
+
+    <sql id="BaseColumns">
+        id, judge_fingerprint, event_type, detail, operator_emp_no, created_at
+    </sql>
+
+    <resultMap id="eventMap" type="com.company.cps.domain.CpsVisionCheckJudgeEvent">
+        <id column="id" property="id"/>
+        <result column="judge_fingerprint" property="judgeFingerprint"/>
+        <result column="event_type" property="eventType"/>
+        <result column="detail" property="detail"/>
+        <result column="operator_emp_no" property="operatorEmpNo"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsVisionCheckJudgeEvent"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_vision_check_judge_event (
+            judge_fingerprint, event_type, detail, operator_emp_no
+        ) VALUES (
+            #{judgeFingerprint}, #{eventType}, #{detail}, #{operatorEmpNo}
+        )
+    </insert>
+
+    <select id="findByFingerprint" resultMap="eventMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_vision_check_judge_event
+        WHERE judge_fingerprint = #{fingerprint}
+        ORDER BY id ASC
+    </select>
+
+</mapper>

@@ -1,5 +1,4 @@
 import type { CpsAttachment } from '@/types/cps'
-import { getCpsAttachmentBase64 } from '@/api/cps/attachment'
 import type { CpsAttachmentUploadSource } from '@/api/cps/attachment'
 
 interface UniTempFileLike {
@@ -29,25 +28,21 @@ export const resolveUploadSources = (result: UniApp.ChooseImageSuccessCallbackRe
     .filter(Boolean) as CpsAttachmentUploadSource[]
 }
 
-// 把后端返回的 base64 字符串规范化为可直接用于 <img src> 的 data URL
-export const toImageDataUrl = (value: string) => {
-  const data = value.trim()
-  if (data.startsWith('data:')) return data
-  if (data.includes(';base64,')) return `data:${data}`
-  return `data:image/jpeg;base64,${data.replace(/\s/g, '')}`
+// 直接返回后端的 url（已是 /api/cps/attachments/{id}/content），前端无需再 base64 转换。
+export const toImageUrl = (attachment: { id: number; url: string } | { id: number; fileUrl: string }): string => {
+  if ('url' in attachment && attachment.url) return attachment.url
+  if ('fileUrl' in attachment && attachment.fileUrl) return attachment.fileUrl
+  return ''
 }
 
-// 批量加载附件的 base64 预览源，失败的附件会被忽略
+// 批量加载附件的图片预览源（直接用后端 url，失败的附件会被忽略）
 export const loadAttachmentImageSources = async (attachments: CpsAttachment[]) => {
-  const resolved = await Promise.all(
-    attachments.map(async (attachment) => {
-      try {
-        const base64 = await getCpsAttachmentBase64(attachment.fileUrl)
-        return [attachment.id, toImageDataUrl(base64)] as const
-      } catch {
-        return null
-      }
-    }),
-  )
-  return Object.fromEntries(resolved.filter((source): source is readonly [number, string] => source !== null))
+  const resolved = attachments
+    .map((attachment) => {
+      const url = toImageUrl(attachment)
+      if (!url) return null
+      return [attachment.id, url] as const
+    })
+    .filter((entry): entry is readonly [number, string] => entry !== null)
+  return Object.fromEntries(resolved)
 }

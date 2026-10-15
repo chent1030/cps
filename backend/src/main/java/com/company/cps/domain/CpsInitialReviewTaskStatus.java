@@ -3,8 +3,11 @@ package com.company.cps.domain;
 /**
  * AI 初审任务状态（PRD §28.4）。Java 侧是唯一状态真相源；Python 侧仅执行、不裁决。
  * 界面三态口径：运行中=RUNNING；执行失败=FAILED（立即可接管）；超时可接管=TIMEOUT_OPEN。
+ * A4 触发管理：PENDING_DISPATCH=自动触发关闭时仅建任务未投递（等待 admin 重触发）。
  */
 public enum CpsInitialReviewTaskStatus {
+    /** 仅建任务未投递（自动触发关闭时提交建任务，admin 手动重触发后转 RUNNING；A4）。 */
+    PENDING_DISPATCH,
     /** 初审执行中（投递成功，等待结果或超时）。 */
     RUNNING,
     /** 投递失败或执行异常回调（立即可接管，不等 10 分钟）。 */

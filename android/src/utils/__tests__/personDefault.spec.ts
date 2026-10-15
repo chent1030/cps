@@ -6,7 +6,6 @@ import type { CpsIssueDetail } from '@/types/cps'
 const baseDetail = (overrides: Partial<CpsIssueDetail> = {}): CpsIssueDetail => {
   return {
     id: 1,
-    issueNo: 'CPS001',
     status: 'PENDING_FEEDBACK',
     factory: 'Factory A',
     area: 'Injection Area',

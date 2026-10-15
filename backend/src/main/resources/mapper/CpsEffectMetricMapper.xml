@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsEffectMetricMapper">
+
+    <!--
+      FR-12 效果评估指标（波次11）：
+      - ai_pass_rate            : AI 初次意见=PASS 在所有裁决中占比
+      - human_override_rate     : REJECT 中 AGAINST_AI 占比
+      - avg_close_duration_hours: to_status='CLOSED' 裁决相对 issue.created_at 平均小时数
+      - recurrence_rate_30d     : 90 天窗口内 REOPEN+REJECT 信号 ≥ 1 的问题 / 总问题数
+      复用 cps_review_adjudication JOIN cps_issue（必要时 LEFT JOIN cps_problem_category 取分类名）。
+      返回比例值（百分数已 round，由 service 层负责）。
+    -->
+
+    <sql id="effectBaseWhere">
+        <where>
+            <if test="periodStart != null and periodStart != ''">AND a.created_at &gt;= #{periodStart}</if>
+            <if test="periodEnd != null and periodEnd != ''">AND a.created_at &lt;= #{periodEnd}</if>
+            <if test="metricKey != null and metricKey != ''">AND 1=0</if>
+            <if test="scopeKey != null and scopeKey != ''">AND 1=0</if>
+        </where>
+    </sql>
+
+    <!--
+      ai_pass_rate = ROUND(SUM(ai_overall='PASS') * 100.0 / NULLIF(COUNT(1), 0), 2)
+      样本：cps_review_adjudication JOIN cps_issue（不区分 decision/ai_relation）。
+      NULLIF 防 0 除；metricKey/scopeKey 预留扩展点（当前波次11不实现，置 1=0 让 SQL 仍可解析）。
+    -->
+    <select id="aiPassRate" resultType="java.lang.Double">
+        SELECT ROUND(
+          SUM(CASE WHEN a.ai_overall = 'PASS' THEN 1 ELSE 0 END) * 100.0
+          / NULLIF(COUNT(1), 0),
+          2
+        ) AS metricValue
+        FROM cps_review_adjudication a
+        INNER JOIN cps_issue i ON i.id = a.issue_id
+        <where>
+            <if test="periodStart != null and periodStart != ''">AND a.created_at &gt;= #{periodStart}</if>
+            <if test="periodEnd != null and periodEnd != ''">AND a.created_at &lt;= #{periodEnd}</if>
+            <if test="metricKey != null and metricKey != ''">AND 1 = 0</if>
+            <if test="scopeKey != null and scopeKey != ''">AND 1 = 0</if>
+        </where>
+    </select>
+
+    <!--
+      human_override_rate = ROUND(SUM(decision='REJECT' AND ai_relation='AGAINST_AI') * 100.0
+                                    / NULLIF(SUM(decision='REJECT'), 0), 2)
+      样本：cps_review_adjudication JOIN cps_issue。
+    -->
+    <select id="humanOverrideRate" resultType="java.lang.Double">
+        SELECT ROUND(
+          SUM(CASE WHEN a.decision = 'REJECT' AND a.ai_relation = 'AGAINST_AI' THEN 1 ELSE 0 END) * 100.0
+          / NULLIF(SUM(CASE WHEN a.decision = 'REJECT' THEN 1 ELSE 0 END), 0),
+          2
+        ) AS metricValue
+        FROM cps_review_adjudication a
+        INNER JOIN cps_issue i ON i.id = a.issue_id
+        <where>
+            <if test="periodStart != null and periodStart != ''">AND a.created_at &gt;= #{periodStart}</if>
+            <if test="periodEnd != null and periodEnd != ''">AND a.created_at &lt;= #{periodEnd}</if>
+            <if test="metricKey != null and metricKey != ''">AND 1 = 0</if>
+            <if test="scopeKey != null and scopeKey != ''">AND 1 = 0</if>
+        </where>
+    </select>
+
+    <!--
+      avg_close_duration_hours = ROUND(AVG(TIMESTAMPDIFF(SECOND, i.created_at, a.created_at)/3600.0), 2)
+      仅取 to_status='CLOSED' 的裁决。
+    -->
+    <select id="avgCloseDurationHours" resultType="java.lang.Double">
+        SELECT ROUND(
+          AVG(TIMESTAMPDIFF(SECOND, i.created_at, a.created_at) / 3600.0),
+          2
+        ) AS metricValue
+        FROM cps_review_adjudication a
+        INNER JOIN cps_issue i ON i.id = a.issue_id
+        <where>
+            a.to_status = 'CLOSED'
+            <if test="periodStart != null and periodStart != ''">AND a.created_at &gt;= #{periodStart}</if>
+            <if test="periodEnd != null and periodEnd != ''">AND a.created_at &lt;= #{periodEnd}</if>
+            <if test="metricKey != null and metricKey != ''">AND 1 = 0</if>
+            <if test="scopeKey != null and scopeKey != ''">AND 1 = 0</if>
+        </where>
+    </select>
+
+    <!--
+      recurrence_rate_30d：
+        复发 issue 数 = inner_issue_ids 子查询中 issue_id 集合大小
+        总 issue 数    = 窗口内 cps_review_adjudication.issue_id 集合去重大小
+        recurrence = ROUND(复发数 * 100.0 / NULLIF(总问题数, 0), 2)
+      复发信号：cps_issue_flow_log.action='REOPEN' 或 cps_review_adjudication.decision='REJECT' ≥ 1 次。
+      复用 cps_problem_category LEFT JOIN（task 默认 categoryL2Id 已在 issue 上，LEFT JOIN 仅透出 category_l1_name）；
+      此处 metricKey/scopeKey 预留扩展点（当前波次11不实现，置 1=0 让 SQL 仍可解析）；
+      预留参数：#{metricKey} / #{scopeKey}（契约层占位，type-safe 由 service 钳制 null）。
+    -->
+    <select id="recurrenceRate" resultType="java.lang.Double">
+        SELECT ROUND(
+          (SELECT COUNT(DISTINCT recur.issue_id)
+           FROM (
+             SELECT issue_id FROM cps_issue_flow_log
+             WHERE action = 'REOPEN'
+               AND created_at &gt;= #{periodStart}
+               AND created_at &lt;= #{periodEnd}
+             UNION
+             SELECT issue_id FROM cps_review_adjudication
+             WHERE decision = 'REJECT'
+               AND created_at &gt;= #{periodStart}
+               AND created_at &lt;= #{periodEnd}
+           ) recur
+          ) * 100.0
+          / NULLIF(
+            (SELECT COUNT(DISTINCT a.issue_id)
+             FROM cps_review_adjudication a
+             WHERE a.created_at &gt;= #{periodStart}
+               AND a.created_at &lt;= #{periodEnd}),
+            0),
+          2
+        ) AS metricValue
+    </select>
+
+</mapper>

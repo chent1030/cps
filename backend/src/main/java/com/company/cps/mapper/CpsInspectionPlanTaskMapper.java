@@ -21,4 +21,15 @@ public interface CpsInspectionPlanTaskMapper {
     int insert(CpsInspectionPlanTask task);
 
     List<CpsInspectionPlanTaskType> findExistingTaskTypes(@Param("planId") Long planId);
+
+    /** B3 mobile 任务列表：某负责人的辅房点检任务（状态可筛，空=全部未取消）。 */
+    List<CpsInspectionPlanTask> findCheckTasksForEmp(
+            @Param("targetEmpNo") String targetEmpNo,
+            @Param("taskType") CpsInspectionPlanTaskType taskType,
+            @Param("taskStatus") String taskStatus);
+
+    CpsInspectionPlanTask findById(@Param("id") Long id);
+
+    /** B3：执行推进/完成回写计划任务状态（PENDING→IN_PROGRESS→COMPLETED）。 */
+    int updateTaskStatus(@Param("id") Long id, @Param("taskStatus") String taskStatus);
 }

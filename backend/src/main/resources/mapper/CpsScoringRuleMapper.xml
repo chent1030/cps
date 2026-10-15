@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsScoringRuleMapper">
+
+    <resultMap id="CpsScoringRuleMap" type="com.company.cps.domain.CpsScoringRule">
+        <id property="id" column="id"/>
+        <result property="ruleKey" column="rule_key"/>
+        <result property="factory" column="factory"/>
+        <result property="ruleValue" column="rule_value"/>
+        <result property="version" column="version"/>
+        <result property="effectiveFrom" column="effective_from"/>
+        <result property="effectiveTo" column="effective_to"/>
+        <result property="factoryCalibrationFlag" column="factory_calibration_flag"/>
+        <result property="updatedBy" column="updated_by"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="findAll" resultMap="CpsScoringRuleMap">
+        SELECT * FROM cps_scoring_rule
+        ORDER BY factory_calibration_flag ASC, rule_key ASC, version DESC
+    </select>
+
+    <select id="findById" resultMap="CpsScoringRuleMap">
+        SELECT * FROM cps_scoring_rule WHERE id = #{id}
+    </select>
+
+    <select id="findEffectiveByKeyFactory" resultMap="CpsScoringRuleMap">
+        SELECT * FROM cps_scoring_rule
+        WHERE rule_key = #{ruleKey}
+          AND (
+            (#{factory} IS NULL AND factory IS NULL)
+            OR (#{factory} IS NOT NULL AND factory = #{factory})
+          )
+          AND (effective_from IS NULL OR effective_from &lt;= #{asOfDate})
+          AND (effective_to IS NULL OR effective_to &gt;= #{asOfDate})
+        ORDER BY version DESC
+        LIMIT 1
+    </select>
+
+    <select id="findLatestByKey" resultMap="CpsScoringRuleMap">
+        SELECT * FROM cps_scoring_rule
+        WHERE rule_key = #{ruleKey}
+        ORDER BY version DESC
+        LIMIT 1
+    </select>
+
+    <select id="findFactoryCalibrations" resultMap="CpsScoringRuleMap">
+        SELECT * FROM cps_scoring_rule
+        WHERE factory = #{factory} AND factory_calibration_flag = 1
+        ORDER BY rule_key ASC, version DESC
+    </select>
+
+    <insert id="upsert" parameterType="com.company.cps.domain.CpsScoringRule"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_scoring_rule (
+            rule_key, factory, rule_value, version,
+            effective_from, effective_to, factory_calibration_flag, updated_by
+        ) VALUES (
+            #{ruleKey}, #{factory}, #{ruleValue}, #{version},
+            #{effectiveFrom}, #{effectiveTo}, #{factoryCalibrationFlag}, #{updatedBy}
+        )
+        ON DUPLICATE KEY UPDATE
+            rule_value = VALUES(rule_value),
+            version = VALUES(version),
+            effective_from = VALUES(effective_from),
+            effective_to = VALUES(effective_to),
+            factory_calibration_flag = VALUES(factory_calibration_flag),
+            updated_by = VALUES(updated_by)
+    </insert>
+
+</mapper>

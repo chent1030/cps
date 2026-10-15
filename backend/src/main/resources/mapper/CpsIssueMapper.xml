@@ -50,10 +50,31 @@
         WHERE id = #{id}
     </update>
 
+    <update id="updateStatusClearHandler">
+        UPDATE cps_issue
+        SET status = #{status},
+            current_handler_emp_no = NULL,
+            current_handler_emp_name = NULL,
+            lock_version = lock_version + 1,
+            updated_at = #{updatedAt}
+        WHERE id = #{id} AND status = #{fromStatus}
+    </update>
+
     <select id="findById" resultType="com.company.cps.domain.CpsIssue">
         SELECT *
         FROM cps_issue
         WHERE id = #{id}
+    </select>
+
+    <!-- B4 周评分：created_at 落在 [weekStart, weekEnd+1day) 之间的 issue 全量。
+         weekEnd 已在 service 层转为周日，limit 防爆。 -->
+    <select id="findForWeeklyScore" resultType="com.company.cps.domain.CpsIssue">
+        SELECT *
+        FROM cps_issue
+        WHERE created_at &gt;= #{weekStart}
+          AND created_at &lt; DATE_ADD(#{weekEnd}, INTERVAL 1 DAY)
+        ORDER BY created_at ASC
+        LIMIT #{limit}
     </select>
 
     <update id="updateWorkflowFields" parameterType="com.company.cps.domain.CpsIssue">
@@ -224,6 +245,39 @@
         WHERE status = 'CLOSED'
           AND close_time &gt;= DATE_FORMAT(CURDATE(), '%Y-%m-01')
           AND close_time &lt; DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+    </select>
+
+    <!--
+      I 线记忆体系消费：问题分页。
+      字段集对齐 CpsIssueListItemResponse（adminIssueColumns 已含 FROM + 4 路分类 JOIN）。
+      过滤维度：factory / category_l1_id / category_l2_id / status / submit_time 区间。
+      与 listForAdmin 共用 adminIssueColumns 列集合，保证契约一致（CpsIssueMapperContractTest）。
+    -->
+    <select id="findMemoryPage" resultType="com.company.cps.dto.CpsIssueListItemResponse">
+        SELECT <include refid="adminIssueColumns"/>
+        <where>
+            <if test="factory != null and factory != ''">AND i.factory = #{factory}</if>
+            <if test="categoryL1Id != null">AND i.category_l1_id = #{categoryL1Id}</if>
+            <if test="categoryL2Id != null">AND i.category_l2_id = #{categoryL2Id}</if>
+            <if test="status != null">AND i.status = #{status}</if>
+            <if test="startTime != null and startTime != ''">AND i.submit_time &gt;= #{startTime}</if>
+            <if test="endTime != null and endTime != ''">AND i.submit_time &lt;= #{endTime}</if>
+        </where>
+        ORDER BY i.submit_time DESC, i.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countMemory" resultType="long">
+        SELECT COUNT(1)
+        FROM cps_issue i
+        <where>
+            <if test="factory != null and factory != ''">AND i.factory = #{factory}</if>
+            <if test="categoryL1Id != null">AND i.category_l1_id = #{categoryL1Id}</if>
+            <if test="categoryL2Id != null">AND i.category_l2_id = #{categoryL2Id}</if>
+            <if test="status != null">AND i.status = #{status}</if>
+            <if test="startTime != null and startTime != ''">AND i.submit_time &gt;= #{startTime}</if>
+            <if test="endTime != null and endTime != ''">AND i.submit_time &lt;= #{endTime}</if>
+        </where>
     </select>
 
 </mapper>

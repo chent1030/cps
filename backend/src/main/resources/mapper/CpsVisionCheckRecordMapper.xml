@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsVisionCheckRecordMapper">
+
+    <sql id="BaseColumns">
+        id, room_id, check_item_id, room_type, status,
+        ai_overall, ai_score, ai_reason,
+        photo_object_key, photo_url, judge_fingerprint,
+        human_override_emp_no, human_override_reason,
+        created_by, created_at, updated_at
+    </sql>
+
+    <resultMap id="recordMap" type="com.company.cps.domain.CpsVisionCheckRecord">
+        <id column="id" property="id"/>
+        <result column="room_id" property="roomId"/>
+        <result column="check_item_id" property="checkItemId"/>
+        <result column="room_type" property="roomType"/>
+        <result column="status" property="status"/>
+        <result column="ai_overall" property="aiOverall"/>
+        <result column="ai_score" property="aiScore"/>
+        <result column="ai_reason" property="aiReason"/>
+        <result column="photo_object_key" property="photoObjectKey"/>
+        <result column="photo_url" property="photoUrl"/>
+        <result column="judge_fingerprint" property="judgeFingerprint"/>
+        <result column="human_override_emp_no" property="humanOverrideEmpNo"/>
+        <result column="human_override_reason" property="humanOverrideReason"/>
+        <result column="created_by" property="createdBy"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsVisionCheckRecord"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_vision_check_record (
+            room_id, check_item_id, room_type, status,
+            ai_overall, ai_score, ai_reason,
+            photo_object_key, photo_url, judge_fingerprint,
+            human_override_emp_no, human_override_reason,
+            created_by
+        ) VALUES (
+            #{roomId}, #{checkItemId}, #{roomType}, #{status},
+            #{aiOverall}, #{aiScore}, #{aiReason},
+            #{photoObjectKey}, #{photoUrl}, #{judgeFingerprint},
+            #{humanOverrideEmpNo}, #{humanOverrideReason},
+            #{createdBy}
+        )
+    </insert>
+
+    <select id="findById" resultMap="recordMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_vision_check_record
+        WHERE id = #{id}
+    </select>
+
+    <!-- 幂等：同一 fingerprint 取最新一条已落地（AI_PASS/AI_FAIL/HUMAN_OVERRIDE）记录 -->
+    <select id="findJudgedByFingerprint" resultMap="recordMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_vision_check_record
+        WHERE judge_fingerprint = #{fingerprint}
+          AND status IN ('AI_PASS', 'AI_FAIL', 'HUMAN_OVERRIDE')
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
+
+    <select id="findByFingerprint" resultMap="recordMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_vision_check_record
+        WHERE judge_fingerprint = #{fingerprint}
+        ORDER BY id DESC
+    </select>
+
+    <select id="listByFilters" resultMap="recordMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_vision_check_record
+        <where>
+            <if test="roomId != null">
+                AND room_id = #{roomId}
+            </if>
+            <if test="checkItemId != null">
+                AND check_item_id = #{checkItemId}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="startTime != null">
+                AND created_at &gt;= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND created_at &lt;= #{endTime}
+            </if>
+        </where>
+        ORDER BY id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByFilters" resultType="long">
+        SELECT COUNT(1)
+        FROM cps_vision_check_record
+        <where>
+            <if test="roomId != null">
+                AND room_id = #{roomId}
+            </if>
+            <if test="checkItemId != null">
+                AND check_item_id = #{checkItemId}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="startTime != null">
+                AND created_at &gt;= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND created_at &lt;= #{endTime}
+            </if>
+        </where>
+    </select>
+
+    <!-- AI 判定结果回写：要求 status='AI_JUDGING'，否则 0 行 = 重放/越权覆盖 -->
+    <update id="updateAiJudgeResult" parameterType="com.company.cps.domain.CpsVisionCheckRecord">
+        UPDATE cps_vision_check_record
+        SET ai_overall = #{aiOverall},
+            ai_score = #{aiScore},
+            ai_reason = #{aiReason},
+            status = #{status},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+          AND status = 'AI_JUDGING'
+    </update>
+
+    <!-- 状态流转（AI_JUDGING/TIMEOUT/PENDING 回退）：不做 CAS，纯 setter，service 层守卫 state -->
+    <update id="updateStatusFields" parameterType="com.company.cps.domain.CpsVisionCheckRecord">
+        UPDATE cps_vision_check_record
+        <set>
+            <if test="status != null">status = #{status},</if>
+            <if test="humanOverrideEmpNo != null">human_override_emp_no = #{humanOverrideEmpNo},</if>
+            <if test="humanOverrideReason != null">human_override_reason = #{humanOverrideReason},</if>
+            <if test="aiOverall != null">ai_overall = #{aiOverall},</if>
+            <if test="aiScore != null">ai_score = #{aiScore},</if>
+            <if test="aiReason != null">ai_reason = #{aiReason},</if>
+            updated_at = CURRENT_TIMESTAMP
+        </set>
+        WHERE id = #{id}
+    </update>
+
+</mapper>

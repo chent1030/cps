@@ -61,4 +61,30 @@
         WHERE plan_id = #{planId}
     </select>
 
+
+    <select id="findCheckTasksForEmp" resultMap="taskMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_inspection_plan_task
+        WHERE task_type = #{taskType}
+          AND (target_emp_no IS NULL OR target_emp_no = #{targetEmpNo})
+          <if test="taskStatus != null and taskStatus != ''">
+            AND task_status = #{taskStatus}
+          </if>
+          <if test="taskStatus == null or taskStatus == ''">
+            AND task_status != 'CANCELLED'
+          </if>
+        ORDER BY scheduled_at ASC, id ASC
+    </select>
+
+    <select id="findById" resultMap="taskMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_inspection_plan_task
+        WHERE id = #{id}
+    </select>
+
+    <update id="updateTaskStatus">
+        UPDATE cps_inspection_plan_task
+        SET task_status = #{taskStatus}
+        WHERE id = #{id} AND task_status != 'CANCELLED'
+    </update>
 </mapper>

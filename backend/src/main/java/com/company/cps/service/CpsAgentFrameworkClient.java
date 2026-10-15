@@ -93,8 +93,12 @@ public class CpsAgentFrameworkClient {
     }
 
     /**
-     * C-01：触发整改初审（事务提交后投递，POST {base}/api/agent/rectifications）。
-     * 幂等键 cps-rectify-{issueId}-v{n} 与任务表唯一索引一致，Python 重复收单不重复执行。
+     * C-01：触发整改初审（事务提交后投递，POST {base}/agent/rectifications）。
+     * 波次7 J线（C7 冻结 schema，additionalProperties=false）：必填 issue_id/submission_id/version_no；
+     * 可选 reason/short_term_measure/long_term_measure/before_attachments/after_attachments/issue_snapshot。
+     * 附件走 AttachmentRef.object_key（cps_issue_attachment.file_url 即 RustFS object key，Python 自取流，
+     * 避免大图 base64 内联——联调清单④同口径）；幂等 task_ref 由 Python 派生（cps-rectify-{issue_id}-v{version_no}）；
+     * 回调地址由 Python 配置（JavaCallbackConfig base_url + 固定 path），不经请求体传递。
      *
      * @return review_task_ref（Python 侧初审任务引用；client 禁用时返回 null 不投递）
      */
@@ -102,48 +106,64 @@ public class CpsAgentFrameworkClient {
             CpsRectificationSubmission submission,
             CpsIssue issue,
             List<CpsIssueAttachment> beforeImages,
-            List<CpsIssueAttachment> afterImages,
-            String callbackUrl,
-            Long taskId
+            List<CpsIssueAttachment> afterImages
     ) {
         if (!properties.isEnabled()) return null;
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("idempotency_key", "cps-rectify-" + submission.getIssueId() + "-v" + submission.getVersionNo());
+        payload.put("issue_id", String.valueOf(issue.getId()));
+        payload.put("submission_id", String.valueOf(submission.getId()));
+        payload.put("version_no", submission.getVersionNo());
+        payload.put("reason", submission.getReason());
+        payload.put("short_term_measure", submission.getShortTermMeasure());
+        payload.put("long_term_measure", submission.getLongTermMeasure());
+
+        payload.put("before_attachments", attachmentRefs(beforeImages));
+        payload.put("after_attachments", attachmentRefs(afterImages));
 
         Map<String, Object> issueSnapshot = new LinkedHashMap<>();
-        issueSnapshot.put("issue_id", issue.getId());
+        issueSnapshot.put("issue_id", String.valueOf(issue.getId()));
         issueSnapshot.put("factory", issue.getFactory());
         issueSnapshot.put("area", issue.getArea());
         issueSnapshot.put("line", issue.getLine());
         issueSnapshot.put("process", issue.getProcess());
         issueSnapshot.put("description", issue.getDescription());
-        payload.put("issue", issueSnapshot);
+        payload.put("issue_snapshot", issueSnapshot);
 
-        payload.put("submission_id", submission.getId());
-        payload.put("version_no", submission.getVersionNo());
-        payload.put("reason", submission.getReason());
-        payload.put("short_term_measure", submission.getShortTermMeasure());
-        payload.put("long_term_measure", submission.getLongTermMeasure());
-        payload.put("responsible_emp_no", submission.getResponsibleEmpNo());
-        payload.put("before_images", imagePayloads(beforeImages));
-        payload.put("after_images", imagePayloads(afterImages));
-
-        Map<String, Object> callback = new LinkedHashMap<>();
-        callback.put("url", callbackUrl);
-        callback.put("task_id", taskId);
-        callback.put("idempotency_key", "initial-review-result-" + taskId);
-        payload.put("callback", callback);
-
-        Map response = client.postForObject(url("/api/agent/rectifications"), new HttpEntity<>(payload, headers()), Map.class);
+        Map response = client.postForObject(url("/agent/rectifications"), new HttpEntity<>(payload, headers()), Map.class);
         if (response == null) {
             throw new IllegalStateException("Agent framework returned no rectification review response");
         }
-        Object ref = response.get("review_task_ref") != null ? response.get("review_task_ref") : response.get("id");
+        Object ref = response.get("review_task_ref") != null ? response.get("review_task_ref") : response.get("task_id");
         if (ref == null) {
             throw new IllegalStateException("Agent framework returned no review_task_ref for submission "
                     + submission.getId());
         }
         return String.valueOf(ref);
+    }
+
+    /**
+     * C-01 附件引用（AttachmentRef，additionalProperties=false）：
+     * 优先 object_key（file_url 即 RustFS object key，Python 侧自取流）；
+     * 无 object_key 的历史附件回退 content_base64（经 contentResolver 读流）。
+     */
+    private List<Map<String, Object>> attachmentRefs(List<CpsIssueAttachment> images) {
+        List<Map<String, Object>> payloads = new ArrayList<>();
+        if (images == null) return payloads;
+        for (CpsIssueAttachment image : images) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            // AttachmentRef.attachment_id 为 str 类型（pydantic 严格校验不收数字）——统一字符串化
+            item.put("attachment_id", image.getId() == null ? null : String.valueOf(image.getId()));
+            item.put("file_name", image.getFileName());
+            if (image.getFileUrl() != null && !image.getFileUrl().trim().isEmpty()) {
+                item.put("object_key", image.getFileUrl());
+            } else {
+                byte[] content = contentResolver.resolve(image);
+                if (content == null || content.length == 0) continue;
+                item.put("content_base64", Base64.getEncoder().encodeToString(content));
+            }
+            payloads.add(item);
+        }
+        return payloads;
     }
 
     /** C-03：查询 Python 侧初审执行状态（GET {base}/api/agent/rectifications/{ref}）；三态由 Java 判定。 */
@@ -153,25 +173,8 @@ public class CpsAgentFrameworkClient {
             status.put("enabled", false);
             return status;
         }
-        Map<String, Object> status = client.getForObject(url("/api/agent/rectifications/" + reviewTaskRef), Map.class);
+        Map<String, Object> status = client.getForObject(url("/agent/rectifications/" + reviewTaskRef), Map.class);
         return status == null ? new LinkedHashMap<>() : status;
-    }
-
-    /** 图片载荷：内容经 resolver 解析（RustFS 流读取/base64 兼容），空内容跳过。 */
-    private List<Map<String, Object>> imagePayloads(List<CpsIssueAttachment> images) {
-        List<Map<String, Object>> payloads = new ArrayList<>();
-        if (images == null) return payloads;
-        for (CpsIssueAttachment image : images) {
-            byte[] content = contentResolver.resolve(image);
-            if (content == null || content.length == 0) continue;
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("attachment_id", image.getId());
-            item.put("file_name", image.getFileName());
-            item.put("file_type", image.getFileType());
-            item.put("content_base64", Base64.getEncoder().encodeToString(content));
-            payloads.add(item);
-        }
-        return payloads;
     }
 
     /**
@@ -203,8 +206,10 @@ public class CpsAgentFrameworkClient {
 
     /**
      * C-05/C-08：admin 端周报运行记录查询（PRD §21.3；AC-04/05）。
-     * GET {base}/api/agent/weekly-report-runs；按类型/周期/状态过滤。
-     * 返回 Map 列表（不强制 schema，由 service 透传给 admin）。
+     * 波次7 J线对齐 Python 实际契约：GET {base}/agent/weekly-reports
+     * （Query：report_type/status/push_status/period/limit/offset；响应 {"items":[...],"total":n}）。
+     * period 过滤（周窗 window_start/window_end）由 service 映射后在 Java 侧执行。
+     * 返回原始行 Map 列表，由 service 归一化。
      */
     public List<Map<String, Object>> listWeeklyReportRuns(
             String inspectionType,
@@ -213,26 +218,31 @@ public class CpsAgentFrameworkClient {
             String periodEnd) {
         if (!properties.isEnabled()) return new java.util.ArrayList<>();
         StringBuilder query = new StringBuilder();
-        if (inspectionType != null) query.append("&inspection_type=").append(inspectionType);
+        if (inspectionType != null) query.append("&report_type=").append(inspectionType);
         if (status != null) query.append("&status=").append(status);
-        if (periodStart != null) query.append("&period_start=").append(periodStart);
-        if (periodEnd != null) query.append("&period_end=").append(periodEnd);
-        String url = url("/agent/weekly-report-runs")
+        query.append("&limit=200");
+        String url = url("/agent/weekly-reports")
                 + (query.length() == 0 ? "" : "?" + query.substring(1));
-        java.util.List<Map<String, Object>> response =
-                (java.util.List<Map<String, Object>>) client.getForObject(url, List.class);
-        return response == null ? new java.util.ArrayList<>() : response;
+        Map<String, Object> response = client.getForObject(url, Map.class);
+        if (response == null) return new java.util.ArrayList<>();
+        Object items = response.get("items");
+        if (!(items instanceof List)) {
+            return new java.util.ArrayList<>();
+        }
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) items;
+        return rows;
     }
 
     /**
-     * C-05/C-08：受控下载周报文件流。Python 校验 internal_trust + status=ARCHIVED；
-     * Java 侧不做二次权限过滤（admin 端已在 controller 校验登录 + operator 身份）。
+     * C-05/C-08：受控下载周报文件流。Python 契约：GET {base}/agent/weekly-reports/{run_id}/download
+     * （校验 internal_trust；run 需有归档产物）。Java 侧不做二次权限过滤（admin 端已在 controller 校验）。
      * 返回字节数组 + contentType；Java 写入 HttpServletResponse 流。
      */
     public WeeklyReportFile downloadWeeklyReportFile(String runId) {
         if (!properties.isEnabled()) return null;
         org.springframework.http.ResponseEntity<byte[]> response = client.exchange(
-                url("/agent/weekly-report-runs/" + runId + "/file"),
+                url("/agent/weekly-reports/" + runId + "/download"),
                 org.springframework.http.HttpMethod.GET,
                 null,
                 byte[].class);

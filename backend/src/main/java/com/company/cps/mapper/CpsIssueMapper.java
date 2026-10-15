@@ -23,6 +23,14 @@ public interface CpsIssueMapper {
     Optional<CpsIssue> findById(@Param("id") Long id);
 
     /**
+     * B4 周评分数据源：自然周内（created_at 落在 [weekStart, weekEnd+1)）的 issue 行，
+     * 上限 limit 防爆。返回字段为 CpsIssue 全量（service 仅用 status/factory/area/empNo/empName）。
+     */
+    List<CpsIssue> findForWeeklyScore(@Param("weekStart") java.time.LocalDate weekStart,
+                                      @Param("weekEnd") java.time.LocalDate weekEnd,
+                                      @Param("limit") int limit);
+
+    /**
      * 更新问题流程相关字段，包括状态、处理人、原因措施、审核意见和关闭时间。
      *
      * <p>A2 乐观锁（AC-24）：WHERE 追加 lock_version CAS 校验并自增；
@@ -40,6 +48,14 @@ public interface CpsIssueMapper {
             @Param("id") Long id,
             @Param("reviewerEmpNo") String reviewerEmpNo,
             @Param("reviewerEmpName") String reviewerEmpName,
+            @Param("status") CpsIssueStatus status,
+            @Param("updatedAt") java.time.LocalDateTime updatedAt
+    );
+
+    /** 系统回退（A4 手动重触发）：PENDING_REVIEW → PENDING_AI_REVIEW 并清空当前处理人；CAS 限定原状态。 */
+    int updateStatusClearHandler(
+            @Param("id") Long id,
+            @Param("fromStatus") CpsIssueStatus fromStatus,
             @Param("status") CpsIssueStatus status,
             @Param("updatedAt") java.time.LocalDateTime updatedAt
     );
@@ -100,4 +116,28 @@ public interface CpsIssueMapper {
     long countOverdueIssues();
 
     long countClosedThisMonth();
+
+    /**
+     * I 线记忆体系消费：分页查询问题全集（与 listForAdmin 共用 adminIssueColumns/adminIssueFilter）。
+     * 字段集对齐 CpsIssueListItemResponse，用于记忆体系构建"问题上下文"。
+     */
+    List<CpsIssueListItemResponse> findMemoryPage(
+            @Param("factory") String factory,
+            @Param("categoryL1Id") Long categoryL1Id,
+            @Param("categoryL2Id") Long categoryL2Id,
+            @Param("status") CpsIssueStatus status,
+            @Param("startTime") String startTime,
+            @Param("endTime") String endTime,
+            @Param("limit") int limit,
+            @Param("offset") int offset
+    );
+
+    long countMemory(
+            @Param("factory") String factory,
+            @Param("categoryL1Id") Long categoryL1Id,
+            @Param("categoryL2Id") Long categoryL2Id,
+            @Param("status") CpsIssueStatus status,
+            @Param("startTime") String startTime,
+            @Param("endTime") String endTime
+    );
 }

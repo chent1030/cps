@@ -25,7 +25,7 @@ describe('request mock fallback', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<!doctype html><div id="app"></div>', { status: 200 })))
 
     await expect(request.get('/api/cps/issues', { params: { tab: 'todo', page: 1, pageSize: 20 } })).resolves.toEqual(
-      expect.arrayContaining([expect.objectContaining({ issueNo: 'CPS20260627001' })]),
+      expect.arrayContaining([expect.objectContaining({ id: 1 })]),
     )
   })
 

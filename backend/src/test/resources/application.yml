@@ -1,0 +1,72 @@
+spring:
+  application:
+    name: cps-backend-test
+  datasource:
+    # 波次13 C7 系统化测试：默认占位 MySQL（CI/本地真机启动另覆盖）；
+    # 本批次契约类 + 服务级集成测试不需要真实 DB 即可运行。
+    url: jdbc:mysql://localhost:3306/cps?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: Ct0520.0402
+    driver-class-name: com.mysql.cj.jdbc.Driver
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+flyway:
+  baseline-on-migrate: true
+  baseline-version: 0
+cps:
+  storage:
+    endpoint: http://127.0.0.1:9000
+    access-key: admin
+    secret-key: Ct0520.0402
+    bucket: cps-attachments
+    public-url: http://127.0.0.1:9000
+  agent-framework:
+    # 波次13 C7：默认指向 MockRestServiceServer 绑定的 RestTemplate（服务测试注入）。
+    enabled: true
+    base-url: http://python.test/api/v1
+    tenant-id: test-tenant
+    timeout-ms: 5000
+  room-check:
+    judge:
+      enabled: false  # 测试用 mock 客户端替代；默认关闭 Python HTTP 调用
+      base-url: http://127.0.0.1:8000
+      path: /api/v1/agent/room-checks/judge
+      timeout-ms: 5000
+  speech:
+    enabled: false
+    base-url: http://127.0.0.1:8000
+    path: /api/v1/agent/speech-to-text
+    timeout-ms: 5000
+    max-audio-bytes: 1048576
+  initial-review:
+    scan-enabled: false
+    scan-interval-ms: 600000
+    scan-initial-delay-ms: 600000
+    timeout-seconds: 600
+    callback-base-url: http://127.0.0.1:8080
+  callback:
+    trust-enabled: false  # 测试放开来源校验
+    trusted-ips: 127.0.0.1,::1
+  knowledge:
+    vector:
+      bootstrap-enabled: false
+  ai:
+    embedding:
+      provider: siglip2
+      base-url: http://127.0.0.1:8090
+      endpoint: /image-embeddings
+      api-key:
+      dimension: 1152
+      timeout-ms: 5000
+  milvus:
+    enabled: false
+    base-url: http://localhost:8008
+    api-key:
+    host: 127.0.0.1
+    port: 19530
+    collection: cps_knowledge_image_vector_siglip2_v1
+    metric-type: COSINE
+    index-type: HNSW
+    top-k: 10

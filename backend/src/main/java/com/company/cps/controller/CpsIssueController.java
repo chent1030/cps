@@ -6,7 +6,11 @@ import com.company.cps.dto.CpsIssueCreateRequest;
 import com.company.cps.dto.CpsIssueCreateResponse;
 import com.company.cps.dto.CpsIssueDetailResponse;
 import com.company.cps.dto.CpsIssueListItemResponse;
+import com.company.cps.dto.CpsInitialReviewTakeOverRequest;
 import com.company.cps.dto.CpsReviewerReassignRequest;
+import com.company.cps.dto.CpsReviewAdjudicateRequest;
+import com.company.cps.dto.CpsReviewAdjudicationResponse;
+import com.company.cps.service.CpsInitialReviewService;
 import com.company.cps.service.CpsIssueService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,9 +27,11 @@ import java.util.List;
 public class CpsIssueController {
 
     private final CpsIssueService issueService;
+    private final CpsInitialReviewService initialReviewService;
 
-    public CpsIssueController(CpsIssueService issueService) {
+    public CpsIssueController(CpsIssueService issueService, CpsInitialReviewService initialReviewService) {
         this.issueService = issueService;
+        this.initialReviewService = initialReviewService;
     }
 
     /**
@@ -88,6 +94,50 @@ public class CpsIssueController {
                 request.getReviewerEmpNo(),
                 resolveCurrentEmpNo(request.getOperatorEmpNo()),
                 request.getReason()
+        );
+    }
+
+    /**
+     * A3 审核员初审视图（PRD §28.2/§29）：AI 初审三态（running/failed/timeout_open 等）+
+     * 可接管性与剩余秒数 + AI 结果与逐项意见 + 提交快照 + 既有裁决 + 事件流水。
+     */
+    @GetMapping("/{id}/initial-review")
+    public java.util.Map<String, Object> initialReviewView(
+            @PathVariable Long id
+    ) {
+        return initialReviewService.reviewerView(id);
+    }
+
+    /**
+     * A3 超时接管（PRD §28.2/§29，AC-27）：RUNNING 满 10 分钟（或 FAILED）后方可接管，
+     * RUNNING 未满 10 分钟拒绝；接管必须注明原因；接管后开放人工裁决。
+     */
+    @PostMapping("/{id}/initial-review/take-over")
+    public java.util.Map<String, Object> takeOverInitialReview(
+            @PathVariable Long id,
+            @RequestBody CpsInitialReviewTakeOverRequest request
+    ) {
+        return initialReviewService.takeOverForIssue(
+                id,
+                resolveCurrentEmpNo(request.getEmpNo()),
+                request.getReason()
+        );
+    }
+
+    /**
+     * A3 审核裁决（PRD §28.3，AC-16）：APPROVE=通过关单、REJECT=退回整改人员；
+     * 理由必填；同 (issue, version) 重复裁决幂等返回 duplicated=true。
+     */
+    @PostMapping("/{id}/adjudicate")
+    public CpsReviewAdjudicationResponse adjudicate(
+            @PathVariable Long id,
+            @RequestBody CpsReviewAdjudicateRequest request
+    ) {
+        return issueService.adjudicate(
+                id,
+                request.getDecision(),
+                request.getReason(),
+                resolveCurrentEmpNo(request.getEmpNo())
         );
     }
 

@@ -15,6 +15,22 @@
       </a-button>
     </header>
 
+    <nav class="cps-quick-entry" aria-label="快捷入口">
+      <button
+        v-for="entry in quickEntries"
+        :key="entry.label"
+        type="button"
+        class="cps-quick-entry__item"
+        :class="{ 'cps-quick-entry__item--primary': entry.primary }"
+        @click="entry.go"
+      >
+        <span class="cps-quick-entry__icon">
+          <component :is="entry.icon" />
+        </span>
+        <span class="cps-quick-entry__label">{{ entry.label }}</span>
+      </button>
+    </nav>
+
     <a-card :body-style="{ padding: '0' }" class="cps-tabs-card">
       <a-tabs v-model:activeKey="tab" class="cps-list-tabs" @change="onTabChange">
         <a-tab-pane v-for="item in tabs" :key="item.value" :tab="item.label" />
@@ -37,7 +53,7 @@
               <div class="cps-issue-card__head">
                 <div class="cps-issue-card__identity">
                   <span class="cps-issue-card__eyebrow">巡检单</span>
-                  <strong class="cps-issue-card__no">{{ issue.issueNo }}</strong>
+                  <strong class="cps-issue-card__no">巡检问题</strong>
                 </div>
                 <div class="cps-issue-card__badges">
                   <a-tag :color="statusMeta[issue.status].color" class="cps-pill">{{ statusMeta[issue.status].label }}</a-tag>
@@ -66,7 +82,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { PlusOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, UnorderedListOutlined, SafetyCertificateOutlined, BarChartOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 
 import { listCpsIssues } from '@/api/cps/issue'
@@ -98,6 +114,13 @@ const overdueCount = computed<number>(() => items.value.filter((item) => item.ov
 const navigateToCreate = () => {
   uni.navigateTo({ url: '/views/cps/IssueCreateView' })
 }
+
+const quickEntries = [
+  { label: '新建问题', icon: PlusOutlined, primary: true, go: navigateToCreate },
+  { label: '点检任务', icon: UnorderedListOutlined, primary: false, go: () => uni.navigateTo({ url: '/views/cps/RoomCheckListView' }) },
+  { label: '初审裁决', icon: SafetyCertificateOutlined, primary: false, go: () => uni.navigateTo({ url: '/views/cps/InitialReviewView' }) },
+  { label: '评分排名', icon: BarChartOutlined, primary: false, go: () => uni.navigateTo({ url: '/views/cps/ScoreRankingView' }) },
+]
 
 const navigateToDetail = (id: number) => {
   uni.navigateTo({ url: `/views/cps/IssueDetailView?id=${id}` })
@@ -204,6 +227,58 @@ onShow(() => {
   color: #0f766e !important;
   border: none !important;
   font-weight: 800 !important;
+}
+
+.cps-quick-entry {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.cps-quick-entry__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 6px 12px;
+  background: #fff;
+  border: 1px solid rgba(20, 184, 166, 0.18);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.cps-quick-entry__item:active {
+  transform: scale(0.96);
+}
+
+.cps-quick-entry__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #f0fdfa;
+  color: #0f766e;
+  font-size: 20px;
+}
+
+.cps-quick-entry__label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.cps-quick-entry__item--primary .cps-quick-entry__icon {
+  background: linear-gradient(135deg, #14b8a6, #0f766e);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(20, 184, 166, 0.35);
+}
+
+.cps-quick-entry__item--primary .cps-quick-entry__label {
+  color: #0f766e;
 }
 
 .cps-tabs-card {

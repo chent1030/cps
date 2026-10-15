@@ -9,7 +9,7 @@ public class CpsAgentFrameworkProperties {
     private boolean enabled;
     private String baseUrl = "http://127.0.0.1:8000/api/v1";
     private String tenantId = "local-factory";
-    private int timeoutMs = 10000;
+    private int timeoutMs = 180000;
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }

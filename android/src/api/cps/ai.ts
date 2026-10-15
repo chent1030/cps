@@ -1,8 +1,42 @@
 import { request } from '@/api/request'
 import type { CpsAiSuggestionPayload } from '@/types/cps'
 
-export const inspectCpsImage = (sourceAttachmentId: number) => {
-  return request.post<CpsAiSuggestionPayload>('/api/cps/ai/match-knowledge', { attachmentId: sourceAttachmentId })
+// 后端 /api/cps/ai/match-knowledge 返回字段名是 categoryL1Id/L1Name/L2Id/L2Name（无 "ai" 前缀），
+// 与前端 CpsAiSuggestionPayload 不一致。这里统一归一化为前端 ai* 字段，避免在 view 里再手工映射。
+interface CpsMatchKnowledgeBackendResponse {
+  sourceAttachmentId: number
+  matchedCaseId: number
+  matchedImageId: number
+  confidence: number | string
+  categoryL1Id: number | null
+  categoryL2Id: number | null
+  categoryL1Name: string | null
+  categoryL2Name: string | null
+  reasonSuggestion: string | null
+  measureSuggestion: string | null
+  modelName: string | null
+  modelVersion: string | null
+  matchedCases?: unknown[]
+}
+
+const normalizeMatchResponse = (resp: CpsMatchKnowledgeBackendResponse): CpsAiSuggestionPayload => ({
+  sourceAttachmentId: resp.sourceAttachmentId,
+  aiCategoryL1Id: resp.categoryL1Id,
+  aiCategoryL1Name: resp.categoryL1Name,
+  aiCategoryL2Id: resp.categoryL2Id,
+  aiCategoryL2Name: resp.categoryL2Name,
+  reasonSuggestion: resp.reasonSuggestion,
+  measureSuggestion: resp.measureSuggestion,
+  modelName: resp.modelName,
+  modelVersion: resp.modelVersion,
+  confidence: resp.confidence,
+})
+
+export const inspectCpsImage = async (sourceAttachmentId: number): Promise<CpsAiSuggestionPayload> => {
+  const resp = await request.post<CpsMatchKnowledgeBackendResponse>('/api/cps/ai/match-knowledge', {
+    attachmentId: sourceAttachmentId,
+  })
+  return normalizeMatchResponse(resp)
 }
 
 interface TranscribeResponse {

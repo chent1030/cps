@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsPushConfigMapper">
+
+    <select id="findGlobal" resultType="com.company.cps.domain.CpsPushConfig">
+        SELECT id, channel, endpoint, secret_ref, enabled, updated_by, created_at, updated_at
+        FROM cps_push_config
+        WHERE id = 1
+        LIMIT 1
+    </select>
+
+    <insert id="upsert" parameterType="com.company.cps.domain.CpsPushConfig">
+        INSERT INTO cps_push_config (id, channel, endpoint, secret_ref, enabled, updated_by)
+        VALUES (1, #{channel}, #{endpoint}, #{secretRef}, #{enabled}, #{updatedBy})
+        ON DUPLICATE KEY UPDATE
+          channel = VALUES(channel),
+          endpoint = VALUES(endpoint),
+          secret_ref = VALUES(secret_ref),
+          enabled = VALUES(enabled),
+          updated_by = VALUES(updated_by)
+    </insert>
+
+</mapper>

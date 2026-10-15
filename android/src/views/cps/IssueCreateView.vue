@@ -233,10 +233,10 @@ import {
   searchCpsEmployees,
   type CpsEmployeeOption,
 } from '@/api/cps/master'
-import { getCpsAttachmentBase64, uploadCpsAttachment } from '@/api/cps/attachment'
+import { uploadCpsAttachment } from '@/api/cps/attachment'
 import type { CpsUploadedImage } from '@/types/cps'
 import { useFormDraftStore } from '@/store/formDraft'
-import { toImageDataUrl } from '@/utils/image'
+import { toImageUrl } from '@/utils/image'
 
 const draft = useFormDraftStore()
 
@@ -334,7 +334,7 @@ watch(
       feedbackCandidates.value = []
       return
     }
-    const handlers = await getFeedbackHandler({
+    const handler = await getFeedbackHandler({
       factory: value.factory,
       area: value.area,
       line: value.line,
@@ -342,7 +342,7 @@ watch(
     })
     draft.feedbackEmpNo = ''
     draft.feedbackPerson = null
-    feedbackCandidates.value = handlers
+    feedbackCandidates.value = handler ? [handler] : []
   },
 )
 
@@ -408,7 +408,9 @@ const customRequest: UploadProps['customRequest'] = async (options) => {
   try {
     const uploaded = await uploadCpsAttachment(file as File)
     draft.images = [...draft.images, uploaded]
-    void imageToBase64(uploaded)
+    // 直接使用后端返回的 /api/cps/attachments/{id}/content 路径作为预览地址，
+    // 免掉 base64 转换与 /api/cps/attachments/base64 接口（已下线）。
+    draft.imagePreviewSources = { ...draft.imagePreviewSources, [uploaded.id]: uploaded.url }
     onSuccess?.({}, file as any)
     if (shouldInspectFirst) {
       await onFirstImageReady(uploaded.id)
@@ -427,18 +429,11 @@ const onRemoveImage = (index: number) => {
 const onPreviewImage = (index: number) => {
   const target = draft.images[index]
   if (!target) return
-  const urls = draft.images.map((i) => draft.imagePreviewSources[i.id]).filter(Boolean)
+  const urls = draft.images
+    .map((i) => draft.imagePreviewSources[i.id] || i.url)
+    .filter(Boolean)
   if (typeof uni !== 'undefined' && typeof uni.previewImage === 'function') {
-    uni.previewImage({ urls, current: draft.imagePreviewSources[target.id] })
-  }
-}
-
-const imageToBase64 = async (image: CpsUploadedImage) => {
-  try {
-    const base64 = await getCpsAttachmentBase64(image.url)
-    draft.imagePreviewSources = { ...draft.imagePreviewSources, [image.id]: toImageDataUrl(base64) }
-  } catch {
-    message.error('图片预览加载失败')
+    uni.previewImage({ urls, current: draft.imagePreviewSources[target.id] || target.url })
   }
 }
 

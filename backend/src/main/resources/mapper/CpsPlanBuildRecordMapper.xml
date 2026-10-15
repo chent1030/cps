@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsPlanBuildRecordMapper">
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsPlanBuildRecord" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_plan_build_record (
+            plan_id, task_type, result, error_msg, built_by, build_source
+        ) VALUES (
+            #{planId}, #{taskType}, #{result}, #{errorMsg}, #{builtBy}, #{buildSource}
+        )
+    </insert>
+
+    <select id="findByPlanId" resultType="com.company.cps.domain.CpsPlanBuildRecord">
+        SELECT id, plan_id, task_type, result, error_msg, built_by, build_source, created_at
+        FROM cps_plan_build_record
+        WHERE plan_id = #{planId}
+        ORDER BY id ASC
+    </select>
+</mapper>

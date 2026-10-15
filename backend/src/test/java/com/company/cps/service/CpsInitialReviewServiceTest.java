@@ -7,6 +7,8 @@ import com.company.cps.domain.CpsInitialReviewTaskStatus;
 import com.company.cps.domain.CpsIssue;
 import com.company.cps.domain.CpsIssueStatus;
 import com.company.cps.dto.CpsInitialReviewCallbackRequest;
+import com.company.cps.mapper.CpsInitialReviewConfigMapper;
+import com.company.cps.mapper.CpsInitialReviewEventMapper;
 import com.company.cps.mapper.CpsInitialReviewItemMapper;
 import com.company.cps.mapper.CpsInitialReviewResultMapper;
 import com.company.cps.mapper.CpsInitialReviewTaskMapper;
@@ -14,6 +16,7 @@ import com.company.cps.mapper.CpsIssueAttachmentMapper;
 import com.company.cps.mapper.CpsIssueFlowLogMapper;
 import com.company.cps.mapper.CpsIssueMapper;
 import com.company.cps.mapper.CpsRectificationSubmissionMapper;
+import com.company.cps.mapper.CpsReviewAdjudicationMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -57,6 +60,9 @@ class CpsInitialReviewServiceTest {
     @Mock private CpsIssueFlowLogMapper flowLogMapper;
     @Mock private CpsAgentFrameworkClient agentFrameworkClient;
     @Mock private CpsAssignmentService assignmentService;
+    @Mock private CpsInitialReviewConfigMapper configMapper;
+    @Mock private CpsInitialReviewEventMapper eventMapper;
+    @Mock private CpsReviewAdjudicationMapper adjudicationMapper;
 
     private CpsInitialReviewService service;
 
@@ -67,7 +73,7 @@ class CpsInitialReviewServiceTest {
         properties.setCallbackBaseUrl("http://127.0.0.1:8080/");
         service = new CpsInitialReviewService(taskMapper, resultMapper, itemMapper, submissionMapper,
                 issueMapper, attachmentMapper, flowLogMapper, agentFrameworkClient, assignmentService,
-                properties, new CpsWorkflowStateMachineV2());
+                properties, new CpsWorkflowStateMachineV2(), configMapper, eventMapper, adjudicationMapper);
     }
 
     // ---------- createTask 幂等 ----------
@@ -317,7 +323,7 @@ class CpsInitialReviewServiceTest {
         when(issueMapper.findById(101L)).thenReturn(Optional.of(issue(CpsIssueStatus.PENDING_AI_REVIEW, "R001")));
         when(attachmentMapper.findByIssueAndStage(101L, "ISSUE")).thenReturn(Collections.emptyList());
         when(attachmentMapper.findByIssueAndStage(101L, "PROOF")).thenReturn(Collections.emptyList());
-        when(agentFrameworkClient.triggerInitialReview(any(), any(), any(), any(), anyString(), eq(9L)))
+        when(agentFrameworkClient.triggerInitialReview(any(), any(), any(), any()))
                 .thenReturn("rr-90");
 
         service.dispatchAfterCommit(9L);
@@ -343,7 +349,7 @@ class CpsInitialReviewServiceTest {
     void dispatchSkipsTerminalTasks() {
         when(taskMapper.findById(9L)).thenReturn(task(9L, 101L, 2, CpsInitialReviewTaskStatus.TAKEN_OVER));
         service.dispatchAfterCommit(9L);
-        verify(agentFrameworkClient, never()).triggerInitialReview(any(), any(), any(), any(), anyString(), anyLong());
+        verify(agentFrameworkClient, never()).triggerInitialReview(any(), any(), any(), any());
     }
 
     // ---------- fixtures ----------

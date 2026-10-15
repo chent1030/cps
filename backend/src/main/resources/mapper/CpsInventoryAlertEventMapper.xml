@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsInventoryAlertEventMapper">
+
+    <sql id="BaseColumns">
+        id, item_id, status, first_triggered_at, last_eval_at, last_eval_qty,
+        threshold_snapshot, closed_at, closed_by, close_reason, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsInventoryAlertEvent" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_inventory_alert_event (
+            item_id, status, first_triggered_at, last_eval_at, last_eval_qty,
+            threshold_snapshot, closed_at, closed_by, close_reason
+        ) VALUES (
+            #{itemId}, #{status}, #{firstTriggeredAt}, #{lastEvalAt}, #{lastEvalQty},
+            #{thresholdSnapshot}, #{closedAt}, #{closedBy}, #{closeReason}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.company.cps.domain.CpsInventoryAlertEvent">
+        UPDATE cps_inventory_alert_event
+        SET status = #{status},
+            last_eval_at = #{lastEvalAt},
+            last_eval_qty = #{lastEvalQty},
+            closed_at = #{closedAt},
+            closed_by = #{closedBy},
+            close_reason = #{closeReason}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 合并事件判定：同物品当前 OPEN（DB 层 UNIQUE(open_item_id) 兜底唯一） -->
+    <select id="findOpenByItemId" resultType="com.company.cps.domain.CpsInventoryAlertEvent">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_inventory_alert_event
+        WHERE item_id = #{itemId} AND status = 'OPEN'
+    </select>
+
+    <select id="findById" resultType="com.company.cps.domain.CpsInventoryAlertEvent">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_inventory_alert_event
+        WHERE id = #{id}
+    </select>
+
+    <select id="page" resultType="com.company.cps.domain.CpsInventoryAlertEvent">
+        SELECT e.id, e.item_id, e.status, e.first_triggered_at, e.last_eval_at, e.last_eval_qty,
+               e.threshold_snapshot, e.closed_at, e.closed_by, e.close_reason, e.created_at, e.updated_at,
+               i.item_code, i.item_name, i.unit,
+               i.stock_qty AS current_stock_qty, i.alert_threshold AS current_alert_threshold
+        FROM cps_inventory_alert_event e
+        JOIN cps_inventory_item i ON i.id = e.item_id
+        WHERE 1 = 1
+        <if test="status != null and status != ''">
+          AND e.status = #{status}
+        </if>
+        <if test="itemId != null">
+          AND e.item_id = #{itemId}
+        </if>
+        ORDER BY e.last_eval_at DESC, e.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM cps_inventory_alert_event e
+        WHERE 1 = 1
+        <if test="status != null and status != ''">
+          AND e.status = #{status}
+        </if>
+        <if test="itemId != null">
+          AND e.item_id = #{itemId}
+        </if>
+    </select>
+</mapper>
