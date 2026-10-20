@@ -543,8 +543,8 @@ const v1Steps: { value: CpsIssueStatus; label: string }[] = [
   { value: 'PENDING_REVIEW', label: '待审核' },
   { value: 'CLOSED', label: '已关闭' },
 ]
+// v2 新流程没有「待反馈」：新建即进入整改，提交整改后才进 AI 初审
 const v2Steps: { value: CpsIssueStatus; label: string }[] = [
-  { value: 'PENDING_FEEDBACK', label: '待反馈' },
   { value: 'PENDING_RECTIFY', label: '待整改' },
   { value: 'PENDING_AI_REVIEW', label: 'AI 初审' },
   { value: 'PENDING_REVIEW', label: '待审核' },
@@ -554,8 +554,11 @@ const statusSteps = computed(() => (isV2Flow.value ? v2Steps : v1Steps))
 const currentStepIndex = computed(() => {
   if (!detail.value) return 0
   const status = detail.value.status
-  // v2 的「待配置审核员」并入 AI 初审这一步展示
-  if (isV2Flow.value && status === 'PENDING_REVIEWER_CONFIG') return 2
+  if (isV2Flow.value) {
+    // 迁移遗留的待反馈单按「待整改」展示；「待配置审核员」并入 AI 初审
+    if (status === 'PENDING_FEEDBACK') return 0
+    if (status === 'PENDING_REVIEWER_CONFIG') return 1
+  }
   const index = statusSteps.value.findIndex((node) => node.value === status)
   return index < 0 ? 0 : index
 })

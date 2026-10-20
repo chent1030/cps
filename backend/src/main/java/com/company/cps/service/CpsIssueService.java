@@ -160,7 +160,8 @@ public class CpsIssueService {
         validateAiSuggestionSource(request.getIssueAttachmentIds(), request.getAiSuggestion());
 
         CpsIssue issue = new CpsIssue();
-        issue.setStatus(CpsIssueStatus.PENDING_FEEDBACK);
+        // 新流程（PRD §28.1）：新建后直接进入整改人员，反馈指派节点已收敛掉
+        issue.setStatus(CpsIssueStatus.PENDING_RECTIFY);
         // 新单统一走 V2 整改域流程（flow_version 路由；存量行 DB 默认 'legacy' 不受影响）
         issue.setFlowVersion(FLOW_VERSION_V2);
         issue.setFactory(request.getFactory().trim());
@@ -195,7 +196,7 @@ public class CpsIssueService {
 
         attachFiles(issueId, request.getIssueAttachmentIds(), "ISSUE", currentEmpNo);
         insertAiSuggestionIfPresent(issueId, request.getAiSuggestion(), now);
-        insertFlowLog(issueId, null, CpsIssueStatus.PENDING_FEEDBACK, CpsIssueAction.SUBMIT, currentEmpNo, null, feedbackEmpNo, "submit issue");
+        insertFlowLog(issueId, null, CpsIssueStatus.PENDING_RECTIFY, CpsIssueAction.SUBMIT, currentEmpNo, null, feedbackEmpNo, "submit issue");
         // 兜底：agent 框架不可用时不让"用户提交问题"整笔回滚（issue 落库、附件绑定、流程日志都已写入）
         String agentInspectionId = null;
         try {

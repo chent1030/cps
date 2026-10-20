@@ -280,7 +280,7 @@
         <a-card class="cps-card" :body-style="{ padding: '16px' }" style="margin-top: 16px">
           <template #title>
             <div class="cps-card-title">
-              <h2 class="cps-card-title__main">反馈人</h2>
+              <h2 class="cps-card-title__main">整改安排</h2>
             </div>
           </template>
           <a-form layout="vertical">
@@ -292,8 +292,8 @@
                 :maxlength="64"
               />
             </a-form-item>
-            <a-form-item label="反馈人">
-              <a-input :value="feedbackPersonLabel" placeholder="选择反馈人" read-only @click="feedbackPickerOpen = true">
+            <a-form-item label="整改人">
+              <a-input :value="feedbackPersonLabel" placeholder="选择整改人" read-only @click="feedbackPickerOpen = true">
                 <template #suffix><UserOutlined /></template>
               </a-input>
             </a-form-item>
@@ -328,7 +328,7 @@
     <!-- 反馈人选择弹窗（内联） -->
     <a-modal
       :open="feedbackPickerOpen"
-      title="选择反馈人"
+      title="选择整改人"
       :width="isLandscape ? 520 : '100%'"
       :centered="isLandscape"
       :footer="null"

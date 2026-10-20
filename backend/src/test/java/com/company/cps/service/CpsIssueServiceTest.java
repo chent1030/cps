@@ -65,7 +65,7 @@ class CpsIssueServiceTest {
     }
 
     @Test
-    void createIssueInitializesPendingFeedbackAndCurrentHandler() {
+    void createIssueInitializesPendingRectifyAndCurrentHandler() {
         mockIssueInsertGeneratedId(900L);
         CpsIssueCreateRequest request = new CpsIssueCreateRequest();
         request.setFactory("F1");
@@ -75,6 +75,7 @@ class CpsIssueServiceTest {
         request.setCategoryL1Id(10L);
         request.setCategoryL2Id(11L);
         request.setDescription("label missing");
+        request.setResourceNo("R-1");
         request.setFeedbackEmpNo("E10001");
         request.setIssueAttachmentIds(Collections.singletonList(101L));
         when(attachmentMapper.attachToIssue(101L, 900L, "ISSUE", 1, "E00001", "E00001")).thenReturn(1);
@@ -84,7 +85,7 @@ class CpsIssueServiceTest {
         ArgumentCaptor<CpsIssue> issueCaptor = ArgumentCaptor.forClass(CpsIssue.class);
         verify(issueMapper).insert(issueCaptor.capture());
         CpsIssue saved = issueCaptor.getValue();
-        assertEquals(CpsIssueStatus.PENDING_FEEDBACK, saved.getStatus());
+        assertEquals(CpsIssueStatus.PENDING_RECTIFY, saved.getStatus());
         assertEquals("E10001", saved.getCurrentHandlerEmpNo());
         assertEquals("E00001", saved.getCreatorEmpNo());
         assertEquals("F1", saved.getFactory());
@@ -262,6 +263,7 @@ class CpsIssueServiceTest {
         request.setCategoryL1Id(10L);
         request.setCategoryL2Id(11L);
         request.setDescription("label missing");
+        request.setResourceNo("R-1");
         request.setFeedbackEmpNo("E10001");
         request.setIssueAttachmentIds(Collections.singletonList(101L));
         return request;
