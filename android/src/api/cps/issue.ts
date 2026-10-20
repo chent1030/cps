@@ -35,6 +35,13 @@ export const getCpsIssueDetail = (id: number) => {
   return request.get<CpsIssueDetail>(`/api/cps/issues/${id}`, { params: { empNo: EMP_NO } })
 }
 
+/** 页签角标：当前用户 4 个问题页签的条数 */
+export const getCpsIssueCounts = () => {
+  return request.get<Record<CpsIssueTab, number>>('/api/cps/issues/counts', {
+    params: { empNo: EMP_NO },
+  })
+}
+
 export const executeCpsIssueAction = (id: number, payload: CpsIssueActionRequest) => {
   return request.post<{
     issueId: number

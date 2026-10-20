@@ -17,7 +17,20 @@
 
     <a-card :body-style="{ padding: '0' }" class="cps-tabs-card">
       <a-tabs v-model:activeKey="tab" class="cps-list-tabs" @change="onTabChange">
-        <a-tab-pane v-for="item in tabs" :key="item.value" :tab="item.label" />
+        <a-tab-pane v-for="item in tabs" :key="item.value">
+          <template #tab>
+            <span class="cps-tab-label">
+              {{ item.label }}
+              <a-badge
+                v-if="item.count > 0"
+                :count="item.count"
+                :overflow-count="99"
+                class="cps-tab-badge"
+                :number-style="{ backgroundColor: '#14b8a6', boxShadow: 'none', fontSize: '11px', height: '17px', lineHeight: '17px', minWidth: '17px', padding: '0 5px' }"
+              />
+            </span>
+          </template>
+        </a-tab-pane>
       </a-tabs>
     </a-card>
 
@@ -103,7 +116,7 @@ import { computed, ref, watch } from 'vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 
-import { listCpsIssues } from '@/api/cps/issue'
+import { listCpsIssues, getCpsIssueCounts } from '@/api/cps/issue'
 import { deleteCpsIssueDraft, listMyCpsIssueDrafts } from '@/api/cps/issueDraft'
 import { listCpsInspectionTypes } from '@/api/cps/inspectionType'
 import { listMyInProgressInspections } from '@/api/cps/inspectionTask'
@@ -122,6 +135,7 @@ type TabKey = CpsIssueTab | 'drafts' | 'running'
 interface TabItem {
   value: TabKey
   label: string
+  count: number
 }
 
 const listCache = useListCacheStore()
@@ -129,6 +143,8 @@ const listCache = useListCacheStore()
 const tab = ref<TabKey>('todo')
 const items = ref<CpsIssueListItem[]>([])
 const loading = ref<boolean>(false)
+// 4 个问题页签的角标条数（后端一次聚合）
+const counts = ref<Record<CpsIssueTab, number>>({ todo: 0, created: 0, related: 0, closed: 0 })
 
 const todoCount = computed<number>(() => items.value.filter((item) => item.status !== 'CLOSED').length)
 const overdueCount = computed<number>(() => items.value.filter((item) => item.overdue).length)
@@ -191,13 +207,21 @@ const typeOptions = ref<CpsInspectionType[]>([])
 const typeLabel = (code: string) => typeOptions.value.find((t) => t.code === code)?.name ?? code
 
 const tabs = computed<TabItem[]>(() => [
-  { value: 'todo', label: '待我处理' },
-  { value: 'created', label: '我发起的' },
-  { value: 'related', label: '我参与的' },
-  { value: 'closed', label: '已关闭' },
-  { value: 'drafts', label: draftCount.value ? `我的草稿 (${draftCount.value})` : '我的草稿' },
-  { value: 'running', label: recordCount.value ? `执行中 (${recordCount.value})` : '执行中' },
+  { value: 'todo', label: '待我处理', count: counts.value.todo },
+  { value: 'created', label: '我发起的', count: counts.value.created },
+  { value: 'related', label: '我参与的', count: counts.value.related },
+  { value: 'closed', label: '已关闭', count: counts.value.closed },
+  { value: 'drafts', label: '我的草稿', count: draftCount.value },
+  { value: 'running', label: '执行中', count: recordCount.value },
 ])
+
+const loadCounts = async () => {
+  try {
+    counts.value = await getCpsIssueCounts()
+  } catch {
+    // 角标拉取失败不影响列表，静默忽略
+  }
+}
 
 const loadDrafts = async () => {
   draftsLoading.value = true
@@ -248,6 +272,7 @@ onShow(() => {
   if (isIssueTab(tab.value)) onShowHandler()
   void loadDrafts()
   void loadRecords()
+  void loadCounts()
 })
 
 const removeDraft = async (id: number) => {
@@ -340,6 +365,16 @@ const formatRecordTime = (t?: string | null) => {
 }
 
 /* 页签内联列表（我的草稿 / 执行中） */
+.cps-tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cps-tab-badge {
+  line-height: 1;
+}
+
 .cps-inline-list {
   display: grid;
   gap: 10px;

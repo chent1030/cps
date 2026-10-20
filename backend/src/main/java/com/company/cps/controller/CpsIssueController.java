@@ -59,6 +59,14 @@ public class CpsIssueController {
     }
 
     /**
+     * 页签角标：当前用户 4 个问题页签（待办/我发起/我参与/已关闭）的条数。
+     */
+    @GetMapping("/counts")
+    public java.util.Map<String, Long> counts(@RequestParam String empNo) {
+        return issueService.counts(resolveCurrentEmpNo(empNo));
+    }
+
+    /**
      * 查询问题详情，包括问题主信息、照片、AI建议、流程记录和当前可操作动作。
      */
     @GetMapping("/{id}")

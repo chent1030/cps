@@ -294,6 +294,20 @@ public class CpsIssueService {
         return issueMapper.listByTab(tab, currentEmpNo, safePageSize, (safePage - 1) * safePageSize);
     }
 
+    /**
+     * 页签角标：当前用户 4 个问题页签（待办/我发起/我参与/已关闭）的条数。
+     * 与 listByTab 使用同一套过滤条件；库里没有匹配记录时返回 0。
+     */
+    public Map<String, Long> counts(String currentEmpNo) {
+        Map<String, Object> raw = issueMapper.countByTabs(currentEmpNo);
+        Map<String, Long> result = new LinkedHashMap<>();
+        for (String key : new String[]{"todo", "created", "related", "closed"}) {
+            Object value = raw == null ? null : raw.get(key);
+            result.put(key, value instanceof Number ? ((Number) value).longValue() : 0L);
+        }
+        return result;
+    }
+
     private void validateCreateRequest(CpsIssueCreateRequest request) {
         requireText(request.getFactory(), "factory is required");
         requireText(request.getArea(), "area is required");

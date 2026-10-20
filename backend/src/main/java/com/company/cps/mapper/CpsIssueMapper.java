@@ -70,6 +70,11 @@ public interface CpsIssueMapper {
             @Param("offset") int offset
     );
 
+    /**
+     * 页签角标：当前用户 4 个问题页签（待办/我发起/我参与/已关闭）的条数。
+     */
+    java.util.Map<String, Object> countByTabs(@Param("empNo") String empNo);
+
     List<CpsIssueListItemResponse> listForAdmin(
             @Param("status") CpsIssueStatus status,
             @Param("factory") String factory,
