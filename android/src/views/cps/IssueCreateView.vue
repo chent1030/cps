@@ -425,6 +425,8 @@ const activeTypeName = ref('')
 
 // 分步流程（用户反馈 #3）：select=第一步选类型，form=第二步按类型渲染表单
 const step = ref<'select' | 'form'>('select')
+// 本次进入是否由「我的草稿」带 draftId 恢复；有值时步骤由 restoreDraft 决定
+const pendingDraftId = ref<number | null>(null)
 
 // ===== Phase D2：类型点检项配置联动 =====
 interface CheckEntryState {
@@ -1031,15 +1033,11 @@ onMounted(async () => {
     draft.factories = await getFactories()
   }
   await loadInspectionTypes()
-  // 恢复上次选择（如有），重置 activeTypeName 用于卡片标题；并据此决定初始步骤
-  if (draft.inspectionTypeCode) {
-    const t = draft.inspectionTypes.find((x) => x.code === draft.inspectionTypeCode)
-    if (t) activeTypeName.value = t.name
-    void loadTypeCheckItems(draft.inspectionTypeCode)
-    step.value = 'form'
-  } else {
-    step.value = 'select'
-  }
+  // 从列表再次进入「新建问题」时，始终回到第一步重新选类型；
+  // 上次选择的类型仍留在 store（避免反复拉接口），但不再自动跳进旧类型的表单。
+  // 仅当本次是从「我的草稿」恢复（?draftId=）时，步骤交给 restoreDraft 决定。
+  if (pendingDraftId.value) return
+  step.value = 'select'
 })
 
 // 从「我的草稿」入口跳入：?draftId=x 时整包恢复（优先级高于本地内存 store）
@@ -1047,6 +1045,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   const raw = Array.isArray(query?.draftId) ? query?.draftId[0] : query?.draftId
   const draftIdParam = Number(raw)
   if (raw !== undefined && Number.isFinite(draftIdParam) && draftIdParam > 0) {
+    pendingDraftId.value = draftIdParam
     void restoreDraft(draftIdParam)
   }
 })
