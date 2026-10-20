@@ -27,15 +27,23 @@
         <template #title>
           <div class="cps-card-title">
             <h2 class="cps-card-title__main">本次巡检属于哪类问题？</h2>
-            <a-tag color="blue">{{ draft.inspectionTypes.length }} 种可选</a-tag>
+            <a-tag color="blue">{{ typeCountLabel }}</a-tag>
           </div>
         </template>
         <p class="cps-create-card__hint">「CPS巡检」进入标准问题上报表单；其他类型按各自配置逐项点检填写（合格判定/文本/拍照），互不混用；分区域类型（如辅房点检）先选区域再开始</p>
+        <a-input-search
+          v-model:value="typeKeyword"
+          class="cps-type-search"
+          placeholder="搜索巡检类型名称或编码"
+          allow-clear
+          :disabled="!draft.inspectionTypes.length"
+        />
         <a-spin :spinning="inspectionTypesLoading">
           <a-empty v-if="!draft.inspectionTypes.length && !inspectionTypesLoading" description="暂无可用巡检类型，请联系管理员配置" />
+          <div v-else-if="!filteredTypes.length" class="cps-type-empty">没有匹配「{{ typeKeyword }}」的类型</div>
           <div v-else class="cps-type-select__grid">
             <button
-              v-for="t in draft.inspectionTypes"
+              v-for="t in filteredTypes"
               :key="t.code"
               type="button"
               class="cps-type-select__item"
@@ -359,11 +367,19 @@
       @update:open="(v: boolean) => (areaPickerOpen = v)"
     >
       <p class="cps-create-card__hint">该类型按区域执行，选定区域后将在该区域下生成点检项快照</p>
+      <a-input-search
+        v-model:value="areaKeyword"
+        class="cps-area-search"
+        placeholder="搜索区域名称、编码或房型"
+        allow-clear
+        :disabled="!areaOptions.length"
+      />
       <a-spin :spinning="areaPickerLoading">
         <a-empty v-if="!areaOptions.length && !areaPickerLoading" description="该类型暂无启用区域，请联系管理员配置" />
+        <div v-else-if="!filteredAreas.length" class="cps-type-empty">没有匹配「{{ areaKeyword }}」的区域</div>
         <div v-else class="cps-area-pick">
           <button
-            v-for="a in areaOptions"
+            v-for="a in filteredAreas"
             :key="a.id"
             type="button"
             class="cps-area-pick__item"
@@ -447,12 +463,27 @@ const areaPickerLoading = ref(false)
 const areaPickerStarting = ref<number | null>(null)
 const areaOptions = ref<CpsInspectionArea[]>([])
 
+// 区域搜索：名称 / 编码 / 拉线房型 / 工序 / 楼栋门牌
+const areaKeyword = ref('')
+const filteredAreas = computed(() => {
+  const keyword = areaKeyword.value.trim().toLowerCase()
+  if (!keyword) return areaOptions.value
+  return areaOptions.value.filter((area) =>
+    [area.areaName, area.areaCode, area.lineOrRoomType, area.process, area.building, area.doorNo]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+      .includes(keyword),
+  )
+})
+
 const riskLabel = (level?: string) =>
   ({ HIGH: '高风险', MEDIUM: '中风险', LOW: '低风险' }[level ?? 'LOW'] ?? level ?? '')
 
 const openAreaPicker = async (t: CpsInspectionType) => {
   areaPickerType.value = t
   areaOptions.value = []
+  areaKeyword.value = ''
   areaPickerOpen.value = true
   areaPickerLoading.value = true
   try {
@@ -708,6 +739,24 @@ const typeActionLabel = (type: CpsInspectionType) => {
   if (type.zoneFlag === 1) return '选择区域'
   return '开始巡检'
 }
+
+// 类型搜索：名称 / 编码 / 巡检内容 / 描述
+const typeKeyword = ref('')
+const filteredTypes = computed(() => {
+  const keyword = typeKeyword.value.trim().toLowerCase()
+  if (!keyword) return draft.inspectionTypes
+  return draft.inspectionTypes.filter((type) =>
+    [type.name, type.code, type.content, type.description]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+      .includes(keyword),
+  )
+})
+const typeCountLabel = computed(() => {
+  const total = draft.inspectionTypes.length
+  return typeKeyword.value.trim() ? `${filteredTypes.value.length}/${total} 种` : `${total} 种可选`
+})
 
 const progressItems = computed<ProgressItem[]>(() => [
   { label: '照片', done: draft.images.length >= 1 && draft.images.length <= 5 },
@@ -1340,6 +1389,18 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 }
 
 /* ===== 第一步：巡检类型选择 ===== */
+.cps-type-search,
+.cps-area-search {
+  margin-bottom: 12px;
+}
+
+.cps-type-empty {
+  padding: 28px 0;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
 .cps-area-pick {
   display: grid;
   gap: 8px;
