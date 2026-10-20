@@ -93,6 +93,71 @@ a {
   font-size: 13px;
 }
 
+/* ===== 品牌色覆盖 =====
+   uni-app 的页面容器不在 App.vue 的 <a-config-provider> 内，antd 组件默认仍是蓝色主色，
+   与 --cps-teal-deep 品牌色不一致；这里在 .cps-page 作用域内统一成深青。
+   选择器重复类名以提高优先级，压过 cssinjs 运行时注入的同名规则。 */
+.cps-page .ant-btn-primary.ant-btn-primary:not(:disabled) {
+  background: var(--cps-teal-deep);
+  border-color: var(--cps-teal-deep);
+  box-shadow: none;
+}
+
+.cps-page .ant-btn-primary.ant-btn-primary:not(:disabled):hover {
+  background: #115e59;
+  border-color: #115e59;
+}
+
+.cps-page .ant-btn-primary.ant-btn-primary:not(:disabled):active {
+  background: #134e4a;
+  border-color: #134e4a;
+}
+
+.cps-page .ant-switch.ant-switch-checked {
+  background: var(--cps-teal-deep);
+}
+
+.cps-page .ant-tabs .ant-tabs-ink-bar {
+  background: var(--cps-teal-deep);
+}
+
+.cps-page .ant-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--cps-teal-deep);
+}
+
+.cps-page .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled) {
+  color: var(--cps-teal-deep);
+  border-color: var(--cps-teal-deep);
+}
+
+.cps-page .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled)::before {
+  background-color: var(--cps-teal-deep);
+}
+
+.cps-page .ant-radio-checked .ant-radio-inner {
+  border-color: var(--cps-teal-deep);
+}
+
+.cps-page .ant-radio-checked .ant-radio-inner::after {
+  background-color: var(--cps-teal-deep);
+}
+
+.cps-page .ant-checkbox-checked .ant-checkbox-inner {
+  background-color: var(--cps-teal-deep);
+  border-color: var(--cps-teal-deep);
+}
+
+.cps-page .ant-input:focus,
+.cps-page .ant-input-focused,
+.cps-page .ant-input-affix-wrapper-focused {
+  border-color: var(--cps-teal);
+  box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.16);
+}
+
+.cps-page .ant-spin-dot-item {
+  background-color: var(--cps-teal-deep);
+}
+
 /* 状态胶囊：全站唯一定义（ tones 与各页 STATUS/JUDGE META 对应） */
 .cps-status-pill {
   display: inline-flex;

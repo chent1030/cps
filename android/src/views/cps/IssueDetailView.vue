@@ -3,19 +3,30 @@
     <header class="cps-hero">
       <div class="cps-hero__top">
         <div class="cps-hero__identity">
-          <p class="cps-hero__eyebrow">巡检问题档案</p>
-          <h1>巡检问题</h1>
+          <p class="cps-hero__eyebrow">CPS 巡检问题</p>
+          <h1 class="cps-hero__title">{{ detail.description }}</h1>
         </div>
         <div class="cps-hero__badges">
           <a-tag :color="detailStatus.color" class="cps-pill">{{ detailStatus.label }}</a-tag>
           <a-tag v-if="detail.overdue" color="red" class="cps-pill">超时</a-tag>
         </div>
       </div>
-      <p class="cps-hero__desc">{{ detail.description }}</p>
       <div class="cps-hero__meta">
         <span>{{ issueLocation }}</span>
         <span>{{ issueCategory }}</span>
+        <span>提交 {{ formatDateTime(detail.submitTime) }}</span>
       </div>
+      <ol class="cps-steps" aria-label="流程进度">
+        <li
+          v-for="(node, index) in statusSteps"
+          :key="node.value"
+          class="cps-steps__item"
+          :class="{ 'is-done': index < currentStepIndex, 'is-active': index === currentStepIndex }"
+        >
+          <span class="cps-steps__num">{{ index + 1 }}</span>
+          <span class="cps-steps__label">{{ node.label }}</span>
+        </li>
+      </ol>
     </header>
 
     <a-row :gutter="[16, 16]">
@@ -24,10 +35,7 @@
         <a-card class="cps-card" :body-style="{ padding: '16px' }">
           <template #title>
             <div class="cps-card-title">
-              <div>
-                <p class="cps-card-title__sub">基础信息</p>
-                <h2 class="cps-card-title__main">处理责任</h2>
-              </div>
+              <h2 class="cps-card-title__main">处理责任</h2>
             </div>
           </template>
           <a-descriptions :column="{ xs: 2, sm: 3 }" size="small" bordered>
@@ -49,10 +57,7 @@
         <a-card class="cps-card" :body-style="{ padding: '16px' }" style="margin-top: 16px">
           <template #title>
             <div class="cps-card-title">
-              <div>
-                <p class="cps-card-title__sub">照片档案</p>
-                <h2 class="cps-card-title__main">问题现场</h2>
-              </div>
+              <h2 class="cps-card-title__main">问题现场</h2>
               <a-tag color="blue">{{ detail.issueAttachments.length }} 张</a-tag>
             </div>
           </template>
@@ -74,10 +79,7 @@
         <a-card class="cps-card" :body-style="{ padding: '16px' }" style="margin-top: 16px">
           <template #title>
             <div class="cps-card-title">
-              <div>
-                <p class="cps-card-title__sub">整改凭证</p>
-                <h2 class="cps-card-title__main">复核照片</h2>
-              </div>
+              <h2 class="cps-card-title__main">复核照片</h2>
               <a-tag color="green">{{ detail.proofAttachments.length }} 张</a-tag>
             </div>
           </template>
@@ -98,149 +100,178 @@
         <a-card class="cps-card" :body-style="{ padding: '16px' }" style="margin-top: 16px">
           <template #title>
             <div class="cps-card-title">
-              <div>
-                <p class="cps-card-title__sub">AI 与分类</p>
-                <h2 class="cps-card-title__main">原因措施</h2>
-              </div>
+              <h2 class="cps-card-title__main">原因措施</h2>
             </div>
           </template>
-          <a-row :gutter="12">
-            <a-col :span="12">
-              <div class="cps-ai-box"><span>AI 分类</span><strong>{{ aiCategory }}</strong></div>
-            </a-col>
-            <a-col :span="12">
-              <div class="cps-ai-box"><span>人工分类</span><strong>{{ issueCategory }}</strong></div>
-            </a-col>
-          </a-row>
-          <p class="cps-ai-line"><b>AI 原因</b>{{ detail.aiSuggestion?.reasonSuggestion || '-' }}</p>
-          <p class="cps-ai-line"><b>AI 措施</b>{{ detail.aiSuggestion?.measureSuggestion || '-' }}</p>
-          <p class="cps-ai-line"><b>人工原因</b>{{ detail.reasonAnalysis || '-' }}</p>
-          <p class="cps-ai-line"><b>人工措施</b>{{ detail.correctiveMeasure || '-' }}</p>
+          <div class="cps-ai-grid">
+            <div class="cps-ai-item">
+              <span class="cps-ai-item__label">AI 分类</span>
+              <strong class="cps-ai-item__value">{{ aiCategory }}</strong>
+            </div>
+            <div class="cps-ai-item">
+              <span class="cps-ai-item__label">人工分类</span>
+              <strong class="cps-ai-item__value">{{ issueCategory }}</strong>
+            </div>
+            <div class="cps-ai-item">
+              <span class="cps-ai-item__label">AI 原因</span>
+              <p class="cps-ai-item__text">{{ detail.aiSuggestion?.reasonSuggestion || '-' }}</p>
+            </div>
+            <div class="cps-ai-item">
+              <span class="cps-ai-item__label">AI 措施</span>
+              <p class="cps-ai-item__text">{{ detail.aiSuggestion?.measureSuggestion || '-' }}</p>
+            </div>
+            <div class="cps-ai-item">
+              <span class="cps-ai-item__label">人工原因</span>
+              <p class="cps-ai-item__text">{{ detail.reasonAnalysis || '-' }}</p>
+            </div>
+            <div class="cps-ai-item">
+              <span class="cps-ai-item__label">人工措施</span>
+              <p class="cps-ai-item__text">{{ detail.correctiveMeasure || '-' }}</p>
+            </div>
+          </div>
         </a-card>
       </a-col>
 
-      <!-- 右列：节点处理 + 流转记录（横屏并排，竖屏在下方） -->
-      <a-col :xs="{ span: 24 }" :xl="{ span: 10 }">
+      <!-- 右列：节点处理 + 流转记录（横屏并排，竖屏置顶） -->
+      <a-col :xs="{ span: 24 }" :xl="{ span: 10 }" class="cps-col-action">
         <a-card class="cps-card" :body-style="{ padding: '16px' }">
           <template #title>
             <div class="cps-card-title">
-              <div>
-                <p class="cps-card-title__sub">节点处理</p>
-                <h2 class="cps-card-title__main">当前操作</h2>
+              <h2 class="cps-card-title__main">当前操作</h2>
+              <div v-if="transferAvailable" class="cps-mode-switch">
+                <span class="cps-mode-switch__label" :class="{ 'is-on': transferMode }">转办</span>
+                <a-switch v-model:checked="transferMode" size="small" />
               </div>
-              <a-tag color="cyan">按节点</a-tag>
             </div>
           </template>
 
-          <a-form layout="vertical">
-            <template v-if="showFeedbackFields">
-              <!-- 第二流程：反馈人员确认/修正问题分类（默认填入 AI 分类） -->
-              <a-form-item label="问题分类（一级）">
-                <a-radio-group :value="actionForm.categoryL1Id ?? undefined" button-style="solid" class="cps-selector-group" @change="(e: any) => onSelectCategoryL1(Number(e.target.value))">
-                  <a-radio-button v-for="item in level1Categories" :key="item.value" :value="Number(item.value)">{{ item.label }}</a-radio-button>
-                </a-radio-group>
-                <span v-if="!level1Categories.length" class="cps-muted">暂无一级分类</span>
-                <div class="cps-default-hint">默认采用 AI 识别分类，可确认或修正</div>
-              </a-form-item>
-              <a-form-item label="问题分类（二级）">
-                <a-radio-group :value="actionForm.categoryL2Id ?? undefined" button-style="solid" class="cps-selector-group" @change="(e: any) => onSelectCategoryL2(Number(e.target.value))">
-                  <a-radio-button v-for="item in level2Categories" :key="item.value" :value="Number(item.value)">{{ item.label }}</a-radio-button>
-                </a-radio-group>
-                <span v-if="!level2Categories.length" class="cps-muted">先选择一级分类</span>
-              </a-form-item>
-              <a-form-item label="原因分析">
-                <a-textarea v-model:value="actionForm.reasonAnalysis" :rows="3" placeholder="填写原因分析" />
-              </a-form-item>
-              <a-form-item label="整改措施">
-                <a-textarea v-model:value="actionForm.correctiveMeasure" :rows="3" placeholder="填写整改措施" />
-              </a-form-item>
-              <a-form-item label="责任员工">
-                <a-input :value="personLabel(actionForm.responsibleEmpNo)" placeholder="选择责任员工" read-only @click="openPersonPicker('responsibleEmpNo', '选择责任员工')">
+          <!-- 转办模式：只填转办目标，常规处理输入全部隐藏 -->
+          <template v-if="transferMode">
+            <div class="cps-mode-hint">
+              <strong>转交给他人处理</strong>
+              <span>当前节点将直接转交，无需填写常规处理内容</span>
+            </div>
+            <a-form layout="vertical">
+              <a-form-item label="转办目标" required>
+                <a-input :value="personLabel(actionForm.targetEmpNo)" placeholder="选择转办目标" read-only @click="openPersonPicker('targetEmpNo', '选择转办目标')">
                   <template #suffix><UserOutlined /></template>
                 </a-input>
-                <div v-if="defaultPersonHint('responsibleEmpNo')" class="cps-default-hint">已默认填入上一节点操作者，可修改</div>
               </a-form-item>
-            </template>
+              <a-form-item label="转办说明">
+                <a-textarea v-model:value="actionForm.comment" :rows="3" placeholder="说明转办原因，便于接收人跟进" />
+              </a-form-item>
+            </a-form>
+            <div class="cps-actions">
+              <a-button block size="large" type="primary" class="cps-actions__btn" :loading="actionLoading === 'TRANSFER'" @click="runAction('TRANSFER')">确认转办</a-button>
+              <a-button block size="large" class="cps-actions__btn" :disabled="actionLoading === 'TRANSFER'" @click="cancelTransfer">取消</a-button>
+            </div>
+          </template>
 
-            <template v-if="showRectifyFields">
-              <a-form-item label="整改说明">
-                <a-textarea v-model:value="actionForm.rectifyRemark" :rows="3" placeholder="填写整改说明" />
-              </a-form-item>
-              <a-form-item label="上传人">
-                <a-input :value="personLabel(actionForm.proofEmpNo)" placeholder="选择上传人" read-only @click="openPersonPicker('proofEmpNo', '选择上传人')">
-                  <template #suffix><UserOutlined /></template>
-                </a-input>
-                <div v-if="defaultPersonHint('proofEmpNo')" class="cps-default-hint">已默认填入上一节点操作者，可修改</div>
-              </a-form-item>
-            </template>
+          <!-- 常规模式：按节点填写 -->
+          <template v-else>
+            <a-form v-if="showAnyActionFields" layout="vertical">
+              <template v-if="showFeedbackFields">
+                <!-- 第二流程：反馈人员确认/修正问题分类（默认填入 AI 分类） -->
+                <a-form-item label="问题分类（一级）">
+                  <a-radio-group :value="actionForm.categoryL1Id ?? undefined" button-style="solid" class="cps-selector-group" @change="(e: any) => onSelectCategoryL1(Number(e.target.value))">
+                    <a-radio-button v-for="item in level1Categories" :key="item.value" :value="Number(item.value)">{{ item.label }}</a-radio-button>
+                  </a-radio-group>
+                  <span v-if="!level1Categories.length" class="cps-muted">暂无一级分类</span>
+                  <div class="cps-default-hint">默认采用 AI 识别分类，可确认或修正</div>
+                </a-form-item>
+                <a-form-item label="问题分类（二级）">
+                  <a-radio-group :value="actionForm.categoryL2Id ?? undefined" button-style="solid" class="cps-selector-group" @change="(e: any) => onSelectCategoryL2(Number(e.target.value))">
+                    <a-radio-button v-for="item in level2Categories" :key="item.value" :value="Number(item.value)">{{ item.label }}</a-radio-button>
+                  </a-radio-group>
+                  <span v-if="!level2Categories.length" class="cps-muted">先选择一级分类</span>
+                </a-form-item>
+                <a-form-item label="原因分析">
+                  <a-textarea v-model:value="actionForm.reasonAnalysis" :rows="3" placeholder="填写原因分析" />
+                </a-form-item>
+                <a-form-item label="整改措施">
+                  <a-textarea v-model:value="actionForm.correctiveMeasure" :rows="3" placeholder="填写整改措施" />
+                </a-form-item>
+                <a-form-item label="责任员工">
+                  <a-input :value="personLabel(actionForm.responsibleEmpNo)" placeholder="选择责任员工" read-only @click="openPersonPicker('responsibleEmpNo', '选择责任员工')">
+                    <template #suffix><UserOutlined /></template>
+                  </a-input>
+                  <div v-if="defaultPersonHint('responsibleEmpNo')" class="cps-default-hint">已默认填入上一节点操作者，可修改</div>
+                </a-form-item>
+              </template>
 
-            <template v-if="showProofFields">
-              <a-form-item label="审核人">
-                <a-input :value="personLabel(actionForm.reviewerEmpNo)" placeholder="选择审核人" read-only @click="openPersonPicker('reviewerEmpNo', '选择审核人')">
-                  <template #suffix><UserOutlined /></template>
-                </a-input>
-              </a-form-item>
-              <a-form-item label="整改照片">
-                <!-- 整改照片上传（内联） -->
-                <a-upload list-type="picture-card" :file-list="proofFileList" :max-count="5" :custom-request="customProofRequest" :before-upload="beforeProofUpload" :show-upload-list="false" multiple accept="image/*">
-                  <div v-if="proofImages.length < 5" class="cps-uploader__trigger">
-                    <span class="cps-uploader__plus">+</span>
-                    <span class="cps-uploader__text">{{ proofUploading ? '上传中' : '上传整改图片' }}</span>
+              <template v-if="showRectifyFields">
+                <a-form-item label="整改说明">
+                  <a-textarea v-model:value="actionForm.rectifyRemark" :rows="3" placeholder="填写整改说明" />
+                </a-form-item>
+                <a-form-item label="上传人">
+                  <a-input :value="personLabel(actionForm.proofEmpNo)" placeholder="选择上传人" read-only @click="openPersonPicker('proofEmpNo', '选择上传人')">
+                    <template #suffix><UserOutlined /></template>
+                  </a-input>
+                  <div v-if="defaultPersonHint('proofEmpNo')" class="cps-default-hint">已默认填入上一节点操作者，可修改</div>
+                </a-form-item>
+              </template>
+
+              <template v-if="showProofFields">
+                <a-form-item label="审核人">
+                  <a-input :value="personLabel(actionForm.reviewerEmpNo)" placeholder="选择审核人" read-only @click="openPersonPicker('reviewerEmpNo', '选择审核人')">
+                    <template #suffix><UserOutlined /></template>
+                  </a-input>
+                </a-form-item>
+                <a-form-item label="整改照片">
+                  <!-- 整改照片上传（内联） -->
+                  <a-upload list-type="picture-card" :file-list="proofFileList" :max-count="5" :custom-request="customProofRequest" :before-upload="beforeProofUpload" :show-upload-list="false" multiple accept="image/*">
+                    <div v-if="proofImages.length < 5" class="cps-uploader__trigger">
+                      <span class="cps-uploader__plus">+</span>
+                      <span class="cps-uploader__text">{{ proofUploading ? '上传中' : '上传整改图片' }}</span>
+                    </div>
+                  </a-upload>
+                  <div class="cps-uploader__grid">
+                    <div v-for="(image, index) in proofImages" :key="image.id" class="cps-uploader__item" @click="previewProofImage(index)">
+                      <img :src="attachmentImageSources[image.id] || ''" :alt="image.name" />
+                      <span v-if="!proofUploading" class="cps-uploader__delete" @click.stop="removeProofImage(index)">×</span>
+                      <span class="cps-uploader__index">{{ index + 1 }}</span>
+                    </div>
                   </div>
-                </a-upload>
-                <div class="cps-uploader__grid">
-                  <div v-for="(image, index) in proofImages" :key="image.id" class="cps-uploader__item" @click="previewProofImage(index)">
-                    <img :src="attachmentImageSources[image.id] || ''" :alt="image.name" />
-                    <span v-if="!proofUploading" class="cps-uploader__delete" @click.stop="removeProofImage(index)">×</span>
-                    <span class="cps-uploader__index">{{ index + 1 }}</span>
-                  </div>
-                </div>
-                <p class="cps-uploader__hint">最多上传 5 张</p>
+                  <p class="cps-uploader__hint">最多上传 5 张</p>
+                </a-form-item>
+              </template>
+
+              <template v-if="showReviewFields">
+                <a-form-item label="审核意见">
+                  <a-textarea v-model:value="actionForm.reviewOpinion" :rows="3" placeholder="填写审核意见" />
+                </a-form-item>
+              </template>
+
+              <a-form-item label="流转备注">
+                <a-textarea v-model:value="actionForm.comment" :rows="2" placeholder="填写备注" />
               </a-form-item>
-            </template>
+            </a-form>
 
-            <template v-if="showReviewFields">
-              <a-form-item label="审核意见">
-                <a-textarea v-model:value="actionForm.reviewOpinion" :rows="3" placeholder="填写审核意见" />
-              </a-form-item>
-            </template>
-
-            <a-form-item v-if="showTransferField" label="转办目标">
-              <a-input :value="personLabel(actionForm.targetEmpNo)" placeholder="选择转办目标" read-only @click="openPersonPicker('targetEmpNo', '选择转办目标')">
-                <template #suffix><UserOutlined /></template>
-              </a-input>
-            </a-form-item>
-
-            <a-form-item label="流转备注">
-              <a-textarea v-model:value="actionForm.comment" :rows="2" placeholder="填写备注" />
-            </a-form-item>
-          </a-form>
-
-          <!-- 动作按钮（内联） -->
-          <div class="cps-actions">
-            <a-button
-              v-for="action in workflowActions"
-              :key="action"
-              block
-              size="large"
-              :type="action === 'REVIEW_CLOSE' ? 'primary' : 'default'"
-              :danger="action === 'REVIEW_REJECT'"
-              class="cps-actions__btn"
-              :class="{ 'cps-actions__btn--success': action === 'REVIEW_CLOSE', 'cps-actions__btn--danger': action === 'REVIEW_REJECT' }"
-              @click="runAction(action)"
-            >
-              {{ actionLabels[action] }}
-            </a-button>
-          </div>
+            <a-empty v-if="!normalActions.length" description="当前节点没有可执行的操作" />
+            <div v-else class="cps-actions">
+              <a-button
+                v-for="action in normalActions"
+                :key="action"
+                block
+                size="large"
+                :type="action === 'REVIEW_CLOSE' || normalActions.length === 1 ? 'primary' : 'default'"
+                :danger="action === 'REVIEW_REJECT'"
+                class="cps-actions__btn"
+                :class="{ 'cps-actions__btn--success': action === 'REVIEW_CLOSE', 'cps-actions__btn--danger': action === 'REVIEW_REJECT' }"
+                :loading="actionLoading === action"
+                @click="runAction(action)"
+              >
+                {{ actionLabels[action] }}
+              </a-button>
+            </div>
+            <p v-if="transferAvailable" class="cps-action-tip">需要转交他人处理？打开右上角「转办」开关</p>
+          </template>
         </a-card>
 
         <a-card class="cps-card" :body-style="{ padding: '16px' }" style="margin-top: 16px">
           <template #title>
             <div class="cps-card-title">
-              <div>
-                <p class="cps-card-title__sub">流转记录</p>
-                <h2 class="cps-card-title__main">处理轨迹</h2>
-              </div>
+              <h2 class="cps-card-title__main">处理轨迹</h2>
             </div>
           </template>
           <!-- 流程时间线（内联） -->
@@ -345,6 +376,9 @@ const proofUploading = ref(false)
 const attachmentImageSources = ref<Record<number, string>>({})
 const selectedPeople = ref<Record<string, CpsEmployeeOption>>({})
 const defaultAppliedFields = ref<Set<ActionPersonField>>(new Set())
+// 转办模式开关 + 正在提交的动作
+const transferMode = ref(false)
+const actionLoading = ref<CpsIssueAction | null>(null)
 
 // 分类选项（第二流程：反馈人员确认/修正分类）
 const level1Categories = ref<CpsOption[]>([])
@@ -421,7 +455,26 @@ const workflowActions = computed<CpsIssueAction[]>(() => {
   if (!detail.value) return []
   return detail.value.availableActions.length ? detail.value.availableActions : statusDefaultActions[detail.value.status]
 })
-const showTransferField = computed(() => workflowActions.value.includes('TRANSFER'))
+// 转办独立成模式：开启后只填转办目标，常规操作项不再展示
+const transferAvailable = computed(() => workflowActions.value.includes('TRANSFER'))
+const normalActions = computed<CpsIssueAction[]>(() => workflowActions.value.filter((action) => action !== 'TRANSFER'))
+const showAnyActionFields = computed(
+  () => showFeedbackFields.value || showRectifyFields.value || showProofFields.value || showReviewFields.value,
+)
+
+const statusSteps: { value: CpsIssueStatus; label: string }[] = [
+  { value: 'PENDING_FEEDBACK', label: '待反馈' },
+  { value: 'PENDING_RECTIFY', label: '待整改' },
+  { value: 'PENDING_UPLOAD_PROOF', label: '待传图' },
+  { value: 'PENDING_REVIEW', label: '待审核' },
+  { value: 'CLOSED', label: '已关闭' },
+]
+const currentStepIndex = computed(() => {
+  if (!detail.value) return 0
+  const index = statusSteps.findIndex((node) => node.value === detail.value?.status)
+  return index < 0 ? 0 : index
+})
+const formatDateTime = (value?: string | null) => (value ? value.replace('T', ' ').slice(0, 16) : '-')
 
 const statusDefaultActions: Record<CpsIssueStatus, CpsIssueAction[]> = {
   PENDING_FEEDBACK: ['REPLY_ASSIGN', 'TRANSFER'],
@@ -529,6 +582,8 @@ const resetActionForm = () => {
 const applyDefaultPersons = () => {
   if (!detail.value) return
   resetActionForm()
+  // 每次加载后回到常规处理模式
+  transferMode.value = false
   const defaults = resolveDefaultPersons(detail.value)
   for (const { field, person } of defaults) {
     actionForm.value[field] = person.empNo
@@ -641,13 +696,25 @@ const buildActionPayload = (action: CpsIssueAction) => {
 }
 
 const runAction = async (action: CpsIssueAction) => {
+  if (actionLoading.value) return
+  if (action === 'TRANSFER' && !actionForm.value.targetEmpNo) {
+    message.warning('请选择转办目标')
+    return
+  }
+  actionLoading.value = action
   try {
     await executeCpsIssueAction(issueId.value, buildActionPayload(action))
-    message.success('操作成功')
+    message.success(action === 'TRANSFER' ? '已转办' : '操作成功')
     await load()
   } catch (error) {
     message.error(error instanceof Error ? error.message : '操作失败')
+  } finally {
+    actionLoading.value = null
   }
+}
+
+const cancelTransfer = () => {
+  transferMode.value = false
 }
 
 const previewAttachments = (attachments: CpsAttachment[], startPosition: number) => {
@@ -739,10 +806,12 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 }
 
 .cps-hero h1 {
-  margin: 4px 0 12px;
-  font-size: 24px;
+  margin: 6px 0 0;
+  font-size: 22px;
   font-weight: 800;
-  word-break: break-all;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  word-break: break-word;
 }
 
 .cps-hero__badges {
@@ -752,27 +821,79 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   justify-content: flex-end;
 }
 
-.cps-hero__desc {
-  margin: 0 0 12px;
-  color: rgba(255, 255, 255, 0.96);
-  font-size: 16px;
+/* 流程进度条：5 个节点，当前节点高亮 */
+.cps-steps {
+  display: flex;
+  gap: 6px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+}
+
+.cps-steps__item {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--cps-radius-pill);
+  padding: 5px 10px 5px 6px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
   font-weight: 700;
-  line-height: 26px;
+}
+
+.cps-steps__num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.cps-steps__item.is-done {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.cps-steps__item.is-done .cps-steps__num {
+  background: rgba(255, 255, 255, 0.42);
+  color: #115e59;
+}
+
+.cps-steps__item.is-active {
+  background: #fff;
+  color: var(--cps-teal-deep);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
+}
+
+.cps-steps__item.is-active .cps-steps__num {
+  background: var(--cps-teal-deep);
+  color: #fff;
 }
 
 .cps-hero__meta {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .cps-hero__meta span {
+  flex: 0 1 auto;
+  max-width: 100%;
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: var(--cps-radius-md);
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.16);
   font-size: 14px;
   font-weight: 700;
+  line-height: 1.4;
+  text-overflow: ellipsis;
 }
 
 .cps-pill {
@@ -787,6 +908,12 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   box-shadow: var(--cps-shadow-card);
 }
 
+.cps-card :deep(.ant-card-head) {
+  min-height: 54px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--cps-border);
+}
+
 .cps-card-title {
   display: flex;
   align-items: center;
@@ -794,18 +921,12 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   gap: 12px;
 }
 
-.cps-card-title__sub {
-  margin: 0;
-  color: #0f766e;
-  font-size: 12px;
-  font-weight: 800;
-}
-
 .cps-card-title__main {
-  margin: 2px 0 0;
+  margin: 0;
   color: #0f172a;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .cps-photo-grid {
@@ -850,43 +971,45 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   line-height: 22px;
 }
 
-.cps-ai-box {
+.cps-ai-grid {
   display: grid;
-  gap: 4px;
-  padding: 12px;
-  border-radius: var(--cps-radius-md);
-  background: var(--cps-mist);
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 
-.cps-ai-box span {
+@media (min-width: 640px) {
+  .cps-ai-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.cps-ai-item {
+  border: 1px solid var(--cps-border);
+  border-radius: var(--cps-radius-md);
+  padding: 12px;
+  background: #fff;
+}
+
+.cps-ai-item__label {
   color: #64748b;
   font-size: 12px;
   font-weight: 700;
 }
 
-.cps-ai-box strong {
+.cps-ai-item__value {
+  display: block;
+  margin-top: 4px;
   color: #0f172a;
   font-size: 15px;
   font-weight: 800;
 }
 
-.cps-ai-line {
-  display: grid;
-  gap: 4px;
-  margin: 10px 0 0;
-  border-left: 4px solid var(--cps-teal);
-  border-radius: var(--cps-radius-sm);
-  padding: 10px 12px;
-  background: var(--cps-cloud);
+.cps-ai-item__text {
+  margin: 6px 0 0;
   color: var(--cps-ink-2);
   font-size: 14px;
-  line-height: 22px;
-}
-
-.cps-ai-line b {
-  color: #0f172a;
-  font-size: 13px;
-  font-weight: 800;
+  line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 .cps-default-hint {
@@ -1016,6 +1139,51 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   font-size: 13px;
 }
 
+/* 转办模式开关与提示 */
+.cps-mode-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cps-mode-switch__label {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.cps-mode-switch__label.is-on {
+  color: var(--cps-teal-deep);
+}
+
+.cps-mode-hint {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 14px;
+  border-left: 3px solid var(--cps-teal);
+  border-radius: var(--cps-radius-sm);
+  padding: 10px 12px;
+  background: var(--cps-mist);
+}
+
+.cps-mode-hint strong {
+  color: var(--cps-teal-deep);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.cps-mode-hint span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.cps-action-tip {
+  margin: 12px 0 0;
+  color: #94a3b8;
+  font-size: 12px;
+  text-align: center;
+}
+
 /* 动作按钮（内联） */
 .cps-actions {
   display: grid;
@@ -1028,6 +1196,11 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   border-radius: var(--cps-radius-lg) !important;
   font-size: 16px !important;
   font-weight: 700 !important;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.cps-actions__btn:not(:disabled):active {
+  transform: translateY(1px);
 }
 
 .cps-actions__btn--success {
@@ -1152,6 +1325,13 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   .cps-page {
     max-width: 1280px;
     padding: 20px 28px 56px;
+  }
+}
+
+/* 竖屏/窄屏：把「当前操作」提到最前，现场处理不用滑到底 */
+@media (max-width: 1199px) {
+  .cps-detail-page .cps-col-action {
+    order: -1;
   }
 }
 </style>

@@ -4,16 +4,17 @@
       <div class="cps-hero__main">
         <p class="cps-hero__eyebrow">CPS 现场巡检</p>
         <h1>{{ step === 'select' ? '选择巡检类型' : '新建问题' }}</h1>
-        <div v-if="step === 'form'" class="cps-create-progress">
-          <a-tag v-for="item in progressItems" :key="item.label" :color="item.done ? 'cyan' : 'default'" class="cps-progress-tag">
-            {{ item.label }}
-          </a-tag>
-        </div>
-        <div v-else class="cps-create-progress">
-          <a-tag color="cyan" class="cps-progress-tag">第 1 步 · 选类型</a-tag>
-          <a-tag class="cps-progress-tag">第 2 步 · 填表单</a-tag>
-          <a-tag class="cps-progress-tag">第 3 步 · 提交</a-tag>
-        </div>
+        <ol class="cps-steps">
+          <li
+            v-for="(label, index) in stepLabels"
+            :key="label"
+            class="cps-steps__item"
+            :class="{ 'is-active': stepIndex === index, 'is-done': stepIndex > index }"
+          >
+            <span class="cps-steps__num">{{ index + 1 }}</span>
+            <span class="cps-steps__label">{{ label }}</span>
+          </li>
+        </ol>
       </div>
       <a-tag color="blue" class="cps-hero__badge">AI 辅助</a-tag>
     </header>
@@ -25,10 +26,7 @@
       <a-card class="cps-card" :body-style="{ padding: '20px' }">
         <template #title>
           <div class="cps-card-title">
-            <div>
-              <p class="cps-card-title__sub">第一步 · 选择类型</p>
-              <h2 class="cps-card-title__main">本次巡检属于哪类问题？</h2>
-            </div>
+            <h2 class="cps-card-title__main">本次巡检属于哪类问题？</h2>
             <a-tag color="blue">{{ draft.inspectionTypes.length }} 种可选</a-tag>
           </div>
         </template>
@@ -45,22 +43,15 @@
               :disabled="startingCustom !== null"
               @click="onSelectInspectionType(t.code)"
             >
-              <strong class="cps-type-select__name">
-                {{ t.name }}
-                <a-tag v-if="t.builtin === 1" color="purple" style="margin-left: 6px">内置</a-tag>
-              </strong>
+              <span class="cps-type-select__head">
+                <strong class="cps-type-select__name">{{ t.name }}</strong>
+                <a-tag v-if="t.builtin === 1" color="purple" class="cps-type-select__tag">内置</a-tag>
+              </span>
               <span class="cps-type-select__code">{{ t.code }}</span>
               <span v-if="t.content || t.description" class="cps-type-select__desc">{{ t.content || t.description }}</span>
               <span class="cps-type-select__go">
-                {{
-                  startingCustom === t.code
-                    ? '正在开启巡检…'
-                    : t.builtin === 1
-                      ? '上报问题 →'
-                      : t.zoneFlag === 1
-                        ? '选择区域 →'
-                        : '开始巡检 →'
-                }}
+                <span>{{ typeActionLabel(t) }}</span>
+                <span class="cps-type-select__arrow" aria-hidden="true">→</span>
               </span>
             </button>
           </div>
@@ -77,10 +68,7 @@
         <a-card class="cps-card" :body-style="{ padding: '16px' }">
           <template #title>
             <div class="cps-card-title">
-              <div>
-                <p class="cps-card-title__sub">现场证据</p>
-                <h2 class="cps-card-title__main">问题照片</h2>
-              </div>
+              <h2 class="cps-card-title__main">问题照片</h2>
               <a-tag color="blue">{{ draft.images.length }}/5</a-tag>
             </div>
           </template>
@@ -119,10 +107,7 @@
         <a-card class="cps-card" :body-style="{ padding: '16px' }" style="margin-top: 16px">
           <template #title>
             <div class="cps-card-title">
-              <div>
-                <p class="cps-card-title__sub">问题描述</p>
-                <h2 class="cps-card-title__main">现场情况</h2>
-              </div>
+              <h2 class="cps-card-title__main">现场情况</h2>
             </div>
           </template>
           <a-textarea
@@ -157,10 +142,10 @@
         <a-card class="cps-card" :body-style="{ padding: '14px 16px' }">
           <div class="cps-type-active">
             <div class="cps-type-active__info">
-              <p class="cps-card-title__sub">巡检类型 · 第 1 步已选</p>
+              <span class="cps-type-active__label">当前巡检类型</span>
               <strong class="cps-type-active__name">
                 {{ activeTypeName || draft.inspectionTypeCode }}
-                <a-tag color="arcoblue" style="margin-left: 6px">{{ draft.inspectionTypeCode }}</a-tag>
+                <span class="cps-type-active__code">{{ draft.inspectionTypeCode }}</span>
               </strong>
             </div>
             <a-button size="small" @click="switchType">切换类型</a-button>
@@ -181,10 +166,7 @@
         >
           <template #title>
             <div class="cps-card-title">
-              <div>
-                <p class="cps-card-title__sub">按类型配置点检</p>
-                <h2 class="cps-card-title__main">现场点检项</h2>
-              </div>
+              <h2 class="cps-card-title__main">现场点检项</h2>
               <a-tag color="cyan">{{ checkDoneCount }}/{{ typeCheckItems.length }}</a-tag>
             </div>
           </template>
@@ -236,10 +218,7 @@
         <a-card class="cps-card" :body-style="{ padding: '16px' }" style="margin-top: 16px">
           <template #title>
             <div class="cps-card-title">
-              <div>
-                <p class="cps-card-title__sub">位置选择</p>
-                <h2 class="cps-card-title__main">工厂 / 区域 / 拉线 / 工序</h2>
-              </div>
+              <h2 class="cps-card-title__main">工厂 / 区域 / 拉线 / 工序</h2>
             </div>
           </template>
 
@@ -283,10 +262,7 @@
         <a-card v-if="aiSuggestionSummary" class="cps-card cps-create-ai" :body-style="{ padding: '16px' }" style="margin-top: 16px">
           <template #title>
             <div class="cps-card-title">
-              <div>
-                <p class="cps-card-title__sub">AI 建议</p>
-                <h2 class="cps-card-title__main">原因措施</h2>
-              </div>
+              <h2 class="cps-card-title__main">原因措施</h2>
               <a-tag color="blue">可修改</a-tag>
             </div>
           </template>
@@ -296,10 +272,7 @@
         <a-card class="cps-card" :body-style="{ padding: '16px' }" style="margin-top: 16px">
           <template #title>
             <div class="cps-card-title">
-              <div>
-                <p class="cps-card-title__sub">派发信息</p>
-                <h2 class="cps-card-title__main">反馈人</h2>
-              </div>
+              <h2 class="cps-card-title__main">反馈人</h2>
             </div>
           </template>
           <a-form layout="vertical">
@@ -322,6 +295,11 @@
     </a-row>
 
     <div v-if="step === 'form'" class="cps-submit-bar">
+      <div class="cps-submit-bar__progress">
+        <span v-for="item in progressItems" :key="item.label" class="cps-progress-chip" :class="{ 'is-done': item.done }">
+          {{ item.done ? '✓' : '·' }} {{ item.label }}
+        </span>
+      </div>
       <div class="cps-submit-bar__actions">
         <a-button
           size="large"
@@ -718,6 +696,17 @@ interface ProgressItem {
   label: string
   done: boolean
 }
+// 顶部三步进度：选类型 → 填表单 → 提交（提交即底部动作条）
+const stepLabels = ['选类型', '填表单', '提交']
+const stepIndex = computed(() => (step.value === 'select' ? 0 : 1))
+
+const typeActionLabel = (type: CpsInspectionType) => {
+  if (startingCustom.value === type.code) return '正在开启巡检…'
+  if (type.builtin === 1) return '上报问题'
+  if (type.zoneFlag === 1) return '选择区域'
+  return '开始巡检'
+}
+
 const progressItems = computed<ProgressItem[]>(() => [
   { label: '照片', done: draft.images.length >= 1 && draft.images.length <= 5 },
   { label: '位置', done: Boolean(draft.location.factory && draft.location.area && draft.location.line && draft.location.process && draft.resourceNo.trim()) },
@@ -1104,16 +1093,59 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   font-weight: 800;
 }
 
-.cps-create-progress {
+/* 顶部三步进度 */
+.cps-steps {
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
-  margin-top: 4px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
 }
 
-.cps-progress-tag {
-  border-radius: 999px !important;
-  font-weight: 700 !important;
+.cps-steps__item {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--cps-radius-pill);
+  padding: 5px 10px 5px 6px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cps-steps__num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.cps-steps__item.is-done {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.cps-steps__item.is-done .cps-steps__num {
+  background: rgba(255, 255, 255, 0.42);
+  color: #115e59;
+}
+
+.cps-steps__item.is-active {
+  background: #fff;
+  color: var(--cps-teal-deep);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
+}
+
+.cps-steps__item.is-active .cps-steps__num {
+  background: var(--cps-teal-deep);
+  color: #fff;
 }
 
 .cps-hero__badge {
@@ -1128,6 +1160,12 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   box-shadow: var(--cps-shadow-card);
 }
 
+.cps-card :deep(.ant-card-head) {
+  min-height: 54px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--cps-border);
+}
+
 .cps-card-title {
   display: flex;
   align-items: center;
@@ -1135,18 +1173,12 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   gap: 12px;
 }
 
-.cps-card-title__sub {
-  margin: 0;
-  color: var(--cps-teal-deep);
-  font-size: 12px;
-  font-weight: 800;
-}
-
 .cps-card-title__main {
-  margin: 2px 0 0;
+  margin: 0;
   color: var(--cps-ink);
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .cps-create-card__hint {
@@ -1267,13 +1299,13 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 }
 
 .cps-selector-row {
-  display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
-  align-items: start;
+  display: flex;
+  align-items: flex-start;
   gap: 12px;
 }
 
 .cps-selector-label {
+  flex: 0 0 56px;
   padding-top: 6px;
   color: #0f172a;
   font-size: 14px;
@@ -1282,8 +1314,10 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 
 .cps-selector-group {
   display: flex;
+  flex: 1 1 auto;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
 .cps-selector-group :deep(.ant-radio-button-wrapper) {
@@ -1299,8 +1333,11 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 }
 
 .cps-muted {
+  flex: 1 1 auto;
+  padding-top: 6px;
   color: #64748b;
   font-size: 14px;
+  white-space: nowrap;
 }
 
 /* ===== 第一步：巡检类型选择 ===== */
@@ -1412,7 +1449,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   background: #fff;
   text-align: left;
   cursor: pointer;
-  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
   /* grid 子项默认 min-width:auto 会被长文本撑宽轨道 → 显式归零保证各列等宽 */
   min-width: 0;
 }
@@ -1421,8 +1458,32 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   border: none;
 }
 
+.cps-type-select__item:hover {
+  border-color: rgba(20, 184, 166, 0.45);
+  box-shadow: 0 8px 20px rgba(15, 118, 110, 0.12);
+  transform: translateY(-2px);
+}
+
 .cps-type-select__item:active {
-  transform: scale(0.98);
+  transform: translateY(0) scale(0.99);
+}
+
+.cps-type-select__item:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.cps-type-select__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cps-type-select__tag {
+  flex-shrink: 0;
+  border-radius: var(--cps-radius-pill) !important;
+  font-weight: 700 !important;
 }
 
 .cps-type-select__item[data-color='red'] {
@@ -1582,10 +1643,25 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 }
 
 .cps-type-select__go {
-  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--cps-border);
   color: var(--cps-teal-deep);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
+}
+
+.cps-type-select__arrow {
+  font-size: 15px;
+  transition: transform 140ms ease;
+}
+
+.cps-type-select__item:hover .cps-type-select__arrow {
+  transform: translateX(3px);
 }
 
 /* ===== 第二步：当前类型指示卡 ===== */
@@ -1602,12 +1678,29 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   min-width: 0;
 }
 
+.cps-type-active__label {
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .cps-type-active__name {
   display: flex;
   align-items: center;
   color: #0f172a;
   font-size: 16px;
   font-weight: 800;
+}
+
+.cps-type-active__code {
+  margin-left: 8px;
+  border-radius: var(--cps-radius-pill);
+  padding: 1px 9px;
+  background: var(--cps-mist);
+  color: var(--cps-teal-deep);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
 .cps-create-ai {
@@ -1683,7 +1776,33 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   max-width: 1280px;
   margin: 0 auto;
   padding: 12px 20px max(12px, env(safe-area-inset-bottom));
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0), #f8fafc 40%);
+  background: rgba(248, 250, 252, 0.97);
+  border-top: 1px solid var(--cps-border);
+  box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.cps-submit-bar__progress {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.cps-progress-chip {
+  border-radius: var(--cps-radius-pill);
+  padding: 3px 10px;
+  background: #fff;
+  border: 1px solid var(--cps-border);
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cps-progress-chip.is-done {
+  border-color: rgba(20, 184, 166, 0.4);
+  background: var(--cps-mist);
+  color: var(--cps-teal-deep);
 }
 
 .cps-submit-bar__actions {
