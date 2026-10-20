@@ -18,6 +18,9 @@ public class CpsRoomCheckRecordItem {
     private String judgeResult;
     private String judgeReason;
     private String finalResult;
+    private String finalModifiedBy;
+    private LocalDateTime finalModifiedAt;
+    private String finalModifyReason;
     private LocalDateTime judgedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -50,6 +53,12 @@ public class CpsRoomCheckRecordItem {
     public void setJudgeReason(String judgeReason) { this.judgeReason = judgeReason; }
     public String getFinalResult() { return finalResult; }
     public void setFinalResult(String finalResult) { this.finalResult = finalResult; }
+    public String getFinalModifiedBy() { return finalModifiedBy; }
+    public void setFinalModifiedBy(String finalModifiedBy) { this.finalModifiedBy = finalModifiedBy; }
+    public LocalDateTime getFinalModifiedAt() { return finalModifiedAt; }
+    public void setFinalModifiedAt(LocalDateTime finalModifiedAt) { this.finalModifiedAt = finalModifiedAt; }
+    public String getFinalModifyReason() { return finalModifyReason; }
+    public void setFinalModifyReason(String finalModifyReason) { this.finalModifyReason = finalModifyReason; }
     public LocalDateTime getJudgedAt() { return judgedAt; }
     public void setJudgedAt(LocalDateTime judgedAt) { this.judgedAt = judgedAt; }
     public LocalDateTime getCreatedAt() { return createdAt; }

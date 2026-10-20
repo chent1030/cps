@@ -94,7 +94,7 @@ export function IssuesPage() {
     <>
       <PageHead
         title="问题管理"
-        detail="查看问题全字段、附件和流程人员，支持位置下拉筛选与创建时间范围查询。"
+        detail="问题明细、附件与流程记录"
       >
         <Button
           icon={<IconDownload />}
@@ -186,7 +186,7 @@ export function IssuesPage() {
           </Button>
         </Form>
       </Card>
-      <div style={{ marginTop: 20 }}>
+      <div style={{ marginTop: 16 }}>
         <StatePanel {...remote}>
           {remote.data && (
             <Card className="table-card">

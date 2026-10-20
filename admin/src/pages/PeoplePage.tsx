@@ -149,7 +149,7 @@ export function PeoplePage() {
   ]
 
   return <>
-    <PageHead title="区域人员" detail="被配置员工信息必填，当前操作人由管理端登录会话自动记录。">
+    <PageHead title="区域人员" detail="区域与责任人配置">
       <Space size={10}>
         <Upload accept=".xlsx,.xls" showUploadList={false} beforeUpload={importExcel}><Button icon={<IconUpload />}>导入 Excel</Button></Upload>
         <Button onClick={() => void downloadImportTemplate()}>下载导入模板</Button>
@@ -167,15 +167,15 @@ export function PeoplePage() {
         <Button type="primary" htmlType="submit" icon={<IconFilter />}>筛选</Button>
       </Form>
     </Card>
-    <div style={{ marginTop: 20 }}>
+    <div style={{ marginTop: 16 }}>
       <StatePanel {...remote}>{remote.data && <Card className="table-card">
         <Table rowKey="id" columns={columns} data={remote.data.records} pagination={false} scroll={{ x: 800 }} />
         <div className="pagination-wrap"><Pagination current={remote.data.page} pageSize={remote.data.pageSize} total={remote.data.total} sizeCanChange showTotal onChange={(page, pageSize) => setQuery({ ...query, page, pageSize })} /></div>
       </Card>}</StatePanel>
     </div>
-    <Modal title={editing ? '编辑区域人员配置' : '新增区域人员配置'} visible={visible} onCancel={closeModal} onOk={() => void save()} confirmLoading={saving} okText="保存" cancelText="取消">
+    <Modal title={editing ? '编辑区域人员配置' : '新增区域人员配置'} visible={visible} onCancel={closeModal} onOk={() => void save()} confirmLoading={saving} okText="保存" cancelText="取消" style={{ width: 640 }}>
       <Form layout="vertical">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className="form-grid">
           <Form.Item label="工厂" required><Input value={form.factory} onChange={(factory) => setForm({ ...form, factory })} /></Form.Item>
           <Form.Item label="区域" required><Input value={form.area} onChange={(area) => setForm({ ...form, area })} /></Form.Item>
           <Form.Item label="拉线" required><Input value={form.line} onChange={(line) => setForm({ ...form, line })} /></Form.Item>
@@ -183,7 +183,6 @@ export function PeoplePage() {
           <Form.Item label="员工工号" required><Input value={form.empNo} onChange={(empNo) => setForm({ ...form, empNo })} /></Form.Item>
           <Form.Item label="员工姓名" required><Input value={form.empName} onChange={(empName) => setForm({ ...form, empName })} /></Form.Item>
         </div>
-        <Typography.Text type="secondary">当前操作人由登录会话自动带入，创建时写入创建人，编辑时写入更新人。</Typography.Text>
       </Form>
     </Modal>
   </>

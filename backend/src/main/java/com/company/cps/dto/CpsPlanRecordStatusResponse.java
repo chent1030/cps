@@ -15,6 +15,8 @@ public class CpsPlanRecordStatusResponse {
 
     public static class TypeRecordStatus {
         private String taskType;
+        /** 该类型是否在本计划建单范围内（选择性建单：草稿未勾选=false，不计缺失） */
+        private boolean requested = true;
         private boolean taskExists;
         private Long taskId;
         private String taskStatus;
@@ -26,6 +28,8 @@ public class CpsPlanRecordStatusResponse {
 
         public String getTaskType() { return taskType; }
         public void setTaskType(String taskType) { this.taskType = taskType; }
+        public boolean isRequested() { return requested; }
+        public void setRequested(boolean requested) { this.requested = requested; }
         public boolean isTaskExists() { return taskExists; }
         public void setTaskExists(boolean taskExists) { this.taskExists = taskExists; }
         public Long getTaskId() { return taskId; }

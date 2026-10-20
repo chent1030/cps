@@ -2,10 +2,10 @@ package com.company.cps.dto;
 
 public class CpsAdminLoginRequest {
     private String empNo;
-    private String empName;
+    private String password;
 
     public String getEmpNo() { return empNo; }
     public void setEmpNo(String empNo) { this.empNo = empNo; }
-    public String getEmpName() { return empName; }
-    public void setEmpName(String empName) { this.empName = empName; }
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
 }

@@ -24,4 +24,11 @@ public interface CpsRoomCheckRecordItemMapper {
                           @Param("judgeReason") String judgeReason,
                           @Param("finalResult") String finalResult,
                           @Param("judgedAt") java.time.LocalDateTime judgedAt);
+
+    /** PRD 24.2.2/24.2.5：点检人确认/修正最终结果（仅与 AI 判定不同的项落修正留痕）。 */
+    int updateFinalResult(@Param("id") Long id,
+                          @Param("finalResult") String finalResult,
+                          @Param("finalModifiedBy") String finalModifiedBy,
+                          @Param("finalModifiedAt") java.time.LocalDateTime finalModifiedAt,
+                          @Param("finalModifyReason") String finalModifyReason);
 }

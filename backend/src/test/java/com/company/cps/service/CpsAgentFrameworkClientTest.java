@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -53,6 +54,26 @@ class CpsAgentFrameworkClientTest {
         properties.setBaseUrl(BASE_URL);
         properties.setTimeoutMs(2000);
         client = new CpsAgentFrameworkClient(properties, contentResolver, restTemplate);
+    }
+
+    @Test
+    void runtimeStatusSendsBearerWhenApiTokenConfigured() {
+        CpsAgentFrameworkProperties tokenProperties = new CpsAgentFrameworkProperties();
+        tokenProperties.setEnabled(true);
+        tokenProperties.setBaseUrl(BASE_URL);
+        tokenProperties.setTimeoutMs(2000);
+        tokenProperties.setApiToken(" dev-shared-key ");
+        CpsAgentFrameworkClient tokenClient =
+                new CpsAgentFrameworkClient(tokenProperties, contentResolver, restTemplate);
+
+        server.expect(requestTo(BASE_URL + "/cps/metrics"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("Authorization", "Bearer dev-shared-key")) // trim 后发送
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        Map<String, Object> status = tokenClient.runtimeStatus();
+        assertEquals("ONLINE", status.get("state"));
+        server.verify();
     }
 
     @Test

@@ -12,6 +12,12 @@ public class CpsIssue {
     private String area;
     private String line;
     private String process;
+    /** 资源号：巡检现场手动录入的物理资源标识（PRD 24.2.6），与 factory/area/line/process 共同构成位置维度。 */
+    private String resourceNo;
+    /** 巡检类型编码（Phase B1）：关联 cps_inspection_type.code，决定 extraData 的 schema 形态。 */
+    private String inspectionTypeCode;
+    /** 动态字段值（Phase B1，JSON 字符串）：与 inspectionType 的 formSchemaJson 对应。 */
+    private String extraData;
     private Long aiCategoryL1Id;
     private Long aiCategoryL2Id;
     private Long categoryL1Id;
@@ -61,6 +67,12 @@ public class CpsIssue {
     public void setLine(String line) { this.line = line; }
     public String getProcess() { return process; }
     public void setProcess(String process) { this.process = process; }
+    public String getResourceNo() { return resourceNo; }
+    public void setResourceNo(String resourceNo) { this.resourceNo = resourceNo; }
+    public String getInspectionTypeCode() { return inspectionTypeCode; }
+    public void setInspectionTypeCode(String inspectionTypeCode) { this.inspectionTypeCode = inspectionTypeCode; }
+    public String getExtraData() { return extraData; }
+    public void setExtraData(String extraData) { this.extraData = extraData; }
     public Long getAiCategoryL1Id() { return aiCategoryL1Id; }
     public void setAiCategoryL1Id(Long aiCategoryL1Id) { this.aiCategoryL1Id = aiCategoryL1Id; }
     public Long getAiCategoryL2Id() { return aiCategoryL2Id; }

@@ -5,7 +5,8 @@
 <mapper namespace="com.company.cps.mapper.CpsCheckItemMapper">
 
     <sql id="BaseColumns">
-        id, item_code, content, photo_category, deduct_score, status,
+        id, item_code, content, check_types, photo_min_count, photo_criteria, text_hint,
+        photo_category, deduct_score, status,
         applicable_room_types, config_version, enabled, created_by, updated_by, created_at, updated_at
     </sql>
 
@@ -39,10 +40,12 @@
 
     <insert id="insert" parameterType="com.company.cps.domain.CpsCheckItem" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_check_item (
-            item_code, content, photo_category, deduct_score, status,
+            item_code, content, check_types, photo_min_count, photo_criteria, text_hint,
+            photo_category, deduct_score, status,
             applicable_room_types, config_version, enabled, created_by, updated_by
         ) VALUES (
-            #{itemCode}, #{content}, #{photoCategory}, #{deductScore}, #{status},
+            #{itemCode}, #{content}, #{checkTypes}, #{photoMinCount}, #{photoCriteria}, #{textHint},
+            #{photoCategory}, #{deductScore}, #{status},
             #{applicableRoomTypes}, 1, #{enabled}, #{createdBy}, #{updatedBy}
         )
     </insert>
@@ -50,6 +53,10 @@
     <update id="update" parameterType="com.company.cps.domain.CpsCheckItem">
         UPDATE cps_check_item
         SET content = #{content},
+            check_types = #{checkTypes},
+            photo_min_count = #{photoMinCount},
+            photo_criteria = #{photoCriteria},
+            text_hint = #{textHint},
             photo_category = #{photoCategory},
             deduct_score = #{deductScore},
             status = #{status},

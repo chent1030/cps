@@ -26,9 +26,30 @@ public class CpsCallbackTrustService {
 
     /** 校验远端地址是否可信；trust-enabled=false 时放行全部（本地联调）。 */
     public boolean isTrusted(String remoteAddr) {
+        return isTrusted(remoteAddr, null);
+    }
+
+    /**
+     * IP 白名单 OR 共享密钥任一命中即可信（跨网络部署：Python 带 Authorization: Bearer <shared-token>）。
+     * 密钥比较用恒定时间，避免时序侧信道。
+     */
+    public boolean isTrusted(String remoteAddr, String authorizationHeader) {
         if (!properties.isTrustEnabled()) {
             return true;
         }
+        if (isTrustedIp(remoteAddr)) {
+            return true;
+        }
+        String token = properties.getSharedToken();
+        if (token == null || token.trim().isEmpty() || authorizationHeader == null) {
+            return false;
+        }
+        byte[] expected = ("Bearer " + token.trim()).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] actual = authorizationHeader.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return java.security.MessageDigest.isEqual(expected, actual);
+    }
+
+    private boolean isTrustedIp(String remoteAddr) {
         if (remoteAddr == null || remoteAddr.trim().isEmpty()) {
             return false;
         }

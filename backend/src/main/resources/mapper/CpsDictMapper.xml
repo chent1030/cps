@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsDictMapper">
+
+    <!-- 列名经 mapUnderscoreToCamelCase 映射：type_id→typeId, t.type_code→typeCode, t.type_name→typeName -->
+    <sql id="BaseColumns">
+        i.id, i.type_id, t.type_code, t.type_name,
+        i.item_value, i.item_label, i.sort_no, i.enabled, i.builtin, i.remark,
+        i.created_by, i.updated_by, i.created_at, i.updated_at
+    </sql>
+
+    <sql id="FromJoin">
+        FROM cps_dict i
+        JOIN cps_dict_type t ON t.id = i.type_id
+    </sql>
+
+    <select id="findAll" resultType="com.company.cps.domain.CpsDict">
+        SELECT <include refid="BaseColumns" />
+        <include refid="FromJoin" />
+        WHERE 1 = 1
+        <if test="typeCode != null and typeCode != ''">
+          AND t.type_code = #{typeCode}
+        </if>
+        <if test="enabled != null">
+          AND i.enabled = #{enabled}
+          <!-- enabled=true 视为"可用"：条目启用且所属类型启用 -->
+          <if test="enabled">
+            AND t.enabled = 1
+          </if>
+        </if>
+        ORDER BY t.sort_no ASC, t.type_code ASC, i.sort_no ASC, i.id ASC
+    </select>
+
+    <select id="findById" resultType="com.company.cps.domain.CpsDict">
+        SELECT <include refid="BaseColumns" />
+        <include refid="FromJoin" />
+        WHERE i.id = #{id}
+    </select>
+
+    <select id="findByTypeAndValue" resultType="com.company.cps.domain.CpsDict">
+        SELECT <include refid="BaseColumns" />
+        <include refid="FromJoin" />
+        WHERE t.type_code = #{typeCode}
+          AND i.item_value = #{itemValue}
+    </select>
+
+    <!-- 后端校验口径：条目启用且所属类型启用 -->
+    <select id="countEnabled" resultType="int">
+        SELECT COUNT(*)
+        <include refid="FromJoin" />
+        WHERE t.type_code = #{typeCode}
+          AND i.item_value = #{itemValue}
+          AND i.enabled = 1
+          AND t.enabled = 1
+    </select>
+
+    <select id="countByTypeId" resultType="int">
+        SELECT COUNT(*)
+        FROM cps_dict
+        WHERE type_id = #{typeId}
+    </select>
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsDict" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_dict (
+            type_id, item_value, item_label, sort_no, enabled, builtin, remark,
+            created_by, updated_by
+        ) VALUES (
+            #{typeId}, #{itemValue}, #{itemLabel}, #{sortNo}, #{enabled}, #{builtin}, #{remark},
+            #{createdBy}, #{updatedBy}
+        )
+    </insert>
+
+    <!-- 条目不可换类型：update 不含 type_id -->
+    <update id="update" parameterType="com.company.cps.domain.CpsDict">
+        UPDATE cps_dict
+        SET item_label = #{itemLabel},
+            sort_no = #{sortNo},
+            enabled = #{enabled},
+            remark = #{remark},
+            updated_by = #{updatedBy}
+        WHERE id = #{id}
+    </update>
+
+    <update id="setEnabled">
+        UPDATE cps_dict
+        SET enabled = #{enabled}, updated_by = #{updatedBy}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM cps_dict
+        WHERE id = #{id}
+    </delete>
+</mapper>

@@ -6,7 +6,7 @@ import type { CpsSpeechField, CpsSpeechTranscriptionResult } from '@/types/cps'
  * 转写文本仅回填表单（PRD §20.2，不作证据）；UNAVAILABLE 时展示降级文案允许重试/手输。
  */
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
-const EMP_NO = import.meta.env.VITE_CPS_EMP_NO ?? 'DEMO_EMP'
+const EMP_NO = import.meta.env.VITE_CPS_EMP_NO ?? '61016968'
 
 export const transcribeSpeech = (
   source: File | string,

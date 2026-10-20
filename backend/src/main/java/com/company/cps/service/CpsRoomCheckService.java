@@ -2,12 +2,14 @@ package com.company.cps.service;
 
 import com.company.cps.domain.CpsCheckItem;
 import com.company.cps.domain.CpsInspectionPlanTask;
-import com.company.cps.domain.CpsInspectionPlanTaskType;
 import com.company.cps.domain.CpsRoom;
 import com.company.cps.domain.CpsRoomCheckJudgeOutcome;
 import com.company.cps.domain.CpsRoomCheckRecord;
 import com.company.cps.domain.CpsRoomCheckRecordItem;
 import com.company.cps.domain.CpsRoomCheckRecordStatus;
+import com.company.cps.dto.CpsPageResponse;
+import com.company.cps.dto.CpsRoomCheckAdminRowDto;
+import com.company.cps.dto.CpsRoomCheckConfirmRequest;
 import com.company.cps.dto.CpsRoomCheckRecordResponse;
 import com.company.cps.dto.CpsRoomCheckRejudgeResponse;
 import com.company.cps.dto.CpsRoomCheckStartRequest;
@@ -31,12 +33,14 @@ import java.util.UUID;
 /**
  * B3 辅房点检执行域（PRD §22-§24）。
  *
- * 状态机：PENDING待执行 → IN_PROGRESS执行中（首张照片）→ JUDGED已判定（提交+同步判定，锁定）。
- * 判定（C-04 同步）：成功回写明细；TYPE_MISMATCH/UNJUDGEABLE 阻断提交须补拍；服务未起降级 PENDING 不阻塞。
- * 评分（B4 消费）：score=max(0,100−FAIL 项 deduct_score 和)；降级单 score=NULL 不计入排名。
+ * 状态机：PENDING待执行 → IN_PROGRESS执行中（首张照片）→ AWAIT_CONFIRM已判定待确认（提交+同步判定成功）
+ * → JUDGED已确认锁定（点检人 confirm，计分）。
+ * 判定（C-04 同步）：成功回写明细；TYPE_MISMATCH/UNJUDGEABLE 阻断提交须补拍；服务未起降级 JUDGED+PENDING 不阻塞。
+ * 确认（PRD 24.2.2）：AWAIT_CONFIRM 下点检人可修正 PASS/FAIL（修正留痕 24.2.5），确认后按最终结果计分（24.2.6）。
+ * 评分（B4 消费）：score=max(0,100−FAIL 项 deduct_score 和)；降级单/待确认单 score=NULL 不计入排名。
  *
  * 注：判定 HTTP 调用刻意不包 @Transactional（避免长事务占连接），写库逐条自动提交；
- * 崩溃窗口内可能出现"明细已回写、单未 JUDGED"，重试提交可修复（幂等覆盖写）。
+ * 崩溃窗口内可能出现"明细已回写、单未推进"，重试提交可修复（幂等覆盖写）。
  */
 @Service
 public class CpsRoomCheckService {
@@ -68,7 +72,7 @@ public class CpsRoomCheckService {
     /** mobile 任务列表：empNo 的 INSPECT_CHECK 任务 + 覆盖房间进度。 */
     public List<CpsRoomCheckTaskResponse> listTasks(String empNo, String taskStatus) {
         List<CpsInspectionPlanTask> tasks = planTaskMapper.findCheckTasksForEmp(
-                empNo, CpsInspectionPlanTaskType.INSPECT_CHECK, emptyToNull(taskStatus));
+                empNo, "INSPECT_CHECK", emptyToNull(taskStatus));
         List<CpsRoomCheckTaskResponse> result = new ArrayList<>();
         for (CpsInspectionPlanTask task : tasks) {
             CpsRoomCheckTaskResponse row = new CpsRoomCheckTaskResponse();
@@ -90,7 +94,8 @@ public class CpsRoomCheckService {
 
     /**
      * 开启点检：按 房间×点检项 生成明细快照（幂等：同任务同房间未判定单直接复用）。
-     * 点检项筛选：enabled 且 APPLICABLE 且 applicable_room_types 为空或含房间类型（PRD §23.2）。
+     * 点检项圈定（V20261017）：房间配置了 check_item_ids → 精确取配置项（仍需 enabled 且 APPLICABLE）；
+     * 未配置 → 回退 applicable_room_types 房型匹配（enabled 且 APPLICABLE 且房型命中，PRD §23.2）。
      */
     public CpsRoomCheckRecordResponse start(CpsRoomCheckStartRequest request) {
         String empNo = requireText(request.getEmpNo(), "empNo is required");
@@ -105,7 +110,7 @@ public class CpsRoomCheckService {
             if (task == null) {
                 throw new IllegalArgumentException("plan task not found: " + request.getPlanTaskId());
             }
-            if (task.getTaskType() != CpsInspectionPlanTaskType.INSPECT_CHECK) {
+            if (!"INSPECT_CHECK".equals(task.getTaskType())) {
                 throw new IllegalArgumentException("plan task is not INSPECT_CHECK: " + task.getTaskType());
             }
             if (task.getTargetEmpNo() != null && !task.getTargetEmpNo().equals(empNo)) {
@@ -135,9 +140,14 @@ public class CpsRoomCheckService {
         record.setRecordStatus(CpsRoomCheckRecordStatus.PENDING.name());
         recordMapper.insert(record);
 
+        List<String> configuredCodes = parseCodes(room.getCheckItemIds());
         List<CpsRoomCheckRecordItem> items = new ArrayList<>();
         for (CpsCheckItem item : checkItemMapper.findAll(null, "APPLICABLE", true)) {
-            if (!appliesToRoom(item.getApplicableRoomTypes(), room.getRoomType())) {
+            if (!configuredCodes.isEmpty()) {
+                if (!configuredCodes.contains(item.getItemCode())) {
+                    continue; // 房间已精确配置：只取配置项（停用/不适用项自然跳过）
+                }
+            } else if (!appliesToRoom(item.getApplicableRoomTypes(), room.getRoomType())) {
                 continue;
             }
             CpsRoomCheckRecordItem detail = new CpsRoomCheckRecordItem();
@@ -152,7 +162,9 @@ public class CpsRoomCheckService {
             items.add(detail);
         }
         if (items.isEmpty()) {
-            throw new IllegalArgumentException("no applicable check items for room type: " + room.getRoomType());
+            throw new IllegalArgumentException(configuredCodes.isEmpty()
+                    ? "no applicable check items for room type: " + room.getRoomType()
+                    : "no available check items configured for room (codes missing/disabled): " + room.getRoomCode());
         }
         itemMapper.insertBatch(items);
         if (task != null && "PENDING".equals(task.getTaskStatus())) {
@@ -166,6 +178,21 @@ public class CpsRoomCheckService {
         CpsRoomCheckRecord record = requireRecord(recordId);
         requireOwner(record, empNo);
         return toResponse(record);
+    }
+
+    /** 逗号分隔编号 → 去空白去空片段列表（"A, B,,C" → [A,B,C]）。 */
+    private static List<String> parseCodes(String raw) {
+        List<String> codes = new ArrayList<>();
+        if (raw == null || raw.trim().isEmpty()) {
+            return codes;
+        }
+        for (String piece : raw.split(",")) {
+            String code = piece.trim();
+            if (!code.isEmpty() && !codes.contains(code)) {
+                codes.add(code);
+            }
+        }
+        return codes;
     }
 
     /** admin 追溯视角：不做"仅本人"校验。 */
@@ -205,8 +232,8 @@ public class CpsRoomCheckService {
      * 提交并同步判定（PRD 24.2/24.3）：
      * 1) 全部明细必须有照片（证据要求，不许绕过）；
      * 2) C-04 判定 TYPE_MISMATCH/UNJUDGEABLE ⇒ 阻断提交，须重拍/补拍（AC-08/09）；
-     * 3) PASS/FAIL ⇒ 回写明细并计分（100−FAIL扣分和，最低0），JUDGED 锁定；
-     * 4) 服务未起/超时 ⇒ 降级 judge_result=PENDING、score=NULL、JUDGED，不阻塞流程。
+     * 3) PASS/FAIL ⇒ 回写明细，进入 AWAIT_CONFIRM 待点检人确认（PRD 24.2.2），确认后计分锁定；
+     * 4) 服务未起/超时 ⇒ 降级 judge_result=PENDING、score=NULL、JUDGED（锁定，admin rejudge 兜底），不阻塞流程。
      */
     public CpsRoomCheckRecordResponse submit(Long recordId, String empNo) {
         CpsRoomCheckRecord record = requireRecord(recordId);
@@ -220,16 +247,17 @@ public class CpsRoomCheckService {
         List<CpsRoomCheckJudgeClient.ItemJudge> judged = judgeClient.judge(record, items, attempt);
         LocalDateTime now = LocalDateTime.now();
         if (judged == null) {
-            // 降级：PENDING 回写明细与单，不阻塞流程（清单⑤：admin rejudge 入口补判定）
+            // 降级：PENDING 回写明细，仍推 AWAIT_CONFIRM 让点检人走 confirm 流程人工判定
+            // （PRD 24.2.2 显式要求：AI 不可达/降级时由点检人决策，不允许静默锁定计分）
             for (CpsRoomCheckRecordItem item : items) {
                 itemMapper.updateJudgeResult(item.getId(),
                         CpsRoomCheckJudgeOutcome.PENDING.name(),
-                        "judge service unavailable: degraded to PENDING (admin rejudge will retry)",
+                        "judge service unavailable: degraded to PENDING, awaiting point-checker manual decision",
                         CpsRoomCheckJudgeOutcome.PENDING.name(), now);
             }
-            record.setRecordStatus(CpsRoomCheckRecordStatus.JUDGED.name());
+            record.setRecordStatus(CpsRoomCheckRecordStatus.AWAIT_CONFIRM.name());
             record.setJudgeStatus("PENDING");
-            record.setScore(null);
+            record.setScore(null); // 待点检人 confirm 后按 final_result 计分
             record.setSubmittedAt(now);
             recordMapper.updateJudgeResult(record);
             refreshPlanTaskStatus(record.getPlanTaskId());
@@ -247,7 +275,7 @@ public class CpsRoomCheckService {
             }
             String outcome = result.outcome == null ? CpsRoomCheckJudgeOutcome.UNJUDGEABLE.name() : result.outcome;
             if (CpsRoomCheckJudgeOutcome.PENDING.name().equals(outcome)) {
-                hasPending = true; // 单 item 降级（SKIPPED/技术失败）：不阻塞、不计分，留 rejudge 补判
+                hasPending = true; // 单 item 降级（SKIPPED/技术失败）：进 AWAIT_CONFIRM 由点检人决策
             }
             if (CpsRoomCheckJudgeOutcome.TYPE_MISMATCH.name().equals(outcome)
                     || CpsRoomCheckJudgeOutcome.UNJUDGEABLE.name().equals(outcome)) {
@@ -263,8 +291,8 @@ public class CpsRoomCheckService {
                     "retake required (not scored as unqualified, PRD 24.2.3): " + String.join(",", retake));
         }
         if (hasPending) {
-            // 部分/全部明细暂无判定（SKIPPED 或单 item 技术失败）：状态推进但 judge_status=PENDING、不计分
-            record.setRecordStatus(CpsRoomCheckRecordStatus.JUDGED.name());
+            // 部分/全部明细 PENDING：进 AWAIT_CONFIRM 由点检人确认/修正（不再静默锁定计分）
+            record.setRecordStatus(CpsRoomCheckRecordStatus.AWAIT_CONFIRM.name());
             record.setJudgeStatus("PENDING");
             record.setScore(null);
             record.setSubmittedAt(now);
@@ -272,14 +300,93 @@ public class CpsRoomCheckService {
             refreshPlanTaskStatus(record.getPlanTaskId());
             return toResponse(requireRecord(recordId));
         }
-        int score = Math.max(0, 100 - deduct);
-        record.setRecordStatus(CpsRoomCheckRecordStatus.JUDGED.name());
+        record.setRecordStatus(CpsRoomCheckRecordStatus.AWAIT_CONFIRM.name());
         record.setJudgeStatus("SUCCESS");
-        record.setScore(score);
+        record.setScore(null); // 待确认：点检人确认/修正后按 final_result 计分（PRD 24.2.6）
         record.setSubmittedAt(now);
         recordMapper.updateJudgeResult(record);
         refreshPlanTaskStatus(record.getPlanTaskId());
         return toResponse(requireRecord(recordId));
+    }
+
+    /**
+     * PRD 24.2.2/24.2.5/24.2.6：点检人确认/修正判定结果并锁定。
+     * - 仅 AWAIT_CONFIRM 状态、本人可操作；未传决定的项按 AI 判定原样确认；
+     * - 仅 PASS/FAIL 可确认或修正（TYPE_MISMATCH/UNJUDGEABLE 在 submit 已阻断，不能手工改合格绕过证据要求）；
+     * - 与 AI 判定不同的项落修正留痕（修正人/时间/原因）；
+     * - score=max(0,100−final=FAIL 扣分和)：按最终结果计分。
+     */
+    public CpsRoomCheckRecordResponse confirm(Long recordId, CpsRoomCheckConfirmRequest request) {
+        String empNo = requireText(request.getEmpNo(), "empNo is required");
+        CpsRoomCheckRecord record = requireRecord(recordId);
+        requireOwner(record, empNo);
+        if (!CpsRoomCheckRecordStatus.AWAIT_CONFIRM.name().equals(record.getRecordStatus())) {
+            throw new IllegalArgumentException(
+                    "record is not awaiting confirmation (PRD 24.2.2): " + record.getRecordStatus());
+        }
+        List<CpsRoomCheckRecordItem> items = itemMapper.findByRecordId(recordId);
+        java.util.Map<Long, CpsRoomCheckConfirmRequest.ItemDecision> decisions = new java.util.HashMap<>();
+        if (request.getItems() != null) {
+            for (CpsRoomCheckConfirmRequest.ItemDecision decision : request.getItems()) {
+                if (decision.getItemId() == null) {
+                    throw new IllegalArgumentException("itemId is required in decisions");
+                }
+                decisions.put(decision.getItemId(), decision);
+            }
+        }
+        LocalDateTime now = LocalDateTime.now();
+        int deduct = 0;
+        for (CpsRoomCheckRecordItem item : items) {
+            String judge = item.getJudgeResult() == null ? "" : item.getJudgeResult();
+            if (!CpsRoomCheckJudgeOutcome.PASS.name().equals(judge)
+                    && !CpsRoomCheckJudgeOutcome.FAIL.name().equals(judge)
+                    && !CpsRoomCheckJudgeOutcome.PENDING.name().equals(judge)) {
+                throw new IllegalArgumentException(
+                        "item has no confirmable judge result (retake required): " + item.getItemCode());
+            }
+            String finalResult = judge;
+            CpsRoomCheckConfirmRequest.ItemDecision decision = decisions.remove(item.getId());
+            if (decision != null && decision.getFinalResult() != null) {
+                String outcome = decision.getFinalResult().trim().toUpperCase(Locale.ROOT);
+                if (!CpsRoomCheckJudgeOutcome.PASS.name().equals(outcome)
+                        && !CpsRoomCheckJudgeOutcome.FAIL.name().equals(outcome)) {
+                    throw new IllegalArgumentException(
+                            "finalResult must be PASS or FAIL (PRD 24.2.3): " + outcome);
+                }
+                finalResult = outcome;
+            }
+            boolean modified = !finalResult.equals(judge);
+            itemMapper.updateFinalResult(item.getId(), finalResult,
+                    modified ? empNo : null,
+                    modified ? now : null,
+                    modified ? trimToNull(decision == null ? null : decision.getReason()) : null);
+            if (CpsRoomCheckJudgeOutcome.FAIL.name().equals(finalResult)) {
+                deduct += item.getDeductScore() == null ? 0 : item.getDeductScore();
+            }
+        }
+        if (!decisions.isEmpty()) {
+            throw new IllegalArgumentException("decision for unknown item id: " + decisions.keySet().iterator().next());
+        }
+        record.setRecordStatus(CpsRoomCheckRecordStatus.JUDGED.name());        record.setJudgeStatus("SUCCESS");
+        record.setScore(Math.max(0, 100 - deduct));
+        int updated = recordMapper.updateConfirmResult(record);
+        if (updated == 0) {
+            throw new IllegalStateException("record confirmation conflicted (already confirmed?)");
+        }
+        refreshPlanTaskStatus(record.getPlanTaskId());
+        return toResponse(requireRecord(recordId));
+    }
+
+    /** B：admin 管理台点检记录分页列表（PRD §22 追溯）。 */
+    public CpsPageResponse<CpsRoomCheckAdminRowDto> adminPage(
+            String recordStatus, String judgeStatus, String roomCode, int page, int pageSize) {
+        int size = Math.min(Math.max(pageSize, 1), 100);
+        int offset = (Math.max(page, 1) - 1) * size;
+        long total = recordMapper.countRecords(
+                emptyToNull(recordStatus), emptyToNull(judgeStatus), trimToNull(roomCode));
+        List<CpsRoomCheckAdminRowDto> rows = recordMapper.pageRecords(
+                emptyToNull(recordStatus), emptyToNull(judgeStatus), trimToNull(roomCode), offset, size);
+        return new CpsPageResponse<>(total, rows);
     }
 
     /**
@@ -463,5 +570,13 @@ public class CpsRoomCheckService {
             return null;
         }
         return value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    /** 保留大小写的去空白（房间编码模糊匹配用，emptyToNull 会大写化不适用）。 */
+    private static String trimToNull(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        return value.trim();
     }
 }

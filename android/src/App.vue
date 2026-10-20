@@ -22,6 +22,7 @@ const theme: ThemeConfig = {
     colorError: '#ef4444',
     colorInfo: '#2563eb',
     borderRadius: 10,
+    controlHeight: 40,
     fontFamily:
       'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
   },

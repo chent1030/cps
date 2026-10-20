@@ -37,6 +37,10 @@
             <a-descriptions-item label="责任人">{{ detail.responsibleEmpNo || '-' }}</a-descriptions-item>
             <a-descriptions-item label="上传人">{{ detail.proofEmpNo || '-' }}</a-descriptions-item>
             <a-descriptions-item label="审核人">{{ detail.reviewerEmpNo || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="资源号">{{ detail.resourceNo || '-' }}</a-descriptions-item>
+            <a-descriptions-item v-if="detail.inspectionTypeCode" label="巡检类型">
+              <a-tag color="arcoblue">{{ detail.inspectionTypeCode }}</a-tag>
+            </a-descriptions-item>
             <a-descriptions-item label="提交时间">{{ detail.submitTime || '-' }}</a-descriptions-item>
             <a-descriptions-item v-if="detail.closeTime" label="关闭时间">{{ detail.closeTime }}</a-descriptions-item>
           </a-descriptions>
@@ -704,17 +708,16 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 <style scoped>
 .cps-page {
   width: 100%;
-  max-width: 1400px;
+  max-width: 720px;
   margin: 0 auto;
-  padding: 16px 20px 48px;
+  padding: 16px 16px 48px;
 }
 
 .cps-hero {
-  border: 1px solid rgba(20, 184, 166, 0.22);
-  border-radius: 16px;
-  padding: 20px 24px 20px 28px;
-  background: linear-gradient(135deg, rgba(20, 184, 166, 0.95) 0%, rgba(37, 99, 235, 0.92) 62%, rgba(34, 197, 94, 0.86) 100%);
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.15);
+  border-radius: var(--cps-radius-xl);
+  padding: 20px 24px;
+  background: var(--cps-hero-bg);
+  box-shadow: var(--cps-shadow-hero);
   color: #fff;
   margin-bottom: 16px;
 }
@@ -730,13 +733,14 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 .cps-hero__eyebrow {
   margin: 0;
   color: rgba(255, 255, 255, 0.82);
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
 }
 
 .cps-hero h1 {
   margin: 4px 0 12px;
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 800;
   word-break: break-all;
 }
@@ -764,7 +768,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 
 .cps-hero__meta span {
   border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 10px;
+  border-radius: var(--cps-radius-md);
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.16);
   font-size: 14px;
@@ -772,15 +776,15 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 }
 
 .cps-pill {
-  border-radius: 999px !important;
+  border-radius: var(--cps-radius-pill) !important;
   font-weight: 700 !important;
   margin: 0 !important;
 }
 
 .cps-card {
-  border-radius: 14px;
-  border: 1px solid rgba(20, 184, 166, 0.16);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  border-radius: var(--cps-radius-lg);
+  border: 1px solid var(--cps-border);
+  box-shadow: var(--cps-shadow-card);
 }
 
 .cps-card-title {
@@ -850,8 +854,8 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   display: grid;
   gap: 4px;
   padding: 12px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #f0fdfa 0%, #eff6ff 100%);
+  border-radius: var(--cps-radius-md);
+  background: var(--cps-mist);
 }
 
 .cps-ai-box span {
@@ -870,11 +874,11 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   display: grid;
   gap: 4px;
   margin: 10px 0 0;
-  border-left: 4px solid #14b8a6;
-  border-radius: 8px;
+  border-left: 4px solid var(--cps-teal);
+  border-radius: var(--cps-radius-sm);
   padding: 10px 12px;
-  background: #f8fafc;
-  color: #334155;
+  background: var(--cps-cloud);
+  color: var(--cps-ink-2);
   font-size: 14px;
   line-height: 22px;
 }
@@ -899,8 +903,8 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 }
 
 .cps-selector-group :deep(.ant-radio-button-wrapper) {
-  border-radius: 999px;
-  border: 1px solid #cbd5e1;
+  border-radius: var(--cps-radius-pill);
+  border: 1px solid var(--cps-border-strong);
   height: 36px;
   line-height: 34px;
   padding: 0 16px;
@@ -935,9 +939,9 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 .cps-detail-page :deep(.ant-upload.ant-upload-select .ant-upload) {
   width: 100%;
   padding: 18px;
-  border-radius: 12px;
-  background: #ecfeff;
-  border: 1px dashed #67e8f9;
+  border-radius: var(--cps-radius-lg);
+  background: var(--cps-mist);
+  border: 1px dashed #99f6e4;
 }
 
 .cps-uploader__plus {
@@ -1020,25 +1024,25 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 }
 
 .cps-actions__btn {
-  height: 52px !important;
-  border-radius: 12px !important;
+  height: 48px !important;
+  border-radius: var(--cps-radius-lg) !important;
   font-size: 16px !important;
   font-weight: 700 !important;
 }
 
 .cps-actions__btn--success {
-  background: #15803d !important;
-  border-color: #15803d !important;
+  background: var(--cps-success-deep) !important;
+  border-color: var(--cps-success-deep) !important;
 }
 
 .cps-actions__btn--danger {
-  background: #fff1f2 !important;
+  background: #fee2e2 !important;
   border-color: #fecaca !important;
-  color: #be123c !important;
+  color: var(--cps-danger-deep) !important;
 }
 
 .cps-actions__btn--danger:hover {
-  background: #ffe4e6 !important;
+  background: #fecaca !important;
 }
 
 /* 流程时间线（内联） */
@@ -1085,9 +1089,9 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 .cps-flow__comment {
   margin-top: 6px;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--cps-radius-sm);
   background: #fff;
-  color: #0f172a;
+  color: var(--cps-ink);
   font-size: 13px;
 }
 
@@ -1115,8 +1119,8 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   width: 100%;
   min-height: 56px;
   padding: 8px 12px;
-  border-radius: 10px;
-  background: #f8fafc;
+  border-radius: var(--cps-radius-md);
+  background: var(--cps-cloud);
 }
 
 .cps-person-picker__option :deep(.ant-radio + span) {
@@ -1146,6 +1150,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 
 @media (min-width: 1200px) {
   .cps-page {
+    max-width: 1280px;
     padding: 20px 28px 56px;
   }
 }

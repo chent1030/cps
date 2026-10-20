@@ -23,15 +23,21 @@ public class CpsMasterDataService {
     private final CpsProblemCategoryMapper categoryMapper;
     private final CpsAreaPersonConfigMapper areaPersonConfigMapper;
     private final CpsAdminUserMapper adminUserMapper;
+    private final CpsAdminUserService adminUserService;
+    private final CpsAdminAuditLogService auditLogService;
 
     public CpsMasterDataService(
             CpsProblemCategoryMapper categoryMapper,
             CpsAreaPersonConfigMapper areaPersonConfigMapper,
-            CpsAdminUserMapper adminUserMapper
+            CpsAdminUserMapper adminUserMapper,
+            CpsAdminUserService adminUserService,
+            CpsAdminAuditLogService auditLogService
     ) {
         this.categoryMapper = categoryMapper;
         this.areaPersonConfigMapper = areaPersonConfigMapper;
         this.adminUserMapper = adminUserMapper;
+        this.adminUserService = adminUserService;
+        this.auditLogService = auditLogService;
     }
 
     public List<CpsOptionResponse> getFactories() {
@@ -66,10 +72,46 @@ public class CpsMasterDataService {
     public CpsAdminLoginResponse login(CpsAdminLoginRequest request) {
         requireNonNull(request, "login request is required");
         requireText(request.getEmpNo(), "empNo is required");
-        requireText(request.getEmpName(), "empName is required");
-        com.company.cps.domain.CpsAdminUser operator = adminUserMapper.findEnabledByCredentials(request.getEmpNo().trim(), request.getEmpName().trim())
-                .orElseThrow(() -> new IllegalArgumentException("工号和姓名不匹配，或该人员未启用"));
-        return new CpsAdminLoginResponse(operator.getEmpNo(), operator.getEmpName());
+        requireText(request.getPassword(), "password is required");
+        String empNo = request.getEmpNo().trim();
+        com.company.cps.domain.CpsAdminUser operator = adminUserMapper.findByEmpNo(empNo)
+                .orElseThrow(() -> {
+                    auditLogService.record(empNo, null, "LOGIN_FAIL", "AUTH", empNo, null, null, null, "FAILED", "账号不存在");
+                    return new IllegalArgumentException("工号或密码错误");
+                });
+        if (Boolean.FALSE.equals(operator.getEnabled())) {
+            auditLogService.record(empNo, operator.getEmpName(), "LOGIN_FAIL", "AUTH", empNo, null, null, null, "FAILED", "账号已停用");
+            throw new IllegalArgumentException("账号已停用");
+        }
+        if ("LOCKED".equals(operator.getStatus())) {
+            auditLogService.record(empNo, operator.getEmpName(), "LOGIN_FAIL", "AUTH", empNo, null, null, null, "FAILED", "账号已锁定");
+            throw new IllegalArgumentException("账号已锁定，请联系管理员");
+        }
+        if (!com.company.cps.support.CpsPasswordUtil.matches(request.getPassword(), operator.getSalt(), operator.getPasswordHash())) {
+            auditLogService.record(empNo, operator.getEmpName(), "LOGIN_FAIL", "AUTH", empNo, null, null, null, "FAILED", "密码错误");
+            throw new IllegalArgumentException("工号或密码错误");
+        }
+        boolean superAdmin = operator.isSuperAdmin();
+        java.util.List<String> permissions = superAdmin ? java.util.Arrays.asList("*") : safe(operator.parsePagePermissions());
+        adminUserService.markLogin(operator.getId());
+        auditLogService.record(empNo, operator.getEmpName(), "LOGIN_SUCCESS", "AUTH", empNo, null, null, null, "SUCCESS", null);
+        return new CpsAdminLoginResponse(
+                operator.getEmpNo(),
+                operator.getEmpName(),
+                superAdmin,
+                Boolean.TRUE.equals(operator.getMustChangePassword()),
+                permissions
+        );
+    }
+
+    private static java.util.List<String> safe(java.util.List<String> list) {
+        return list == null ? java.util.Collections.emptyList() : list;
+    }
+
+    /** 退出登录时记录审计日志（前端主动调用） */
+    public void recordLogout(String empNo, String empName) {
+        if (empNo == null || empNo.isBlank()) return;
+        auditLogService.record(empNo, empName, "LOGOUT", "AUTH", empNo, null, null, null, "SUCCESS", null);
     }
 
     public CpsAdminPageResponse<CpsProblemCategory> pageCategories(

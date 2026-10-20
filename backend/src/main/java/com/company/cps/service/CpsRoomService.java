@@ -2,28 +2,32 @@ package com.company.cps.service;
 
 import com.company.cps.domain.CpsRoom;
 import com.company.cps.dto.CpsRoomRequest;
+import com.company.cps.mapper.CpsCheckItemMapper;
 import com.company.cps.mapper.CpsRoomMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Arrays;
-import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * B1 辅房基础配置（PRD §23.1）：辅房字段全集 + 责任人/经理（区域人员挂在房间行上）。
+ * roomType/riskLevel 自字典 cps_dict 校验（ROOM_TYPE/RISK_LEVEL 启用项，V20261015）。
+ * checkItemIds：房间独立配置的点检项编号（逗号分隔 itemCode，V20261017），保存时校验存在性；
+ * 快照优先用它精确圈定（见 CpsRoomCheckService），空则回退 applicable_room_types 房型匹配。
  */
 @Service
 public class CpsRoomService {
 
-    private static final Set<String> RISK_LEVELS = new HashSet<>(Arrays.asList("HIGH", "MEDIUM", "LOW"));
-
     private final CpsRoomMapper roomMapper;
+    private final CpsDictService dictService;
+    private final CpsCheckItemMapper checkItemMapper;
 
-    public CpsRoomService(CpsRoomMapper roomMapper) {
+    public CpsRoomService(CpsRoomMapper roomMapper, CpsDictService dictService, CpsCheckItemMapper checkItemMapper) {
         this.roomMapper = roomMapper;
+        this.dictService = dictService;
+        this.checkItemMapper = checkItemMapper;
     }
 
     public List<CpsRoom> list(String factory, String roomType, Boolean enabled) {
@@ -51,6 +55,7 @@ public class CpsRoomService {
         room.setRoomName(request.getRoomName());
         room.setRoomType(request.getRoomType());
         room.setRiskLevel(request.getRiskLevel() == null ? "LOW" : request.getRiskLevel());
+        room.setCheckItemIds(normaliseCheckItemIds(request.getCheckItemIds()));
         room.setDeptName(request.getDeptName());
         room.setBaseCode(request.getBaseCode());
         room.setFactory(request.getFactory());
@@ -82,7 +87,7 @@ public class CpsRoomService {
         return room;
     }
 
-    private static void validate(CpsRoomRequest request) {
+    private void validate(CpsRoomRequest request) {
         requireText(request.getRoomCode(), "roomCode");
         requireText(request.getBuilding(), "building");
         requireText(request.getDoorNo(), "doorNo");
@@ -90,9 +95,38 @@ public class CpsRoomService {
         requireText(request.getRoomType(), "roomType");
         requireText(request.getKeeperEmpNo(), "keeperEmpNo");
         requireText(request.getKeeperEmpName(), "keeperEmpName");
-        if (request.getRiskLevel() != null && !RISK_LEVELS.contains(request.getRiskLevel())) {
-            throw new IllegalArgumentException("riskLevel must be one of HIGH/MEDIUM/LOW: " + request.getRiskLevel());
+        String riskLevel = request.getRiskLevel() == null ? "LOW" : request.getRiskLevel();
+        if (!dictService.valueExists(CpsDictService.DICT_RISK_LEVEL, riskLevel)) {
+            throw new IllegalArgumentException(
+                    "riskLevel not in enabled dict RISK_LEVEL: " + riskLevel + "（请在字典管理中启用或新增）");
         }
+        if (!dictService.valueExists(CpsDictService.DICT_ROOM_TYPE, request.getRoomType())) {
+            throw new IllegalArgumentException(
+                    "roomType not in enabled dict ROOM_TYPE: " + request.getRoomType() + "（请在字典管理中启用或新增）");
+        }
+    }
+
+    /** 规整 checkItemIds：逗号 split、去空白、去空片段、保序去重后回拼；全空返回 null。 */
+    private String normaliseCheckItemIds(String raw) {
+        if (raw == null || raw.trim().isEmpty()) {
+            return null;
+        }
+        List<String> codes = new ArrayList<>();
+        for (String piece : raw.split(",")) {
+            String code = piece.trim();
+            if (!code.isEmpty() && !codes.contains(code)) {
+                codes.add(code);
+            }
+        }
+        if (codes.isEmpty()) {
+            return null;
+        }
+        for (String code : codes) {
+            if (!checkItemMapper.findByCode(code).isPresent()) {
+                throw new IllegalArgumentException("check item not found: " + code + "（请先在点检项配置中创建）");
+            }
+        }
+        return String.join(",", codes);
     }
 
     private static void requireText(String value, String field) {

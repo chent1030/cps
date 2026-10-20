@@ -244,7 +244,7 @@ public class CpsAgentFrameworkClient {
         org.springframework.http.ResponseEntity<byte[]> response = client.exchange(
                 url("/agent/weekly-reports/" + runId + "/download"),
                 org.springframework.http.HttpMethod.GET,
-                null,
+                new org.springframework.http.HttpEntity<>(headers()),
                 byte[].class);
         if (response == null || response.getBody() == null) return null;
         org.springframework.http.HttpHeaders headers = response.getHeaders();
@@ -282,7 +282,11 @@ public class CpsAgentFrameworkClient {
             return status;
         }
         try {
-            Map metrics = client.getForObject(url("/cps/metrics"), Map.class);
+            Map metrics = client.exchange(
+                    url("/cps/metrics"),
+                    org.springframework.http.HttpMethod.GET,
+                    new org.springframework.http.HttpEntity<>(headers()),
+                    Map.class).getBody();
             status.put("state", "ONLINE");
             status.put("message", "basic-project Agent 运行时连接正常");
             status.put("metrics", metrics == null ? new LinkedHashMap<>() : metrics);
@@ -296,6 +300,11 @@ public class CpsAgentFrameworkClient {
     private HttpHeaders headers() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        // 跨网络部署：配置了共享密钥则带 Bearer 头（Python principal 内部密钥分支）。
+        String token = properties.getApiToken();
+        if (token != null && !token.trim().isEmpty()) {
+            headers.setBearerAuth(token.trim());
+        }
         return headers;
     }
 

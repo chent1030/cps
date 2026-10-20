@@ -8,7 +8,7 @@ import type { TableColumnProps } from '@arco-design/web-react'
 import { IconFilter, IconPlus } from '@arco-design/web-react/icon'
 import { useState } from 'react'
 import { saveItem, setItemEnabled } from '../../api/inventory'
-import { api, getAdminOperator } from '../../api'
+import { api } from '../../api'
 import { useRemote } from '../../hooks/useRemote'
 import { Enabled, PageHead, StatePanel, Toggle } from '../../components/PageParts'
 import { errorMessage } from '../../lib/presentation'
@@ -105,12 +105,11 @@ export function InventoryItemsPage() {
     { title: '操作', width: 160, align: 'right', render: (_, item) => <Space size={4}><Button type="text" size="small" onClick={() => openEdit(item)}>编辑</Button><Toggle value={item.enabled} onClick={() => void toggle(item)} /></Space> },
   ]
 
-  const operator = getAdminOperator()
   return <>
-    <PageHead title="物品台账" detail={<>物品编码、名称、阈值、库管员等基础台账。{lowStockCount > 0 && <Badge color="orangered" text={`当前 ${lowStockCount} 项低库存`} />}</>}>
+    <PageHead title="物品台账" detail={<>物品编码、阈值与库管员台账。{lowStockCount > 0 && <Badge color="orangered" text={`当前 ${lowStockCount} 项低库存`} />}</>}>
       <Button type="primary" icon={<IconPlus />} onClick={openCreate}>新增物品</Button>
     </PageHead>
-    <Card className="filter-card" style={{ marginTop: 12 }}>
+    <Card className="filter-card">
       <Form layout="inline" onSubmit={() => setQuery({ ...filters, page: 1, size: query.size })} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(140px, 1fr)) auto', gap: 12 }}>
         <Input.Search allowClear value={filters.keyword} onChange={(keyword) => setFilters({ ...filters, keyword })} placeholder="编码或名称" />
         <Input allowClear value={filters.factory} onChange={(factory) => setFilters({ ...filters, factory })} placeholder="基地" />
@@ -119,29 +118,28 @@ export function InventoryItemsPage() {
         <Button type="primary" htmlType="submit" icon={<IconFilter />}>筛选</Button>
       </Form>
     </Card>
-    <div style={{ marginTop: 20 }}>
+    <div style={{ marginTop: 16 }}>
       <StatePanel {...remote}>{remote.data && <Card className="table-card">
         <Table rowKey="id" columns={columns} data={data} pagination={false} scroll={{ x: 900 }} />
         <div className="pagination-wrap"><Pagination current={query.page} pageSize={query.size} total={total} showTotal onChange={(page, size) => setQuery({ ...query, page, size })} /></div>
       </Card>}</StatePanel>
     </div>
 
-    <Modal title={editing ? '编辑物品' : '新增物品'} visible={modalOpen} onCancel={() => setModalOpen(false)} onOk={() => void submit()} confirmLoading={saving} okText="保存" cancelText="取消">
+    <Modal title={editing ? '编辑物品' : '新增物品'} visible={modalOpen} onCancel={() => setModalOpen(false)} onOk={() => void submit()} confirmLoading={saving} okText="保存" cancelText="取消" style={{ width: 640 }}>
       <Form layout="vertical">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Form.Item label="物品编码" required><Input value={form.itemCode} onChange={(itemCode) => setForm({ ...form, itemCode })} /></Form.Item>
+        <div className="form-grid">
+          <Form.Item label="物品编码" extra="留空自动生成"><Input value={form.itemCode} onChange={(itemCode) => setForm({ ...form, itemCode })} placeholder="留空自动生成，如 INV-001" /></Form.Item>
           <Form.Item label="物品名称" required><Input value={form.itemName} onChange={(itemName) => setForm({ ...form, itemName })} /></Form.Item>
           <Form.Item label="单位"><Input value={form.unit} onChange={(unit) => setForm({ ...form, unit })} /></Form.Item>
-          <Form.Item label="预警阈值（≤ 触发）" required><InputNumber min={0} value={form.alertThreshold} onChange={(v) => setForm({ ...form, alertThreshold: v ?? 0 })} /></Form.Item>
+          <Form.Item label="预警阈值" required extra="库存 ≤ 阈值时触发预警"><InputNumber min={0} value={form.alertThreshold} onChange={(v) => setForm({ ...form, alertThreshold: v ?? 0 })} /></Form.Item>
           <Form.Item label="基地"><Input value={form.factory} onChange={(factory) => setForm({ ...form, factory })} /></Form.Item>
           <Form.Item label="库房"><Input value={form.storageRoom} onChange={(storageRoom) => setForm({ ...form, storageRoom })} /></Form.Item>
           <Form.Item label="库管员工号"><Input value={form.roomKeeperEmpNo} onChange={(roomKeeperEmpNo) => setForm({ ...form, roomKeeperEmpNo })} /></Form.Item>
           <Form.Item label="库管员姓名"><Input value={form.roomKeeperEmpName} onChange={(roomKeeperEmpName) => setForm({ ...form, roomKeeperEmpName })} /></Form.Item>
           <Form.Item label="所属基地编码"><Input value={form.baseCode} onChange={(baseCode) => setForm({ ...form, baseCode })} /></Form.Item>
-          <Form.Item label="初始库存"><InputNumber min={0} value={form.stockQty} onChange={(v) => setForm({ ...form, stockQty: v ?? 0 })} disabled={!!editing} /></Form.Item>
+          <Form.Item label="初始库存" extra="库存变更请通过出入库流水登记"><InputNumber min={0} value={form.stockQty} onChange={(v) => setForm({ ...form, stockQty: v ?? 0 })} disabled={!!editing} /></Form.Item>
         </div>
         <Form.Item label="备注"><Input.TextArea value={form.remark} onChange={(remark) => setForm({ ...form, remark })} /></Form.Item>
-        {editing && <Typography.Text type="secondary">库存数量请通过「出入库流水 → 登记出入库」变更，保证流水留痕。当前操作人：{operator?.empName || '未登录'}</Typography.Text>}
       </Form>
     </Modal>
   </>

@@ -18,18 +18,19 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** B2 点检项配置（§23.2 字段 + 扣分值非负 + 状态枚举 + 配置版本自动递增）。 */
+/** B2 点检项配置（§23.2 字段 + 扣分值非负 + 状态枚举 + 照片分类/适用房型走字典校验）。 */
 @ExtendWith(MockitoExtension.class)
 class CpsCheckItemServiceTest {
 
     @Mock private CpsCheckItemMapper checkItemMapper;
+    @Mock private CpsDictService dictService;
 
     private CpsCheckItemService service;
     private CpsCheckItemRequest request;
 
     @BeforeEach
     void setUp() {
-        service = new CpsCheckItemService(checkItemMapper);
+        service = new CpsCheckItemService(checkItemMapper, dictService);
         request = new CpsCheckItemRequest();
         request.setItemCode("CI-001");
         request.setContent("地面无积水");
@@ -39,6 +40,7 @@ class CpsCheckItemServiceTest {
 
     @Test
     void createDefaultsStatusApplicableAndInserts() {
+        when(dictService.valueExists(CpsDictService.DICT_PHOTO_CATEGORY, "地面")).thenReturn(true);
         when(checkItemMapper.findByCode("CI-001")).thenReturn(Optional.empty());
         final CpsCheckItem[] inserted = new CpsCheckItem[1];
         when(checkItemMapper.insert(any(CpsCheckItem.class))).thenAnswer(inv -> {
@@ -64,6 +66,7 @@ class CpsCheckItemServiceTest {
         assertThrows(IllegalArgumentException.class, () -> service.save(null, request, "admin"));
 
         request.setStatus("APPLICABLE");
+        when(dictService.valueExists(CpsDictService.DICT_PHOTO_CATEGORY, "地面")).thenReturn(true);
         CpsCheckItem existing = new CpsCheckItem();
         existing.setId(9L);
         when(checkItemMapper.findByCode("CI-001")).thenReturn(Optional.of(existing));
@@ -72,6 +75,7 @@ class CpsCheckItemServiceTest {
 
     @Test
     void updateAllowsKeepingOwnCodeAndBumpsConfigVersionInSql() {
+        when(dictService.valueExists(CpsDictService.DICT_PHOTO_CATEGORY, "地面")).thenReturn(true);
         CpsCheckItem existing = new CpsCheckItem();
         existing.setId(1L);
         existing.setItemCode("CI-001");
@@ -83,5 +87,17 @@ class CpsCheckItemServiceTest {
         assertDoesNotThrow(() -> service.save(1L, request, "admin"));
         verify(checkItemMapper).update(any(CpsCheckItem.class));
         // config_version 递增由 XML `config_version = config_version + 1` 保证（契约测试覆盖）
+    }
+
+    @Test
+    void rejectsPhotoCategoryAndApplicableRoomTypesNotInDict() {
+        request.setPhotoCategory("未知分类");
+        assertThrows(IllegalArgumentException.class, () -> service.save(null, request, "admin"));
+
+        request.setPhotoCategory("地面");
+        when(dictService.valueExists(CpsDictService.DICT_PHOTO_CATEGORY, "地面")).thenReturn(true);
+        when(dictService.valueExists(CpsDictService.DICT_ROOM_TYPE, "配电房")).thenReturn(true);
+        request.setApplicableRoomTypes("配电房, 未知房型");
+        assertThrows(IllegalArgumentException.class, () -> service.save(null, request, "admin"));
     }
 }

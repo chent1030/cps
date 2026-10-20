@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsInspectionRecordItemMapper">
+
+    <sql id="BaseColumns">
+        id, record_id, check_item_id, item_code, content, check_types, photo_min_count, photo_criteria,
+        deduct_score, config_version, pass_result, text_value,
+        photo_object_key, photo_file_name, photo_count,
+        judge_result, judge_reason, final_result,
+        final_modified_by, final_modified_at, final_modify_reason, judged_at,
+        source_item_id, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsInspectionRecordItem" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_inspection_record_item (
+            record_id, check_item_id, item_code, content, check_types, photo_min_count, photo_criteria,
+            deduct_score, config_version, pass_result, text_value,
+            photo_object_key, photo_file_name, photo_count,
+            judge_result, judge_reason, final_result,
+            final_modified_by, final_modified_at, final_modify_reason, judged_at, source_item_id
+        ) VALUES (
+            #{recordId}, #{checkItemId}, #{itemCode}, #{content}, #{checkTypes}, #{photoMinCount}, #{photoCriteria},
+            #{deductScore}, #{configVersion}, #{passResult}, #{textValue},
+            #{photoObjectKey}, #{photoFileName}, #{photoCount},
+            #{judgeResult}, #{judgeReason}, #{finalResult},
+            #{finalModifiedBy}, #{finalModifiedAt}, #{finalModifyReason}, #{judgedAt}, #{sourceItemId}
+        )
+    </insert>
+
+    <insert id="batchInsert">
+        INSERT INTO cps_inspection_record_item (
+            record_id, check_item_id, item_code, content, check_types, photo_min_count, photo_criteria,
+            deduct_score, config_version, source_item_id
+        ) VALUES
+        <foreach collection="items" item="it" separator=",">
+            (#{it.recordId}, #{it.checkItemId}, #{it.itemCode}, #{it.content}, #{it.checkTypes},
+             #{it.photoMinCount}, #{it.photoCriteria}, #{it.deductScore}, #{it.configVersion}, #{it.sourceItemId})
+        </foreach>
+    </insert>
+
+    <select id="findByRecord" resultType="com.company.cps.domain.CpsInspectionRecordItem">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_inspection_record_item
+        WHERE record_id = #{recordId}
+        ORDER BY id ASC
+    </select>
+
+    <select id="findById" resultType="com.company.cps.domain.CpsInspectionRecordItem">
+        SELECT <include refid="BaseColumns" /> FROM cps_inspection_record_item WHERE id = #{id}
+    </select>
+
+    <update id="updateResult">
+        UPDATE cps_inspection_record_item
+        SET pass_result = #{passResult},
+            text_value = #{textValue},
+            photo_object_key = #{photoObjectKey},
+            photo_file_name = #{photoFileName},
+            photo_count = #{photoCount}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateJudge">
+        UPDATE cps_inspection_record_item
+        SET judge_result = #{judgeResult},
+            judge_reason = #{judgeReason},
+            final_result = #{finalResult},
+            judged_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateFinalWithTrace">
+        UPDATE cps_inspection_record_item
+        SET final_result = #{finalResult},
+            final_modified_by = #{modifiedBy},
+            final_modified_at = NOW(),
+            final_modify_reason = #{modifyReason}
+        WHERE id = #{id}
+    </update>
+</mapper>

@@ -5,7 +5,7 @@
 <mapper namespace="com.company.cps.mapper.CpsRoomMapper">
 
     <sql id="BaseColumns">
-        id, room_code, building, door_no, room_name, room_type, risk_level, dept_name,
+        id, room_code, building, door_no, room_name, room_type, risk_level, check_item_ids, dept_name,
         base AS base_code, factory, keeper_emp_no, keeper_emp_name, keeper_manager_emp_no, keeper_manager_emp_name,
         enabled, created_by, updated_by, created_at, updated_at
     </sql>
@@ -40,11 +40,11 @@
 
     <insert id="insert" parameterType="com.company.cps.domain.CpsRoom" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_room (
-            room_code, building, door_no, room_name, room_type, risk_level, dept_name,
+            room_code, building, door_no, room_name, room_type, risk_level, check_item_ids, dept_name,
             base, factory, keeper_emp_no, keeper_emp_name, keeper_manager_emp_no, keeper_manager_emp_name,
             enabled, created_by, updated_by
         ) VALUES (
-            #{roomCode}, #{building}, #{doorNo}, #{roomName}, #{roomType}, #{riskLevel}, #{deptName},
+            #{roomCode}, #{building}, #{doorNo}, #{roomName}, #{roomType}, #{riskLevel}, #{checkItemIds}, #{deptName},
             #{baseCode}, #{factory}, #{keeperEmpNo}, #{keeperEmpName}, #{keeperManagerEmpNo}, #{keeperManagerEmpName},
             #{enabled}, #{createdBy}, #{updatedBy}
         )
@@ -57,6 +57,7 @@
             room_name = #{roomName},
             room_type = #{roomType},
             risk_level = #{riskLevel},
+            check_item_ids = #{checkItemIds},
             dept_name = #{deptName},
             base = #{baseCode},
             factory = #{factory},

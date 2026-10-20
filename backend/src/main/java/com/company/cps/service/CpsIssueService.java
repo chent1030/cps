@@ -18,6 +18,7 @@ import com.company.cps.dto.CpsIssueAiSuggestionRequest;
 import com.company.cps.dto.CpsIssueCreateRequest;
 import com.company.cps.dto.CpsIssueDetailResponse;
 import com.company.cps.dto.CpsIssueListItemResponse;
+import com.company.cps.dto.CpsInspectionTypeDto;
 import com.company.cps.dto.CpsReviewAdjudicationResponse;
 import com.company.cps.mapper.CpsIssueAiSuggestionMapper;
 import com.company.cps.mapper.CpsIssueAttachmentMapper;
@@ -28,6 +29,8 @@ import com.company.cps.mapper.CpsRectificationTransferMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -39,6 +42,8 @@ import java.util.Set;
 
 @Service
 public class CpsIssueService {
+
+    private static final Logger log = LoggerFactory.getLogger(CpsIssueService.class);
 
     private static final int MAX_ATTACHMENTS = 5;
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -56,6 +61,22 @@ public class CpsIssueService {
     private final CpsRectificationSubmissionMapper submissionMapper;
     private final CpsRectificationTransferMapper transferMapper;
     private final CpsInitialReviewService initialReviewService;
+    /**
+     * 用于把 attachment.fileUrl 从 RustFS object key 拼成可访问的完整 URL；
+     * setStorage 注入以避免改写既有 @Autowired 构造签名（m00655 起：CpsIssueService.getDetail 返回的附件 URL 是裸 key，
+     * 与 CpsRoomCheckService 行为不一致，详情页 / 管理端预览拼不出完整地址）。
+     */
+    private RustFsStorageService storage;
+    /**
+     * Phase B1 巡检类型服务：用于校验 inspectionTypeCode 是否启用，并联动 resourceNo/extraData 必填。
+     * 通过 setter 注入避免破坏既有构造签名（CpsIssueServiceTest 仍以 6 参数构造）。
+     */
+    private CpsInspectionTypeService inspectionTypeService;
+    /**
+     * Phase B2 服务端草稿：问题提交成功后按 draftId 归档（ACTIVE→SUBMITTED）。
+     * 同样走 setter 注入。
+     */
+    private CpsIssueDraftService issueDraftService;
 
     public CpsIssueService(
             CpsIssueMapper issueMapper,
@@ -70,6 +91,7 @@ public class CpsIssueService {
                 new CpsAgentFrameworkClient(new com.company.cps.config.CpsAgentFrameworkProperties(),
                         CpsAttachmentContentResolver.unsupported()),
                 null, null, null, null);
+        // legacy/测试构造：不接 storage，getDetail 走 fileUrl 原值回退（行为不变）。
     }
 
     @Autowired
@@ -99,9 +121,28 @@ public class CpsIssueService {
         this.initialReviewService = initialReviewService;
     }
 
+    /**
+     * Spring 会在 @Autowired 构造注入后调用此 setter（构造链没接 RustFsStorageService 避免破坏既有测试/legacy 构造）。
+     */
+    @Autowired
+    public void setStorage(RustFsStorageService storage) {
+        this.storage = storage;
+    }
+
+    @Autowired
+    public void setInspectionTypeService(CpsInspectionTypeService inspectionTypeService) {
+        this.inspectionTypeService = inspectionTypeService;
+    }
+
+    @Autowired
+    public void setIssueDraftService(CpsIssueDraftService issueDraftService) {
+        this.issueDraftService = issueDraftService;
+    }
+
     @Transactional
     public Long createIssue(CpsIssueCreateRequest request, String currentEmpNo) {
         validateCreateRequest(request);
+        validateInspectionTypeIfPresent(request);
         LocalDateTime now = LocalDateTime.now();
 
         String feedbackEmpNo = firstNonBlank(
@@ -126,6 +167,10 @@ public class CpsIssueService {
         issue.setArea(request.getArea().trim());
         issue.setLine(request.getLine().trim());
         issue.setProcess(request.getProcess().trim());
+        issue.setResourceNo(request.getResourceNo().trim());
+        // Phase B1 巡检类型 + 动态字段透传
+        issue.setInspectionTypeCode(blankToNull(request.getInspectionTypeCode()));
+        issue.setExtraData(blankToNull(request.getExtraData()));
         issue.setAiCategoryL1Id(request.getAiCategoryL1Id());
         issue.setAiCategoryL2Id(request.getAiCategoryL2Id());
         issue.setCategoryL1Id(request.getCategoryL1Id());
@@ -133,7 +178,9 @@ public class CpsIssueService {
         issue.setCategoryModifiedFlag(isCategoryModified(request));
         issue.setDescription(request.getDescription().trim());
         issue.setCreatorEmpNo(currentEmpNo);
-        issue.setCreatorEmpName(empName(currentEmpNo));
+        // 入参 empName 优先（移动端带上"陈涛"），否则回退工号占位
+        String creatorName = firstNonBlank(request.getEmpName(), empName(currentEmpNo));
+        issue.setCreatorEmpName(creatorName);
         issue.setFeedbackEmpNo(feedbackEmpNo);
         issue.setFeedbackEmpName(empName(feedbackEmpNo));
         issue.setCurrentHandlerEmpNo(feedbackEmpNo);
@@ -149,13 +196,24 @@ public class CpsIssueService {
         attachFiles(issueId, request.getIssueAttachmentIds(), "ISSUE", currentEmpNo);
         insertAiSuggestionIfPresent(issueId, request.getAiSuggestion(), now);
         insertFlowLog(issueId, null, CpsIssueStatus.PENDING_FEEDBACK, CpsIssueAction.SUBMIT, currentEmpNo, null, feedbackEmpNo, "submit issue");
-        String agentInspectionId = agentFrameworkClient.createAndStart(
-                issueId, currentEmpNo, request,
-                attachmentMapper.findByIssueAndStage(issueId, "ISSUE")
-        );
+        // 兜底：agent 框架不可用时不让"用户提交问题"整笔回滚（issue 落库、附件绑定、流程日志都已写入）
+        String agentInspectionId = null;
+        try {
+            agentInspectionId = agentFrameworkClient.createAndStart(
+                    issueId, currentEmpNo, request,
+                    attachmentMapper.findByIssueAndStage(issueId, "ISSUE")
+            );
+        } catch (Exception e) {
+            log.warn("[CpsIssueService.createIssue] agent framework call failed for issueId={}, cause={}: {}",
+                    issueId, e.getClass().getSimpleName(), e.getMessage());
+        }
         if (agentInspectionId != null) {
             issue.setAgentInspectionId(agentInspectionId);
             issueMapper.updateAgentInspectionId(issueId, agentInspectionId);
+        }
+        // Phase B2：问题提交成功后归档服务端草稿（ACTIVE→SUBMITTED；失败不影响主流程）
+        if (issueDraftService != null && request.getDraftId() != null) {
+            issueDraftService.markSubmittedQuietly(request.getDraftId(), currentEmpNo, issueId);
         }
         return issueId;
     }
@@ -202,8 +260,24 @@ public class CpsIssueService {
                 .orElseThrow(() -> new IllegalArgumentException("Issue not found: " + issueId));
         CpsIssueDetailResponse response = new CpsIssueDetailResponse();
         response.setIssue(issue);
-        response.setIssueAttachments(attachmentMapper.findByIssueAndStage(issueId, "ISSUE"));
-        response.setProofAttachments(attachmentMapper.findByIssueAndStage(issueId, "PROOF"));
+        List<com.company.cps.domain.CpsIssueAttachment> issueAttachments = attachmentMapper.findByIssueAndStage(issueId, "ISSUE");
+        List<com.company.cps.domain.CpsIssueAttachment> proofAttachments = attachmentMapper.findByIssueAndStage(issueId, "PROOF");
+        // attachment.fileUrl 存的是 RustFS object key（cps/xxx.jpg），详情接口要给前端拼可访问完整 URL。
+        // 行为对齐 CpsRoomCheckService.java:408 storage::publicObjectUrl；storage 不可用时回退原 key 不抛错。
+        if (storage != null) {
+            for (com.company.cps.domain.CpsIssueAttachment attachment : issueAttachments) {
+                if (attachment.getFileUrl() != null && !attachment.getFileUrl().isEmpty()) {
+                    attachment.setFileUrl(storage.publicObjectUrl(attachment.getFileUrl()));
+                }
+            }
+            for (com.company.cps.domain.CpsIssueAttachment attachment : proofAttachments) {
+                if (attachment.getFileUrl() != null && !attachment.getFileUrl().isEmpty()) {
+                    attachment.setFileUrl(storage.publicObjectUrl(attachment.getFileUrl()));
+                }
+            }
+        }
+        response.setIssueAttachments(issueAttachments);
+        response.setProofAttachments(proofAttachments);
         response.setAiSuggestion(aiSuggestionMapper.findLatestByIssueId(issueId));
         response.setFlowLogs(flowLogMapper.findByIssueId(issueId));
         response.setAvailableActions(
@@ -225,10 +299,37 @@ public class CpsIssueService {
         requireText(request.getArea(), "area is required");
         requireText(request.getLine(), "line is required");
         requireText(request.getProcess(), "process is required");
+        requireText(request.getResourceNo(), "resourceNo is required (PRD 24.2.6)");
         requireNonNull(request.getCategoryL1Id(), "categoryL1Id is required");
         requireNonNull(request.getCategoryL2Id(), "categoryL2Id is required");
         requireText(request.getDescription(), "description is required");
         validateAttachmentCount(request.getIssueAttachmentIds(), "issue attachments must contain 1 to 5 files");
+    }
+
+    /**
+     * Phase B1：若客户端传了 inspectionTypeCode，校验该类型存在且启用；
+     * extraData 留作后续按 form_schema 逐字段强校验的 hook，V1 暂只校验 JSON 合法。
+     */
+    private void validateInspectionTypeIfPresent(CpsIssueCreateRequest request) {
+        if (isBlank(request.getInspectionTypeCode())) {
+            return;
+        }
+        if (inspectionTypeService == null) {
+            // 兼容单元测试场景：未注入时直接放行
+            return;
+        }
+        CpsInspectionTypeDto type = inspectionTypeService.findByCodeOrThrow(request.getInspectionTypeCode().trim());
+        if (!isBlank(request.getExtraData())) {
+            try {
+                OBJECT_MAPPER.readTree(request.getExtraData());
+            } catch (Exception e) {
+                throw new IllegalArgumentException("extraData 不是合法 JSON: " + e.getMessage());
+            }
+        }
+    }
+
+    private static String blankToNull(String s) {
+        return isBlank(s) ? null : s.trim();
     }
 
     private void validateActionRequest(CpsIssue issue, CpsIssueActionRequest request) {

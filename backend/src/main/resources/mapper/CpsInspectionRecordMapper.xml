@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsInspectionRecordMapper">
+
+    <sql id="BaseColumns">
+        id, type_code, area_id, area_code, area_name, plan_task_id, plan_id,
+        check_emp_no, check_emp_name, record_status, judge_status, score,
+        started_at, submitted_at, source_record_id, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsInspectionRecord" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_inspection_record (
+            type_code, area_id, area_code, area_name, plan_task_id, plan_id,
+            check_emp_no, check_emp_name, record_status, judge_status, score,
+            started_at, submitted_at, source_record_id
+        ) VALUES (
+            #{typeCode}, #{areaId}, #{areaCode}, #{areaName}, #{planTaskId}, #{planId},
+            #{checkEmpNo}, #{checkEmpName}, #{recordStatus}, #{judgeStatus}, #{score},
+            #{startedAt}, #{submittedAt}, #{sourceRecordId}
+        )
+    </insert>
+
+    <select id="findById" resultType="com.company.cps.domain.CpsInspectionRecord">
+        SELECT <include refid="BaseColumns" /> FROM cps_inspection_record WHERE id = #{id}
+    </select>
+
+    <sql id="PageWhere">
+        <where>
+            <if test="typeCode != null and typeCode != ''">AND type_code = #{typeCode}</if>
+            <if test="areaId != null">AND area_id = #{areaId}</if>
+            <if test="recordStatus != null and recordStatus != ''">AND record_status = #{recordStatus}</if>
+            <if test="checkEmpNo != null and checkEmpNo != ''">AND check_emp_no = #{checkEmpNo}</if>
+            <if test="keyword != null and keyword != ''">
+                AND (area_code LIKE CONCAT('%', #{keyword}, '%')
+                     OR area_name LIKE CONCAT('%', #{keyword}, '%')
+                     OR check_emp_no LIKE CONCAT('%', #{keyword}, '%')
+                     OR check_emp_name LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+    </sql>
+
+    <select id="findPage" resultType="com.company.cps.domain.CpsInspectionRecord">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_inspection_record
+        <include refid="PageWhere" />
+        ORDER BY id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countPage" resultType="long">
+        SELECT COUNT(1) FROM cps_inspection_record
+        <include refid="PageWhere" />
+    </select>
+
+    <update id="updateStatus">
+        UPDATE cps_inspection_record
+        SET record_status = #{toStatus}
+        WHERE id = #{id} AND record_status = #{fromStatus}
+    </update>
+
+    <update id="submit">
+        UPDATE cps_inspection_record
+        SET record_status = #{toStatus},
+            judge_status = #{judgeStatus},
+            score = #{score},
+            submitted_at = NOW()
+        WHERE id = #{id} AND record_status = #{fromStatus}
+    </update>
+
+    <update id="updateScore">
+        UPDATE cps_inspection_record
+        SET score = #{score}, judge_status = #{judgeStatus}
+        WHERE id = #{id}
+    </update>
+
+    <select id="countJudgedByPlanTask" resultType="long">
+        SELECT COUNT(1) FROM cps_inspection_record
+        WHERE plan_task_id = #{planTaskId} AND record_status = 'JUDGED'
+    </select>
+</mapper>

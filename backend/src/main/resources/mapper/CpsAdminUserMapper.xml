@@ -3,10 +3,105 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.company.cps.mapper.CpsAdminUserMapper">
-    <select id="findEnabledByCredentials" resultType="com.company.cps.domain.CpsAdminUser">
-        SELECT id, emp_no, emp_name, enabled, created_at, updated_at
+
+    <resultMap id="CpsAdminUserMap" type="com.company.cps.domain.CpsAdminUser">
+        <id column="id" property="id" />
+        <result column="emp_no" property="empNo" />
+        <result column="emp_name" property="empName" />
+        <result column="password_hash" property="passwordHash" />
+        <result column="salt" property="salt" />
+        <result column="must_change_password" property="mustChangePassword" />
+        <result column="status" property="status" />
+        <result column="page_permissions" property="pagePermissions" />
+        <result column="remark" property="remark" />
+        <result column="last_login_at" property="lastLoginAt" />
+        <result column="enabled" property="enabled" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+    </resultMap>
+
+    <select id="findByEmpNo" resultMap="CpsAdminUserMap">
+        SELECT id, emp_no, emp_name, password_hash, salt, must_change_password, status,
+               page_permissions, remark, last_login_at, enabled, created_at, updated_at
+        FROM cps_admin_user
+        WHERE emp_no = #{empNo}
+        LIMIT 1
+    </select>
+
+    <select id="findEnabledByCredentials" resultMap="CpsAdminUserMap">
+        SELECT id, emp_no, emp_name, password_hash, salt, must_change_password, status,
+               page_permissions, remark, last_login_at, enabled, created_at, updated_at
         FROM cps_admin_user
         WHERE enabled = 1 AND emp_no = #{empNo} AND emp_name = #{empName}
         LIMIT 1
     </select>
+
+    <select id="findPage" resultMap="CpsAdminUserMap">
+        SELECT id, emp_no, emp_name, password_hash, salt, must_change_password, status,
+               page_permissions, remark, last_login_at, enabled, created_at, updated_at
+        FROM cps_admin_user
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (emp_no LIKE CONCAT('%', #{keyword}, '%') OR emp_name LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+        ORDER BY id ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countPage" resultType="long">
+        SELECT COUNT(*) FROM cps_admin_user
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (emp_no LIKE CONCAT('%', #{keyword}, '%') OR emp_name LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+    </select>
+
+    <select id="findAll" resultMap="CpsAdminUserMap">
+        SELECT id, emp_no, emp_name, password_hash, salt, must_change_password, status,
+               page_permissions, remark, last_login_at, enabled, created_at, updated_at
+        FROM cps_admin_user
+        ORDER BY id ASC
+    </select>
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsAdminUser" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_admin_user
+            (emp_no, emp_name, password_hash, salt, must_change_password, status, page_permissions, remark, enabled)
+        VALUES
+            (#{empNo}, #{empName}, #{passwordHash}, #{salt},
+             #{mustChangePassword}, #{status}, #{pagePermissions}, #{remark}, #{enabled})
+    </insert>
+
+    <update id="updateProfile">
+        UPDATE cps_admin_user
+        SET emp_name         = #{empName},
+            status           = #{status},
+            page_permissions = #{pagePermissions},
+            remark           = #{remark}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updatePassword">
+        UPDATE cps_admin_user
+        SET password_hash        = #{passwordHash},
+            salt                 = #{salt},
+            must_change_password = #{mustChangePassword}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateLastLoginAt">
+        UPDATE cps_admin_user SET last_login_at = #{ts} WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM cps_admin_user WHERE id = #{id}
+    </delete>
+
 </mapper>

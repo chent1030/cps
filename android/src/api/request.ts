@@ -141,4 +141,7 @@ export const request = {
   post: <T>(path: string, body?: unknown, options?: RequestOptions) => {
     return send<T>(path, { ...options, method: 'POST', body: body ?? {} })
   },
+  delete: <T>(path: string, options?: RequestOptions) => {
+    return send<T>(path, { ...options, method: 'DELETE' })
+  },
 }

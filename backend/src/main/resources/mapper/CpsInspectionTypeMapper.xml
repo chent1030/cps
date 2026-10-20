@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsInspectionTypeMapper">
+
+  <resultMap id="BaseResultMap" type="com.company.cps.domain.CpsInspectionType">
+    <id column="id" property="id" />
+    <result column="code" property="code" />
+    <result column="name" property="name" />
+    <result column="content" property="content" />
+    <result column="zone_flag" property="zoneFlag" />
+    <result column="builtin" property="builtin" />
+    <result column="check_item_ids" property="checkItemIds" />
+    <result column="description" property="description" />
+    <result column="icon" property="icon" />
+    <result column="color" property="color" />
+    <result column="enabled" property="enabled" />
+    <result column="sort_order" property="sortOrder" />
+    <result column="form_schema" property="formSchemaJson" />
+    <result column="default_assignee_emp_no" property="defaultAssigneeEmpNo" />
+    <result column="remark" property="remark" />
+    <result column="created_at" property="createdAt" />
+    <result column="updated_at" property="updatedAt" />
+  </resultMap>
+
+  <sql id="Base_Column_List">
+    id, code, name, content, zone_flag, builtin, check_item_ids, description, icon, color, enabled, sort_order,
+    form_schema, default_assignee_emp_no, remark, created_at, updated_at
+  </sql>
+
+  <select id="findPage" resultMap="BaseResultMap">
+    SELECT <include refid="Base_Column_List" />
+    FROM cps_inspection_type
+    <where>
+      <if test="keyword != null and keyword != ''">
+        AND (code LIKE CONCAT('%', #{keyword}, '%')
+             OR name LIKE CONCAT('%', #{keyword}, '%')
+             OR description LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+      <if test="enabled != null">
+        AND enabled = #{enabled}
+      </if>
+    </where>
+    ORDER BY sort_order ASC, id ASC
+    LIMIT #{offset}, #{limit}
+  </select>
+
+  <select id="countPage" resultType="int">
+    SELECT COUNT(1) FROM cps_inspection_type
+    <where>
+      <if test="keyword != null and keyword != ''">
+        AND (code LIKE CONCAT('%', #{keyword}, '%')
+             OR name LIKE CONCAT('%', #{keyword}, '%')
+             OR description LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+      <if test="enabled != null">
+        AND enabled = #{enabled}
+      </if>
+    </where>
+  </select>
+
+  <select id="listEnabled" resultMap="BaseResultMap">
+    SELECT <include refid="Base_Column_List" />
+    FROM cps_inspection_type
+    WHERE enabled = 1
+    ORDER BY sort_order ASC, id ASC
+  </select>
+
+  <select id="findById" resultMap="BaseResultMap">
+    SELECT <include refid="Base_Column_List" />
+    FROM cps_inspection_type WHERE id = #{id}
+  </select>
+
+  <select id="findByCode" resultMap="BaseResultMap">
+    SELECT <include refid="Base_Column_List" />
+    FROM cps_inspection_type WHERE code = #{code}
+  </select>
+
+  <insert id="insert" parameterType="com.company.cps.domain.CpsInspectionType"
+          useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO cps_inspection_type (
+      code, name, content, zone_flag, builtin, check_item_ids, description, icon, color, enabled, sort_order,
+      form_schema, default_assignee_emp_no, remark
+    ) VALUES (
+      #{code}, #{name}, #{content}, #{zoneFlag}, COALESCE(#{builtin}, 0), #{checkItemIds}, #{description}, #{icon}, #{color}, #{enabled}, #{sortOrder},
+      #{formSchemaJson}, #{defaultAssigneeEmpNo}, #{remark}
+    )
+  </insert>
+
+  <update id="updateById" parameterType="com.company.cps.domain.CpsInspectionType">
+    UPDATE cps_inspection_type
+    <set>
+      <if test="code != null">code = #{code},</if>
+      <if test="name != null">name = #{name},</if>
+      <if test="content != null">content = #{content},</if>
+      <if test="zoneFlag != null">zone_flag = #{zoneFlag},</if>
+      check_item_ids = #{checkItemIds},
+      <if test="description != null">description = #{description},</if>
+      <if test="icon != null">icon = #{icon},</if>
+      <if test="color != null">color = #{color},</if>
+      <if test="enabled != null">enabled = #{enabled},</if>
+      <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+      <if test="formSchemaJson != null">form_schema = #{formSchemaJson},</if>
+      <if test="defaultAssigneeEmpNo != null">default_assignee_emp_no = #{defaultAssigneeEmpNo},</if>
+      <if test="remark != null">remark = #{remark},</if>
+    </set>
+    WHERE id = #{id}
+  </update>
+
+  <delete id="deleteById">
+    DELETE FROM cps_inspection_type WHERE id = #{id}
+  </delete>
+
+  <select id="countIssueByCode" resultType="long">
+    SELECT COUNT(1) FROM cps_issue WHERE inspection_type_code = #{code}
+  </select>
+
+  <select id="listEnabledLite" resultType="java.util.LinkedHashMap">
+    SELECT code, name, enabled, form_schema AS formSchemaJson
+    FROM cps_inspection_type
+    WHERE enabled = 1
+    ORDER BY sort_order ASC, id ASC
+  </select>
+
+</mapper>

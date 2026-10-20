@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsAdminAuditLogMapper">
+
+    <resultMap id="CpsAdminAuditLogMap" type="com.company.cps.domain.CpsAdminAuditLog">
+        <id column="id" property="id" />
+        <result column="emp_no" property="empNo" />
+        <result column="emp_name" property="empName" />
+        <result column="action" property="action" />
+        <result column="target_type" property="targetType" />
+        <result column="target_id" property="targetId" />
+        <result column="detail" property="detail" />
+        <result column="ip" property="ip" />
+        <result column="user_agent" property="userAgent" />
+        <result column="status" property="status" />
+        <result column="error_message" property="errorMessage" />
+        <result column="created_at" property="createdAt" />
+    </resultMap>
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsAdminAuditLog" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_admin_audit_log
+            (emp_no, emp_name, action, target_type, target_id, detail, ip, user_agent, status, error_message)
+        VALUES
+            (#{empNo}, #{empName}, #{action}, #{targetType}, #{targetId}, #{detail}, #{ip}, #{userAgent}, #{status}, #{errorMessage})
+    </insert>
+
+    <select id="findPage" resultMap="CpsAdminAuditLogMap">
+        SELECT id, emp_no, emp_name, action, target_type, target_id, detail, ip, user_agent, status, error_message, created_at
+        FROM cps_admin_audit_log
+        <where>
+            <if test="empNo != null and empNo != ''">
+                AND emp_no = #{empNo}
+            </if>
+            <if test="action != null and action != ''">
+                AND action = #{action}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (target_id LIKE CONCAT('%', #{keyword}, '%') OR detail LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+        ORDER BY id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countPage" resultType="long">
+        SELECT COUNT(*) FROM cps_admin_audit_log
+        <where>
+            <if test="empNo != null and empNo != ''">
+                AND emp_no = #{empNo}
+            </if>
+            <if test="action != null and action != ''">
+                AND action = #{action}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (target_id LIKE CONCAT('%', #{keyword}, '%') OR detail LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+    </select>
+
+</mapper>

@@ -5,7 +5,8 @@ import java.time.LocalDateTime;
 public class CpsInspectionPlanTask {
     private Long id;
     private Long planId;
-    private CpsInspectionPlanTaskType taskType;
+    /** 任务类型（Phase D）：巡检类型编码（cps_inspection_type.code）或历史枚举值 INSPECT_* */
+    private String taskType;
     private String title;
     private String targetEmpNo;
     private String targetEmpName;
@@ -13,6 +14,8 @@ public class CpsInspectionPlanTask {
     private String frequency;
     private String acceptanceCriteria;
     private String evidenceRequirement;
+    /** 分区域类型任务的覆盖区域编码（逗号分隔）；空=该类型全部启用区域（Phase D） */
+    private String coverageAreaCodes;
     private String taskStatus;
     private Long referenceIssueId;
     private String referenceObjectKey;
@@ -24,8 +27,8 @@ public class CpsInspectionPlanTask {
     public void setId(Long id) { this.id = id; }
     public Long getPlanId() { return planId; }
     public void setPlanId(Long planId) { this.planId = planId; }
-    public CpsInspectionPlanTaskType getTaskType() { return taskType; }
-    public void setTaskType(CpsInspectionPlanTaskType taskType) { this.taskType = taskType; }
+    public String getTaskType() { return taskType; }
+    public void setTaskType(String taskType) { this.taskType = taskType; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public String getTargetEmpNo() { return targetEmpNo; }
@@ -40,6 +43,8 @@ public class CpsInspectionPlanTask {
     public void setAcceptanceCriteria(String acceptanceCriteria) { this.acceptanceCriteria = acceptanceCriteria; }
     public String getEvidenceRequirement() { return evidenceRequirement; }
     public void setEvidenceRequirement(String evidenceRequirement) { this.evidenceRequirement = evidenceRequirement; }
+    public String getCoverageAreaCodes() { return coverageAreaCodes; }
+    public void setCoverageAreaCodes(String coverageAreaCodes) { this.coverageAreaCodes = coverageAreaCodes; }
     public String getTaskStatus() { return taskStatus; }
     public void setTaskStatus(String taskStatus) { this.taskStatus = taskStatus; }
     public Long getReferenceIssueId() { return referenceIssueId; }

@@ -47,10 +47,12 @@ public class CpsInitialReviewCallbackController {
     @PostMapping("/initial-review/result")
     public ResponseEntity<Map<String, Object>> receiveResult(@RequestBody CpsInitialReviewCallbackRequest payload,
                                                              @RequestHeader(value = "X-Forwarded-For", required = false) String forwardedFor,
+                                                             @RequestHeader(value = "Authorization", required = false) String authorization,
                                                              HttpServletRequest request) {
         String remoteAddr = request.getRemoteAddr();
-        // 显式忽略 X-Forwarded-For：内网直连模型下该头可伪造，仅取 TCP 对端地址
-        if (!callbackTrustService.isTrusted(remoteAddr)) {
+        // 显式忽略 X-Forwarded-For：内网直连模型下该头可伪造，仅取 TCP 对端地址；
+        // 跨网络部署时 Python 侧带 Bearer 共享密钥（IP 白名单 OR 密钥任一命中即放行）。
+        if (!callbackTrustService.isTrusted(remoteAddr, authorization)) {
             LOGGER.warn("Rejected initial-review callback from untrusted address {} (forwarded-for ignored: {})",
                     remoteAddr, forwardedFor);
             Map<String, Object> body = new LinkedHashMap<>();

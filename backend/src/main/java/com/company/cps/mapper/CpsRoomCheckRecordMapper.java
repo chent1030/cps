@@ -12,7 +12,7 @@ public interface CpsRoomCheckRecordMapper {
 
     CpsRoomCheckRecord findById(@Param("id") Long id);
 
-    /** 幂等 start：同任务同房间存在未判定（待执行/执行中）的单则复用。 */
+    /** 幂等 start：同任务同房间存在未锁定（待执行/执行中/待确认）的单则复用。 */
     CpsRoomCheckRecord findActiveByTaskAndRoom(@Param("planTaskId") Long planTaskId, @Param("roomId") Long roomId);
 
     /** 任务完成度计算：该计划任务下全部点检单。 */
@@ -29,8 +29,23 @@ public interface CpsRoomCheckRecordMapper {
     /** 波次7 清单⑤：PENDING 降级单补判定重跑（JUDGED 后仅更新 judge_status/judge_attempt/score）。 */
     int updateRejudgeResult(CpsRoomCheckRecord record);
 
+    /** PRD 24.2.2：点检人确认后锁定计分（AWAIT_CONFIRM → JUDGED；乐观并发护栏）。 */
+    int updateConfirmResult(CpsRoomCheckRecord record);
+
     /** 判定轮数只增推进（每轮判定前落库占位，保证补拍/重跑换新幂等键 room-judge-{sub}-{item}-{attempt}）。 */
     int updateJudgeAttempt(@Param("id") Long id, @Param("attempt") int attempt);
+
+    /** admin 记录列表（B：管理台追溯，PRD §22）。 */
+    List<com.company.cps.dto.CpsRoomCheckAdminRowDto> pageRecords(
+            @Param("recordStatus") String recordStatus,
+            @Param("judgeStatus") String judgeStatus,
+            @Param("roomCode") String roomCode,
+            @Param("offset") int offset,
+            @Param("pageSize") int pageSize);
+
+    long countRecords(@Param("recordStatus") String recordStatus,
+                      @Param("judgeStatus") String judgeStatus,
+                      @Param("roomCode") String roomCode);
 
     /** start/首张照片推进状态机与时间戳。 */
     int updateStatusFields(@Param("id") Long id,

@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -82,6 +83,38 @@ class CpsInventoryItemServiceTest {
         assertTrue(service.isLowStock(itemWithStock(4, 5)));
         assertTrue(service.isLowStock(itemWithStock(5, 5)));
         assertFalse(service.isLowStock(itemWithStock(6, 5)));
+    }
+
+    @Test
+    void createGeneratesItemCodeWhenBlank() {
+        // 物品编码非必填（V20261017）：新建留空 → 自动生成 ITEM-*，不做用户唯一性校验
+        request.setItemCode("   ");
+        when(itemMapper.findByCode(startsWith("ITEM-"))).thenReturn(Optional.empty());
+        final CpsInventoryItem[] inserted = new CpsInventoryItem[1];
+        when(itemMapper.insert(any(CpsInventoryItem.class))).thenAnswer(inv -> {
+            inserted[0] = (CpsInventoryItem) inv.getArgument(0);
+            inserted[0].setId(1L);
+            return 1;
+        });
+        when(itemMapper.findById(1L)).thenAnswer(inv -> Optional.of(inserted[0]));
+
+        service.save(null, request, "admin");
+
+        assertTrue(inserted[0].getItemCode().startsWith("ITEM-"));
+        verify(itemMapper).insert(any(CpsInventoryItem.class));
+    }
+
+    @Test
+    void editKeepsOriginalCodeWhenBlank() {
+        CpsInventoryItem existing = new CpsInventoryItem();
+        existing.setId(7L);
+        existing.setItemCode("INV-007");
+        when(itemMapper.findById(7L)).thenReturn(Optional.of(existing));
+        request.setItemCode("");
+
+        service.save(7L, request, "admin");
+
+        assertEquals("INV-007", existing.getItemCode());
     }
 
     private static CpsInventoryItem itemWithStock(int stockQty, int threshold) {

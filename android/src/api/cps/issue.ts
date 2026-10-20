@@ -8,10 +8,15 @@ import type {
   CpsIssueTab,
 } from '@/types/cps'
 
-const EMP_NO = import.meta.env.VITE_CPS_EMP_NO ?? 'DEMO_EMP'
+const EMP_NO = import.meta.env.VITE_CPS_EMP_NO ?? '61016968'
+const EMP_NAME = import.meta.env.VITE_CPS_EMP_NAME ?? '陈涛'
 
 export const createCpsIssue = (payload: CpsIssueCreateRequest) => {
-  return request.post<{ issueId: number }>('/api/cps/issues', { ...payload, empNo: payload.empNo ?? EMP_NO })
+  return request.post<{ issueId: number }>('/api/cps/issues', {
+    ...payload,
+    empNo: payload.empNo ?? EMP_NO,
+    empName: payload.empName ?? EMP_NAME,
+  })
 }
 
 export const listCpsIssues = (params: {
@@ -35,5 +40,9 @@ export const executeCpsIssueAction = (id: number, payload: CpsIssueActionRequest
     issueId: number
     status: CpsIssueStatus
     currentHandlerEmpNo: string | null
-  }>(`/api/cps/issues/${id}/actions`, { ...payload, empNo: payload.empNo ?? EMP_NO })
+  }>(`/api/cps/issues/${id}/actions`, {
+    ...payload,
+    empNo: payload.empNo ?? EMP_NO,
+    empName: payload.empName ?? EMP_NAME,
+  })
 }

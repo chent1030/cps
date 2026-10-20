@@ -1,7 +1,7 @@
 import { request } from '@/api/request'
 import type { CpsUploadedImage } from '@/types/cps'
 
-const EMP_NO = import.meta.env.VITE_CPS_EMP_NO ?? 'DEMO_EMP'
+const EMP_NO = import.meta.env.VITE_CPS_EMP_NO ?? '61016968'
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
 export type CpsAttachmentUploadSource = File | string

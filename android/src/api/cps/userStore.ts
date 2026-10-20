@@ -16,8 +16,8 @@ export interface CpsUserInfo {
 
 /** 默认当前用户：mock 一个 inspector，方便没有登录态时 UI 不暴露 admin-only 入口。 */
 const defaultUser: CpsUserInfo = {
-  empNo: 'MOCK-INSPECTOR',
-  empName: '默认巡检员',
+  empNo: '61016968',
+  empName: '陈涛',
   role: 'inspector',
 }
 

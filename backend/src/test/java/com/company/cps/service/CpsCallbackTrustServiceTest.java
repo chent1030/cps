@@ -44,8 +44,42 @@ class CpsCallbackTrustServiceTest {
         assertTrue(service.isTrusted("203.0.113.9"));
     }
 
+    @Test
+    void sharedTokenAcceptsUnlistedIp() {
+        CpsCallbackTrustService service = service(true, "127.0.0.1");
+        setSharedToken("s3cret-key");
+        // IP 不在白名单，但 Bearer 密钥命中 → 放行（跨网络部署路径）
+        assertTrue(service.isTrusted("203.0.113.9", "Bearer s3cret-key"));
+        // 白名单 IP 无需密钥仍放行（OR 语义）
+        assertTrue(service.isTrusted("127.0.0.1", null));
+    }
+
+    @Test
+    void sharedTokenRejectsWrongOrMissingCredentials() {
+        CpsCallbackTrustService service = service(true, "127.0.0.1");
+        setSharedToken("s3cret-key");
+        assertFalse(service.isTrusted("203.0.113.9", "Bearer wrong-key"));
+        assertFalse(service.isTrusted("203.0.113.9", "s3cret-key")); // 缺 Bearer 前缀
+        assertFalse(service.isTrusted("203.0.113.9", null));
+        assertFalse(service.isTrusted("203.0.113.9", "Bearer s3cret-key-with-suffix"));
+    }
+
+    @Test
+    void emptySharedTokenMeansHeaderIgnored() {
+        CpsCallbackTrustService service = service(true, "127.0.0.1");
+        // 未配置密钥：即使带了任意 Bearer 头也不放行非白名单 IP
+        assertFalse(service.isTrusted("203.0.113.9", "Bearer anything"));
+    }
+
+    private CpsCallbackTrustProperties properties;
+
+    /** 给最近一次 service(...) 构造的 properties 配置共享密钥（service 持有同一实例）。 */
+    private void setSharedToken(String token) {
+        properties.setSharedToken(token);
+    }
+
     private CpsCallbackTrustService service(boolean enabled, String... trustedIps) {
-        CpsCallbackTrustProperties properties = new CpsCallbackTrustProperties();
+        properties = new CpsCallbackTrustProperties();
         properties.setTrustEnabled(enabled);
         properties.setTrustedIps(Arrays.asList(trustedIps));
         return new CpsCallbackTrustService(properties);

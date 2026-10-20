@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsApprovalStepMapper">
+
+    <resultMap id="approvalStepMap" type="com.company.cps.domain.CpsApprovalStep">
+        <id property="id" column="id" />
+        <result property="instanceId" column="instance_id" />
+        <result property="seq" column="seq" />
+        <result property="actorEmpNo" column="actor_emp_no" />
+        <result property="actorEmpName" column="actor_emp_name" />
+        <result property="action" column="action" />
+        <result property="comment" column="comment" />
+        <result property="fromStatus" column="from_status" />
+        <result property="toStatus" column="to_status" />
+        <result property="createdAt" column="created_at" />
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_approval_step (
+            instance_id, seq, actor_emp_no, actor_emp_name, action, comment,
+            from_status, to_status, created_at
+        ) VALUES (
+            #{instanceId}, #{seq}, #{actorEmpNo}, #{actorEmpName}, #{action}, #{comment},
+            #{fromStatus}, #{toStatus}, #{createdAt}
+        )
+    </insert>
+
+    <select id="findByInstance" resultMap="approvalStepMap">
+        SELECT id, instance_id, seq, actor_emp_no, actor_emp_name, action, comment,
+               from_status, to_status, created_at
+        FROM cps_approval_step
+        WHERE instance_id = #{instanceId}
+        ORDER BY seq ASC, id ASC
+    </select>
+
+    <select id="nextSeq" resultType="int">
+        SELECT COALESCE(MAX(seq), 0) + 1 FROM cps_approval_step WHERE instance_id = #{instanceId}
+    </select>
+</mapper>

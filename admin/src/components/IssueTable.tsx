@@ -6,6 +6,8 @@ import type { Issue, IssueStatus } from '../types'
 const statusColor: Record<IssueStatus, string> = { PENDING_FEEDBACK: 'orange', PENDING_RECTIFY: 'red', PENDING_UPLOAD_PROOF: 'arcoblue', PENDING_REVIEW: 'purple', CLOSED: 'green' }
 const columns: TableColumnProps<Issue>[] = [
   { title: '工厂', dataIndex: 'factory', width: 120 }, { title: '区域', dataIndex: 'area', width: 120 }, { title: '拉线', dataIndex: 'line', width: 90 }, { title: '工序', dataIndex: 'process', width: 90 },
+  { title: '资源号', dataIndex: 'resourceNo', width: 130, render: (v) => v || <Typography.Text type="secondary">-</Typography.Text> },
+  { title: '类型', dataIndex: 'inspectionTypeCode', width: 100, render: (v) => v ? <Tag>{v}</Tag> : <Typography.Text type="secondary">-</Typography.Text> },
   { title: '当前节点', dataIndex: 'status', width: 118, render: (value: IssueStatus) => <Tag color={statusColor[value]}>{statusLabel[value]}</Tag> },
   { title: '提交时间', dataIndex: 'submitTime', width: 170, render: (value, record) => <>{formatDate(value)}{record.overdue && <Tag color="red" style={{ marginLeft: 8 }}>超期</Tag>}</> },
   { title: 'AI分类一', dataIndex: 'aiCategoryL1Name', width: 120, render: (v) => v || '-' }, { title: 'AI分类二', dataIndex: 'aiCategoryL2Name', width: 130, render: (v) => v || '-' },
@@ -22,5 +24,5 @@ const columns: TableColumnProps<Issue>[] = [
 function Thumbs({ ids }: { ids?: string }) { if (!ids) return <Typography.Text type="secondary">-</Typography.Text>; return <div style={{ display: 'flex', gap: 5 }}>{ids.split(',').map((id) => <img key={id} src={`/api/cps/attachments/${id}/content`} alt="问题附件" style={{ width: 42, height: 34, objectFit: 'cover', borderRadius: 4 }} />)}</div> }
 export function IssueTable({ records, loading = false, onDetail }: { records: Issue[]; loading?: boolean; onDetail?: (issue: Issue) => void }) {
   const displayColumns = onDetail ? [...columns, { title: '操作', width: 92, fixed: 'right' as const, render: (_: unknown, issue: Issue) => <Button type="text" size="small" onClick={() => onDetail(issue)}>详情</Button> }] : columns
-  return <Table<Issue> rowKey="id" columns={displayColumns} data={records} loading={loading} scroll={{ x: onDetail ? 3242 : 3150 }} pagination={false} noDataElement={<Empty description="暂无问题记录" />} />
+  return <Table<Issue> rowKey="id" columns={displayColumns} data={records} loading={loading} scroll={{ x: onDetail ? 3472 : 3380 }} pagination={false} noDataElement={<Empty description="暂无问题记录" />} />
 }

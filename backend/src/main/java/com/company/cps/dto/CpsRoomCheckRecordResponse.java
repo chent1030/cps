@@ -34,6 +34,9 @@ public class CpsRoomCheckRecordResponse {
         private String judgeResult;
         private String judgeReason;
         private String finalResult;
+        private String finalModifiedBy;
+        private String finalModifiedAt;
+        private String finalModifyReason;
 
         public Long getId() { return id; }
         public void setId(Long id) { this.id = id; }
@@ -61,6 +64,12 @@ public class CpsRoomCheckRecordResponse {
         public void setJudgeReason(String judgeReason) { this.judgeReason = judgeReason; }
         public String getFinalResult() { return finalResult; }
         public void setFinalResult(String finalResult) { this.finalResult = finalResult; }
+        public String getFinalModifiedBy() { return finalModifiedBy; }
+        public void setFinalModifiedBy(String finalModifiedBy) { this.finalModifiedBy = finalModifiedBy; }
+        public String getFinalModifiedAt() { return finalModifiedAt; }
+        public void setFinalModifiedAt(String finalModifiedAt) { this.finalModifiedAt = finalModifiedAt; }
+        public String getFinalModifyReason() { return finalModifyReason; }
+        public void setFinalModifyReason(String finalModifyReason) { this.finalModifyReason = finalModifyReason; }
     }
 
     public static CpsRoomCheckRecordResponse from(CpsRoomCheckRecord record, List<CpsRoomCheckRecordItem> items,
@@ -93,6 +102,9 @@ public class CpsRoomCheckRecordResponse {
             view.judgeResult = item.getJudgeResult();
             view.judgeReason = item.getJudgeReason();
             view.finalResult = item.getFinalResult();
+            view.finalModifiedBy = item.getFinalModifiedBy();
+            view.finalModifiedAt = item.getFinalModifiedAt() == null ? null : item.getFinalModifiedAt().toString();
+            view.finalModifyReason = item.getFinalModifyReason();
             list.add(view);
         }
         response.items = list;

@@ -79,7 +79,7 @@ class CpsRoomCheckServiceTest {
     private CpsInspectionPlanTask task(Long id, String empNo, String rooms) {
         CpsInspectionPlanTask task = new CpsInspectionPlanTask();
         task.setId(id);
-        task.setTaskType(CpsInspectionPlanTaskType.INSPECT_CHECK);
+        task.setTaskType("INSPECT_CHECK");
         task.setTaskStatus("IN_PROGRESS");
         task.setTargetEmpNo(empNo);
         task.setReferenceObjectKey(rooms);
@@ -153,6 +153,61 @@ class CpsRoomCheckServiceTest {
         assertEquals(1, captor.getValue().size());
         assertEquals("C1", captor.getValue().get(0).getItemCode());
         assertEquals(Integer.valueOf(3), captor.getValue().get(0).getConfigVersion());
+    }
+
+    @Test
+    void startUsesRoomConfiguredCheckItemsWhenPresent() {
+        // V20261017：房间配置了 check_item_ids → 精确圈定，房型匹配不再生效
+        CpsRoom configured = room();
+        configured.setCheckItemIds("C1, C3");
+        when(roomMapper.findById(5L)).thenReturn(Optional.of(configured));
+        when(taskMapper.findById(11L)).thenReturn(task(11L, "E001", "R-01"));
+        when(recordMapper.findActiveByTaskAndRoom(11L, 5L)).thenReturn(null);
+        AtomicReference<CpsRoomCheckRecord> saved = new AtomicReference<>();
+        when(recordMapper.insert(any(CpsRoomCheckRecord.class))).thenAnswer(inv -> {
+            saved.set(inv.getArgument(0));
+            saved.get().setId(9L);
+            return 1;
+        });
+        when(recordMapper.findById(9L)).thenAnswer(inv -> saved.get());
+        when(itemMapper.findByRecordId(9L)).thenReturn(new ArrayList<>());
+        // C2 房型命中但未被配置 → 不进快照
+        when(checkItemMapper.findAll(null, "APPLICABLE", true))
+                .thenReturn(Arrays.asList(item(1, "C1", 10), item(2, "C2", 10), item(3, "C3", 10)));
+
+        CpsRoomCheckStartRequest request = new CpsRoomCheckStartRequest();
+        request.setRoomId(5L);
+        request.setEmpNo("E001");
+        request.setPlanTaskId(11L);
+        service.start(request);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<CpsRoomCheckRecordItem>> captor = ArgumentCaptor.forClass(List.class);
+        verify(itemMapper).insertBatch(captor.capture());
+        assertEquals(2, captor.getValue().size());
+        assertEquals("C1", captor.getValue().get(0).getItemCode());
+        assertEquals("C3", captor.getValue().get(1).getItemCode());
+    }
+
+    @Test
+    void startRejectsWhenConfiguredItemsAllUnavailable() {
+        CpsRoom configured = room();
+        configured.setCheckItemIds("C9");
+        when(roomMapper.findById(5L)).thenReturn(Optional.of(configured));
+        when(taskMapper.findById(11L)).thenReturn(task(11L, "E001", "R-01"));
+        when(recordMapper.findActiveByTaskAndRoom(11L, 5L)).thenReturn(null);
+        when(recordMapper.insert(any(CpsRoomCheckRecord.class))).thenAnswer(inv -> {
+            ((CpsRoomCheckRecord) inv.getArgument(0)).setId(9L);
+            return 1;
+        });
+        // 配置的 C9 不存在/停用 → 无可快照项
+        when(checkItemMapper.findAll(null, "APPLICABLE", true)).thenReturn(Arrays.asList(item(1, "C1", 10)));
+
+        CpsRoomCheckStartRequest request = new CpsRoomCheckStartRequest();
+        request.setRoomId(5L);
+        request.setEmpNo("E001");
+        request.setPlanTaskId(11L);
+        assertThrows(IllegalArgumentException.class, () -> service.start(request));
     }
 
     @Test

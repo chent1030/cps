@@ -15,6 +15,7 @@ import java.util.Set;
 /**
  * B2 辅房点检项配置（PRD §23.2）：字段全集 + 配置版本（更新自动递增，XML 内实现）。
  * 扣分口径：单次辅房得分 = 100 − 不合格适用项扣分和（§24.3，不适用不扣分）。
+ * photoCategory / applicableRoomTypes 逐值自字典 cps_dict 校验（PHOTO_CATEGORY / ROOM_TYPE 启用项）。
  */
 @Service
 public class CpsCheckItemService {
@@ -22,9 +23,11 @@ public class CpsCheckItemService {
     private static final Set<String> STATUSES = new HashSet<>(Arrays.asList("APPLICABLE", "NOT_APPLICABLE"));
 
     private final CpsCheckItemMapper checkItemMapper;
+    private final CpsDictService dictService;
 
-    public CpsCheckItemService(CpsCheckItemMapper checkItemMapper) {
+    public CpsCheckItemService(CpsCheckItemMapper checkItemMapper, CpsDictService dictService) {
         this.checkItemMapper = checkItemMapper;
+        this.dictService = dictService;
     }
 
     public List<CpsCheckItem> list(String photoCategory, String status, Boolean enabled) {
@@ -48,6 +51,29 @@ public class CpsCheckItemService {
         if (!STATUSES.contains(status)) {
             throw new IllegalArgumentException("status must be APPLICABLE or NOT_APPLICABLE: " + status);
         }
+        if (!dictService.valueExists(CpsDictService.DICT_PHOTO_CATEGORY, request.getPhotoCategory())) {
+            throw new IllegalArgumentException(
+                    "photoCategory not in enabled dict PHOTO_CATEGORY: " + request.getPhotoCategory()
+                            + "（请在字典管理中启用或新增）");
+        }
+        String applicableRoomTypes = request.getApplicableRoomTypes();
+        if (applicableRoomTypes != null && !applicableRoomTypes.trim().isEmpty()) {
+            for (String part : applicableRoomTypes.split(",")) {
+                String roomType = part.trim();
+                if (!roomType.isEmpty() && !dictService.valueExists(CpsDictService.DICT_ROOM_TYPE, roomType)) {
+                    throw new IllegalArgumentException(
+                            "applicableRoomTypes contains value not in enabled dict ROOM_TYPE: " + roomType
+                                    + "（请在字典管理中启用或新增）");
+                }
+            }
+        }
+        // Phase C1：点检类型多选校验（PASS_FAIL/TEXT/PHOTO；含 PHOTO 时最低张数必填 ≥1）
+        String checkTypes = normalizeCheckTypes(request.getCheckTypes());
+        if (checkTypes.contains("PHOTO")) {
+            if (request.getPhotoMinCount() == null || request.getPhotoMinCount() < 1) {
+                throw new IllegalArgumentException("点检类型含拍照时，最低张数必填且 ≥1");
+            }
+        }
 
         CpsCheckItem existing = id == null
                 ? null
@@ -62,6 +88,10 @@ public class CpsCheckItemService {
         CpsCheckItem item = existing == null ? new CpsCheckItem() : existing;
         item.setItemCode(request.getItemCode());
         item.setContent(request.getContent());
+        item.setCheckTypes(checkTypes);
+        item.setPhotoMinCount(checkTypes.contains("PHOTO") ? request.getPhotoMinCount() : null);
+        item.setPhotoCriteria(checkTypes.contains("PHOTO") ? trimToNull(request.getPhotoCriteria()) : null);
+        item.setTextHint(checkTypes.contains("TEXT") ? trimToNull(request.getTextHint()) : null);
         item.setPhotoCategory(request.getPhotoCategory());
         item.setDeductScore(request.getDeductScore() == null ? 0 : request.getDeductScore());
         item.setStatus(status);
@@ -91,5 +121,32 @@ public class CpsCheckItemService {
         if (value == null || value.trim().isEmpty()) {
             throw new IllegalArgumentException("Check item " + field + " is required");
         }
+    }
+
+    /** Phase C1：点检类型多选规范化。空 → 默认 PASS_FAIL；非法值报错；去重保序。 */
+    private static String normalizeCheckTypes(String raw) {
+        if (raw == null || raw.trim().isEmpty()) {
+            return "PASS_FAIL";
+        }
+        java.util.Set<String> allowed = java.util.Set.of("PASS_FAIL", "TEXT", "PHOTO");
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        for (String part : raw.split(",")) {
+            String v = part.trim().toUpperCase();
+            if (v.isEmpty() || parts.contains(v)) continue;
+            if (!allowed.contains(v)) {
+                throw new IllegalArgumentException("checkTypes 非法值: " + v + "（允许 PASS_FAIL/TEXT/PHOTO）");
+            }
+            parts.add(v);
+        }
+        if (parts.isEmpty()) {
+            throw new IllegalArgumentException("checkTypes 至少选择一项");
+        }
+        return String.join(",", parts);
+    }
+
+    private static String trimToNull(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
     }
 }

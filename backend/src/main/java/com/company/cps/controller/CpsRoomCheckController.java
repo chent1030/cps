@@ -1,5 +1,6 @@
 package com.company.cps.controller;
 
+import com.company.cps.dto.CpsRoomCheckConfirmRequest;
 import com.company.cps.dto.CpsRoomCheckRecordResponse;
 import com.company.cps.dto.CpsRoomCheckStartRequest;
 import com.company.cps.dto.CpsRoomCheckTaskResponse;
@@ -59,10 +60,17 @@ public class CpsRoomCheckController {
         return roomCheckService.uploadPhoto(id, itemId, file, empNo);
     }
 
-    /** 提交并同步判定：成功计分锁定；类型不符/无法判定阻断须补拍；服务未起降级 PENDING 不阻塞。 */
+    /** 提交并同步判定：成功进入待确认（AWAIT_CONFIRM）；类型不符/无法判定阻断须补拍；服务未起降级 JUDGED+PENDING 不阻塞。 */
     @PostMapping("/records/{id}/submit")
     public CpsRoomCheckRecordResponse submit(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return roomCheckService.submit(id, body.get("empNo"));
+    }
+
+    /** PRD 24.2.2：点检人确认/修正判定结果（仅 PASS/FAIL 可修正）后锁定计分。 */
+    @PostMapping("/records/{id}/confirm")
+    public CpsRoomCheckRecordResponse confirm(@PathVariable Long id,
+                                              @RequestBody CpsRoomCheckConfirmRequest request) {
+        return roomCheckService.confirm(id, request);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

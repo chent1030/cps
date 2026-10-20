@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsApprovalInstanceMapper">
+
+    <resultMap id="approvalInstanceMap" type="com.company.cps.domain.CpsApprovalInstance">
+        <id property="id" column="id" />
+        <result property="bizType" column="biz_type" />
+        <result property="bizId" column="biz_id" />
+        <result property="bizTitle" column="biz_title" />
+        <result property="bizCreatorEmpNo" column="biz_creator_emp_no" />
+        <result property="bizCreatorEmpName" column="biz_creator_emp_name" />
+        <result property="bizFactory" column="biz_factory" />
+        <result property="bizArea" column="biz_area" />
+        <result property="status" column="status" />
+        <result property="currentApproverEmpNo" column="current_approver_emp_no" />
+        <result property="currentApproverEmpName" column="current_approver_emp_name" />
+        <result property="lastActionAt" column="last_action_at" />
+        <result property="approvedAt" column="approved_at" />
+        <result property="rejectedAt" column="rejected_at" />
+        <result property="rejectReason" column="reject_reason" />
+        <result property="bizSnapshot" column="biz_snapshot" />
+        <result property="createdAt" column="created_at" />
+        <result property="updatedAt" column="updated_at" />
+    </resultMap>
+
+    <sql id="cols">
+        id, biz_type, biz_id, biz_title, biz_creator_emp_no, biz_creator_emp_name,
+        biz_factory, biz_area, status, current_approver_emp_no, current_approver_emp_name,
+        last_action_at, approved_at, rejected_at, reject_reason, biz_snapshot, created_at, updated_at
+    </sql>
+
+    <select id="findByBiz" resultMap="approvalInstanceMap">
+        SELECT <include refid="cols" />
+        FROM cps_approval_instance
+        WHERE biz_type = #{bizType} AND biz_id = #{bizId}
+    </select>
+
+    <select id="findById" resultMap="approvalInstanceMap">
+        SELECT <include refid="cols" />
+        FROM cps_approval_instance
+        WHERE id = #{id}
+    </select>
+
+    <select id="findPage" resultMap="approvalInstanceMap">
+        SELECT <include refid="cols" />
+        FROM cps_approval_instance
+        <where>
+            <if test="status != null and status != ''">
+                status = #{status}
+            </if>
+            <if test="bizType != null and bizType != ''">
+                AND biz_type = #{bizType}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                    biz_title LIKE CONCAT('%', #{keyword}, '%')
+                    OR biz_creator_emp_name LIKE CONCAT('%', #{keyword}, '%')
+                    OR reject_reason LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+        </where>
+        ORDER BY
+            CASE status WHEN 'PENDING' THEN 0 WHEN 'APPROVED' THEN 1 WHEN 'REJECTED' THEN 2 ELSE 3 END,
+            last_action_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countPage" resultType="long">
+        SELECT COUNT(*) FROM cps_approval_instance
+        <where>
+            <if test="status != null and status != ''">
+                status = #{status}
+            </if>
+            <if test="bizType != null and bizType != ''">
+                AND biz_type = #{bizType}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                    biz_title LIKE CONCAT('%', #{keyword}, '%')
+                    OR biz_creator_emp_name LIKE CONCAT('%', #{keyword}, '%')
+                    OR reject_reason LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+        </where>
+    </select>
+
+    <insert id="upsert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_approval_instance (
+            biz_type, biz_id, biz_title, biz_creator_emp_no, biz_creator_emp_name,
+            biz_factory, biz_area, status, current_approver_emp_no, current_approver_emp_name,
+            last_action_at, biz_snapshot, created_at, updated_at
+        ) VALUES (
+            #{bizType}, #{bizId}, #{bizTitle}, #{bizCreatorEmpNo}, #{bizCreatorEmpName},
+            #{bizFactory}, #{bizArea}, #{status}, #{currentApproverEmpNo}, #{currentApproverEmpName},
+            #{lastActionAt}, #{bizSnapshot}, #{createdAt}, #{updatedAt}
+        )
+        ON DUPLICATE KEY UPDATE
+            biz_title = VALUES(biz_title),
+            biz_creator_emp_no = VALUES(biz_creator_emp_no),
+            biz_creator_emp_name = VALUES(biz_creator_emp_name),
+            biz_factory = VALUES(biz_factory),
+            biz_area = VALUES(biz_area),
+            current_approver_emp_no = VALUES(current_approver_emp_no),
+            current_approver_emp_name = VALUES(current_approver_emp_name),
+            last_action_at = VALUES(last_action_at),
+            biz_snapshot = VALUES(biz_snapshot),
+            updated_at = VALUES(updated_at)
+    </insert>
+
+    <update id="updateStatusCas">
+        UPDATE cps_approval_instance
+        <set>
+            status = #{toStatus},
+            last_action_at = #{lastActionAt},
+            <if test="approvedAt != null">approved_at = #{approvedAt},</if>
+            <if test="rejectedAt != null">rejected_at = #{rejectedAt},</if>
+            <if test="rejectReason != null">reject_reason = #{rejectReason},</if>
+            <if test="currentApproverEmpNo != null">current_approver_emp_no = #{currentApproverEmpNo},</if>
+            <if test="currentApproverEmpName != null">current_approver_emp_name = #{currentApproverEmpName},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id} AND status = #{expectedStatus}
+    </update>
+
+    <update id="updateBizMeta">
+        UPDATE cps_approval_instance
+        <set>
+            <if test="bizTitle != null">biz_title = #{bizTitle},</if>
+            <if test="bizCreatorEmpNo != null">biz_creator_emp_no = #{bizCreatorEmpNo},</if>
+            <if test="bizCreatorEmpName != null">biz_creator_emp_name = #{bizCreatorEmpName},</if>
+            <if test="bizFactory != null">biz_factory = #{bizFactory},</if>
+            <if test="bizArea != null">biz_area = #{bizArea},</if>
+            <if test="bizSnapshot != null">biz_snapshot = #{bizSnapshot},</if>
+            last_action_at = #{lastActionAt},
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+</mapper>

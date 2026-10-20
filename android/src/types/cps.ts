@@ -51,10 +51,19 @@ export interface CpsAiSuggestionPayload {
 
 export interface CpsIssueCreateRequest {
   empNo?: string
+  empName?: string
   factory: string
   area: string
   line: string
   process: string
+  /** 资源号：现场手动录入的物理资源标识（PRD 24.2.6），必填。 */
+  resourceNo: string
+  /** Phase B1：巡检类型编码（来自 /api/cps/inspection-types）。选填，留空走老路径。 */
+  inspectionTypeCode?: string
+  /** Phase B1：动态字段值 JSON 字符串（与所选 inspectionType.formSchemaJson 对应）。 */
+  extraData?: string
+  /** Phase B2：服务端草稿 ID，提交成功后由后端归档。可空。 */
+  draftId?: number
   aiCategoryL1Id: number | null
   aiCategoryL2Id: number | null
   categoryL1Id: number
@@ -66,8 +75,142 @@ export interface CpsIssueCreateRequest {
   aiSuggestion?: CpsAiSuggestionPayload
 }
 
+/** Phase B1：巡检类型 form_schema 中单个字段定义。 */
+export interface CpsInspectionFormField {
+  key: string
+  label: string
+  type: 'input' | 'number' | 'textarea' | 'select' | 'date' | 'switch'
+  required?: boolean
+  maxLength?: number
+  placeholder?: string
+  defaultValue?: string | number | boolean
+  helpText?: string
+  options?: CpsOption[]
+}
+
+export interface CpsInspectionFormSchema {
+  fields: CpsInspectionFormField[]
+}
+
+export interface CpsInspectionType {
+  id: number
+  code: string
+  name: string
+  /** 巡检内容（Phase C1） */
+  content?: string | null
+  /** 是否分区域：1=按区域执行，0=点检项直挂类型（Phase C1） */
+  zoneFlag?: number | null
+  /** 内置类型：1=系统固定（CPS巡检），不可删除/停用（Phase D2） */
+  builtin?: number | null
+  /** 不分区域时直挂点检项编码（逗号分隔）（Phase C1） */
+  checkItemIds?: string | null
+  description?: string
+  icon?: string
+  color?: string
+  enabled?: number
+  sortOrder?: number
+  /** 【已废弃 Phase C1】旧动态表单 schema */
+  formSchemaJson?: string
+  defaultAssigneeEmpNo?: string
+  remark?: string
+  // 解析后的 schema 缓存（v1: formSchemaJson → CpsInspectionFormSchema）
+  _parsedSchema?: CpsInspectionFormSchema
+}
+
+// ===== Phase C1：统一巡检任务（区域 / 记录 / 明细）=====
+
+/** 点检项定义（Phase D2：新建问题页按类型配置联动渲染）。 */
+export interface CpsCheckItemInfo {
+  id: number
+  itemCode: string
+  content: string
+  /** 点检类型多选（逗号分隔）：PASS_FAIL/TEXT/PHOTO */
+  checkTypes: string
+  photoMinCount?: number | null
+  /** 拍照判定条件（自由文本） */
+  photoCriteria?: string | null
+  textHint?: string | null
+  deductScore?: number
+}
+
+/** 新建问题时按点检项填写的结果（存入 extraData.checkResults）。 */
+export interface CpsIssueCheckResult {
+  itemCode: string
+  content: string
+  passResult?: 'PASS' | 'FAIL' | null
+  textValue?: string | null
+  photoUrls?: string[]
+  photoNames?: string[]
+  photoCount?: number
+}
+
+export interface CpsInspectionArea {
+  id: number
+  areaCode: string
+  typeCode: string
+  areaName: string
+  factory?: string | null
+  area?: string | null
+  /** 拉线|房型 */
+  lineOrRoomType?: string | null
+  process?: string | null
+  building?: string | null
+  doorNo?: string | null
+  riskLevel: string
+  keeperEmpNo: string
+  keeperEmpName?: string | null
+  checkItemIds?: string | null
+  enabled?: boolean
+}
+
+export type CpsInspectionRecordStatus = 'PENDING' | 'IN_PROGRESS' | 'AWAIT_CONFIRM' | 'JUDGED'
+
+export interface CpsInspectionRecord {
+  id: number
+  typeCode: string
+  areaId?: number | null
+  areaCode?: string | null
+  areaName?: string | null
+  planTaskId?: number | null
+  planId?: number | null
+  checkEmpNo: string
+  checkEmpName?: string | null
+  recordStatus: CpsInspectionRecordStatus | string
+  judgeStatus?: string | null
+  score?: number | null
+  startedAt?: string | null
+  submittedAt?: string | null
+}
+
+export interface CpsInspectionRecordItem {
+  id: number
+  recordId: number
+  checkItemId: number
+  itemCode: string
+  content: string
+  /** 点检类型快照（逗号分隔）：PASS_FAIL/TEXT/PHOTO */
+  checkTypes: string
+  photoMinCount?: number | null
+  photoCriteria?: string | null
+  deductScore: number
+  passResult?: 'PASS' | 'FAIL' | string | null
+  textValue?: string | null
+  photoObjectKey?: string | null
+  photoFileName?: string | null
+  photoCount?: number
+  judgeResult?: string | null
+  judgeReason?: string | null
+  finalResult?: string | null
+}
+
+export interface CpsInspectionRecordDetail {
+  record: CpsInspectionRecord
+  items: CpsInspectionRecordItem[]
+}
+
 export interface CpsIssueActionRequest {
   empNo?: string
+  empName?: string
   action: CpsIssueAction
   reasonAnalysis?: string
   correctiveMeasure?: string
@@ -94,6 +237,12 @@ export interface CpsIssueListItem {
   area?: string
   line?: string
   process?: string
+  /** 资源号：现场手动录入的物理资源标识（PRD 24.2.6）。 */
+  resourceNo?: string | null
+  /** Phase B1：巡检类型编码。 */
+  inspectionTypeCode?: string | null
+  /** Phase B1：动态字段 JSON 字符串。 */
+  extraData?: string | null
   factoryName?: string
   areaName?: string
   lineName?: string
@@ -138,7 +287,7 @@ export interface CpsIssueDetail extends CpsIssueListItem {
 }
 
 export type CpsRoomCheckJudgeResult = 'PASS' | 'FAIL' | 'TYPE_MISMATCH' | 'UNJUDGEABLE' | 'PENDING'
-export type CpsRoomCheckRecordStatus = 'PENDING' | 'IN_PROGRESS' | 'JUDGED'
+export type CpsRoomCheckRecordStatus = 'PENDING' | 'IN_PROGRESS' | 'AWAIT_CONFIRM' | 'JUDGED'
 
 export interface CpsRoomCheckTask {
   taskId: number
@@ -168,6 +317,9 @@ export interface CpsRoomCheckItem {
   judgeResult: CpsRoomCheckJudgeResult
   judgeReason: string | null
   finalResult: string | null
+  finalModifiedBy?: string | null
+  finalModifiedAt?: string | null
+  finalModifyReason?: string | null
 }
 
 export interface CpsRoomCheckRecord {
@@ -196,103 +348,6 @@ export interface CpsRoomInfo {
   enabled?: boolean
 }
 
-// ===== B5② AI 初审三态/接管/裁决（PRD §28-§29）=====
-
-export type CpsInitialReviewStateView =
-  | 'none'
-  | 'pending_dispatch'
-  | 'running'
-  | 'timeout_open'
-  | 'failed'
-  | 'taken_over'
-  | 'late_result'
-  | 'completed'
-
-export interface CpsInitialReviewTaskView {
-  id: number
-  issueId: number
-  submissionId: number | null
-  versionNo: number | null
-  status: string
-  submittedAt: string | null
-  timeoutAt: string | null
-  completedAt: string | null
-  takenOverBy: string | null
-  takenOverName: string | null
-  takenOverAt: string | null
-  takeoverReason: string | null
-  errorCode: string | null
-  retryCount: number | null
-}
-
-export interface CpsInitialReviewResultView {
-  id: number
-  taskId: number
-  overall: 'PASS' | 'PARTIAL' | 'PROBLEM'
-  modelStatus: string | null
-  isLate: boolean | null
-  createdAt: string | null
-}
-
-export interface CpsInitialReviewItemView {
-  id: number
-  checkType: string
-  fieldName: string | null
-  verdict: string | null
-  textLength: number | null
-  punctuationCount: number | null
-  ratioOk: boolean | null
-  reason: string | null
-  problemFragment: string | null
-}
-
-export interface CpsRectificationSubmissionView {
-  id: number
-  issueId: number
-  versionNo: number | null
-  reason: string | null
-  shortTermMeasure: string | null
-  longTermMeasure: string | null
-  responsibleEmpNo: string | null
-  responsibleEmpName: string | null
-  submittedBy: string | null
-  submittedAt: string | null
-}
-
-export interface CpsReviewAdjudicationView {
-  id: number
-  issueId: number
-  versionNo: number | null
-  reviewerEmpNo: string | null
-  decision: 'APPROVE' | 'REJECT' | string
-  aiOverall: string | null
-  /** 与 AI 意见关系（CpsIssueService.aiRelation）：WITH_AI=同向，AGAINST_AI=反向，NO_AI_RESULT=无 AI 结果。 */
-  aiRelation: string | null
-  reason: string | null
-  createdAt: string | null
-}
-
-export interface CpsInitialReviewEventView {
-  id: number
-  eventType: string
-  detail: string | null
-  operatorEmpNo: string | null
-  createdAt: string | null
-}
-
-export interface CpsInitialReviewView {
-  issue_id: number
-  state_view: CpsInitialReviewStateView
-  can_take_over: boolean
-  seconds_until_takeover: number | null
-  task: CpsInitialReviewTaskView | null
-  result: CpsInitialReviewResultView | null
-  items: CpsInitialReviewItemView[]
-  submission: CpsRectificationSubmissionView | null
-  adjudication: CpsReviewAdjudicationView | null
-  events: CpsInitialReviewEventView[]
-}
-
 // ===== F3/F4 语音转写（D-03 三字段）=====
 
 export type CpsSpeechField = 'reason' | 'short_term' | 'long_term'
@@ -308,4 +363,48 @@ export interface CpsSpeechTranscriptionResult {
   audioObjectKey: string | null
   durationSeconds: number | null
   model: string | null
+}
+
+// ===== Phase B2：服务端草稿（防止一次填不完）=====
+
+/** 草稿表单快照：由 formDraft store 序列化 / 反序列化。 */
+export interface CpsIssueDraftData {
+  location: { factory: string; area: string; line: string; process: string }
+  description: string
+  resourceNo: string
+  inspectionTypeCode: string | null
+  extraData: Record<string, unknown>
+  feedbackEmpNo: string
+  feedbackPerson: { empNo: string; empName?: string | null } | null
+  images: CpsUploadedImage[]
+  imagePreviewSources: Record<number, string>
+  aiSuggestion: CpsAiSuggestionPayload | null
+}
+
+export interface CpsIssueDraft {
+  id: number
+  creatorEmpNo: string
+  creatorEmpName?: string | null
+  title?: string | null
+  inspectionTypeCode?: string | null
+  factory?: string | null
+  area?: string | null
+  /** 完整表单快照 JSON 字符串（CpsIssueDraftData 序列化） */
+  draftData: string
+  status: 'ACTIVE' | 'SUBMITTED' | 'DISCARDED' | string
+  submittedIssueId?: number | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface CpsIssueDraftSaveRequest {
+  /** null=新建，非空=覆盖更新 */
+  id?: number | null
+  empNo?: string
+  empName?: string
+  title?: string
+  inspectionTypeCode?: string | null
+  factory?: string | null
+  area?: string | null
+  draftData: string
 }

@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsInspectionAreaMapper">
+
+    <sql id="BaseColumns">
+        id, area_code, type_code, area_name, factory, area, line_or_room_type, process,
+        building, door_no, risk_level, keeper_emp_no, keeper_emp_name, check_item_ids,
+        remark, enabled, source_room_id, created_by, updated_by, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsInspectionArea" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_inspection_area (
+            area_code, type_code, area_name, factory, area, line_or_room_type, process,
+            building, door_no, risk_level, keeper_emp_no, keeper_emp_name, check_item_ids,
+            remark, enabled, source_room_id, created_by, updated_by
+        ) VALUES (
+            #{areaCode}, #{typeCode}, #{areaName}, #{factory}, #{area}, #{lineOrRoomType}, #{process},
+            #{building}, #{doorNo}, #{riskLevel}, #{keeperEmpNo}, #{keeperEmpName}, #{checkItemIds},
+            #{remark}, #{enabled}, #{sourceRoomId}, #{createdBy}, #{updatedBy}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.company.cps.domain.CpsInspectionArea">
+        UPDATE cps_inspection_area
+        SET type_code = #{typeCode},
+            area_name = #{areaName},
+            factory = #{factory},
+            area = #{area},
+            line_or_room_type = #{lineOrRoomType},
+            process = #{process},
+            building = #{building},
+            door_no = #{doorNo},
+            risk_level = #{riskLevel},
+            keeper_emp_no = #{keeperEmpNo},
+            keeper_emp_name = #{keeperEmpName},
+            check_item_ids = #{checkItemIds},
+            remark = #{remark},
+            enabled = #{enabled},
+            updated_by = #{updatedBy}
+        WHERE id = #{id}
+    </update>
+
+    <select id="findById" resultType="com.company.cps.domain.CpsInspectionArea">
+        SELECT <include refid="BaseColumns" /> FROM cps_inspection_area WHERE id = #{id}
+    </select>
+
+    <select id="findByCode" resultType="com.company.cps.domain.CpsInspectionArea">
+        SELECT <include refid="BaseColumns" /> FROM cps_inspection_area WHERE area_code = #{areaCode}
+    </select>
+
+    <select id="findPage" resultType="com.company.cps.domain.CpsInspectionArea">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_inspection_area
+        <where>
+            <if test="typeCode != null and typeCode != ''">AND type_code = #{typeCode}</if>
+            <if test="factory != null and factory != ''">AND factory = #{factory}</if>
+            <if test="enabled != null">AND enabled = #{enabled}</if>
+            <if test="keyword != null and keyword != ''">
+                AND (area_code LIKE CONCAT('%', #{keyword}, '%')
+                     OR area_name LIKE CONCAT('%', #{keyword}, '%')
+                     OR keeper_emp_no LIKE CONCAT('%', #{keyword}, '%')
+                     OR keeper_emp_name LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+        ORDER BY type_code ASC, id ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countPage" resultType="long">
+        SELECT COUNT(1) FROM cps_inspection_area
+        <where>
+            <if test="typeCode != null and typeCode != ''">AND type_code = #{typeCode}</if>
+            <if test="factory != null and factory != ''">AND factory = #{factory}</if>
+            <if test="enabled != null">AND enabled = #{enabled}</if>
+            <if test="keyword != null and keyword != ''">
+                AND (area_code LIKE CONCAT('%', #{keyword}, '%')
+                     OR area_name LIKE CONCAT('%', #{keyword}, '%')
+                     OR keeper_emp_no LIKE CONCAT('%', #{keyword}, '%')
+                     OR keeper_emp_name LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+    </select>
+
+    <select id="listEnabledByType" resultType="com.company.cps.domain.CpsInspectionArea">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_inspection_area
+        WHERE type_code = #{typeCode} AND enabled = 1
+        ORDER BY risk_level DESC, id ASC
+    </select>
+
+    <update id="setEnabled">
+        UPDATE cps_inspection_area SET enabled = #{enabled}, updated_by = #{updatedBy} WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM cps_inspection_area WHERE id = #{id}
+    </delete>
+
+    <select id="countByTypeCode" resultType="long">
+        SELECT COUNT(1) FROM cps_inspection_area WHERE type_code = #{typeCode}
+    </select>
+</mapper>

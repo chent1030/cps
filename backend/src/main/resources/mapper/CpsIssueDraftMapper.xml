@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsIssueDraftMapper">
+
+  <resultMap id="BaseResultMap" type="com.company.cps.domain.CpsIssueDraft">
+    <id column="id" property="id" />
+    <result column="creator_emp_no" property="creatorEmpNo" />
+    <result column="creator_emp_name" property="creatorEmpName" />
+    <result column="title" property="title" />
+    <result column="inspection_type_code" property="inspectionTypeCode" />
+    <result column="factory" property="factory" />
+    <result column="area" property="area" />
+    <result column="draft_data" property="draftData" />
+    <result column="status" property="status" />
+    <result column="submitted_issue_id" property="submittedIssueId" />
+    <result column="created_at" property="createdAt" />
+    <result column="updated_at" property="updatedAt" />
+  </resultMap>
+
+  <sql id="Base_Column_List">
+    id, creator_emp_no, creator_emp_name, title, inspection_type_code,
+    factory, area, draft_data, status, submitted_issue_id, created_at, updated_at
+  </sql>
+
+  <insert id="insert" parameterType="com.company.cps.domain.CpsIssueDraft" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO cps_issue_draft (
+      creator_emp_no, creator_emp_name, title, inspection_type_code,
+      factory, area, draft_data, status, submitted_issue_id
+    ) VALUES (
+      #{creatorEmpNo}, #{creatorEmpName}, #{title}, #{inspectionTypeCode},
+      #{factory}, #{area}, #{draftData}, #{status}, #{submittedIssueId}
+    )
+  </insert>
+
+  <update id="updateOwnActive">
+    UPDATE cps_issue_draft
+    SET title = #{title},
+        inspection_type_code = #{inspectionTypeCode},
+        factory = #{factory},
+        area = #{area},
+        draft_data = #{draftData}
+    WHERE id = #{id}
+      AND creator_emp_no = #{creatorEmpNo}
+      AND status = 'ACTIVE'
+  </update>
+
+  <select id="findById" resultMap="BaseResultMap">
+    SELECT <include refid="Base_Column_List" />
+    FROM cps_issue_draft
+    WHERE id = #{id}
+  </select>
+
+  <select id="listByCreator" resultMap="BaseResultMap">
+    SELECT <include refid="Base_Column_List" />
+    FROM cps_issue_draft
+    WHERE creator_emp_no = #{creatorEmpNo}
+      AND status = #{status}
+    ORDER BY updated_at DESC
+    LIMIT #{limit}
+  </select>
+
+  <update id="markSubmitted">
+    UPDATE cps_issue_draft
+    SET status = 'SUBMITTED',
+        submitted_issue_id = #{submittedIssueId}
+    WHERE id = #{id}
+      AND creator_emp_no = #{creatorEmpNo}
+      AND status = 'ACTIVE'
+  </update>
+
+  <delete id="deleteOwn">
+    DELETE FROM cps_issue_draft
+    WHERE id = #{id}
+      AND creator_emp_no = #{creatorEmpNo}
+  </delete>
+
+</mapper>

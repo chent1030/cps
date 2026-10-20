@@ -25,6 +25,32 @@ body,
   --cps-mist: #f0fdfa;
   --cps-cloud: #f8fafc;
   --cps-line: #ccfbf1;
+
+  /* 灰阶（slate 单一灰族）与边框两级 */
+  --cps-ink-2: #334155;
+  --cps-faint: #94a3b8;
+  --cps-border: #e2e8f0;
+  --cps-border-strong: #cbd5e1;
+
+  /* 语义深色（浅底上的文字级） */
+  --cps-info-deep: #1d4ed8;
+  --cps-warn-deep: #b45309;
+  --cps-success-deep: #15803d;
+  --cps-danger-deep: #b91c1c;
+
+  /* 圆角刻度：8 内嵌小件 / 10 控件 / 12 卡片 / 16 头部面板 / 999 胶囊 */
+  --cps-radius-sm: 8px;
+  --cps-radius-md: 10px;
+  --cps-radius-lg: 12px;
+  --cps-radius-xl: 16px;
+  --cps-radius-pill: 999px;
+
+  /* 阴影刻度：卡片一级 / 头部二级 */
+  --cps-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.04);
+  --cps-shadow-hero: 0 12px 32px rgba(15, 23, 42, 0.12);
+
+  /* 头部面板统一底色（同色相深青，不做跨色渐变） */
+  --cps-hero-bg: linear-gradient(160deg, #0f766e 0%, #115e59 100%);
 }
 
 body {
@@ -49,4 +75,63 @@ textarea {
 button,
 a {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* 触感反馈：antd 按钮按下时轻微收拢（uni-button 的反馈在各自页面内定义） */
+.ant-btn:not(.ant-btn-loading):not(:disabled):active {
+  transform: scale(0.98);
+}
+
+/* 按钮字号刻度（配合 controlHeight: 48 主 CTA / 40 标准 / 32 紧凑） */
+.cps-page .ant-btn:not(.ant-btn-sm):not(.ant-btn-lg) {
+  font-size: 15px;
+}
+.cps-page .ant-btn.ant-btn-lg {
+  font-size: 16px;
+}
+.cps-page .ant-btn.ant-btn-sm {
+  font-size: 13px;
+}
+
+/* 状态胶囊：全站唯一定义（ tones 与各页 STATUS/JUDGE META 对应） */
+.cps-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: var(--cps-radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.cps-status-pill--blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.cps-status-pill--orange {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.cps-status-pill--green {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.cps-status-pill--teal {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.cps-status-pill--gray {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.cps-status-pill--red {
+  background: #fee2e2;
+  color: #b91c1c;
 }

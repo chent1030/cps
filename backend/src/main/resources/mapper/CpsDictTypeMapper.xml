@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsDictTypeMapper">
+
+    <sql id="BaseColumns">
+        id, type_code, type_name, description, builtin, enabled, sort_no,
+        created_by, updated_by, created_at, updated_at
+    </sql>
+
+    <select id="findAll" resultType="com.company.cps.domain.CpsDictType">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_dict_type
+        WHERE 1 = 1
+        <if test="enabled != null">
+          AND enabled = #{enabled}
+        </if>
+        ORDER BY sort_no ASC, type_code ASC, id ASC
+    </select>
+
+    <select id="findById" resultType="com.company.cps.domain.CpsDictType">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_dict_type
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByCode" resultType="com.company.cps.domain.CpsDictType">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_dict_type
+        WHERE type_code = #{typeCode}
+    </select>
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsDictType" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_dict_type (
+            type_code, type_name, description, builtin, enabled, sort_no,
+            created_by, updated_by
+        ) VALUES (
+            #{typeCode}, #{typeName}, #{description}, #{builtin}, #{enabled}, #{sortNo},
+            #{createdBy}, #{updatedBy}
+        )
+    </insert>
+
+    <!-- 内置类型不可改码：update 不含 type_code -->
+    <update id="update" parameterType="com.company.cps.domain.CpsDictType">
+        UPDATE cps_dict_type
+        SET type_name = #{typeName},
+            description = #{description},
+            sort_no = #{sortNo},
+            updated_by = #{updatedBy}
+        WHERE id = #{id}
+    </update>
+
+    <update id="setEnabled">
+        UPDATE cps_dict_type
+        SET enabled = #{enabled}, updated_by = #{updatedBy}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM cps_dict_type
+        WHERE id = #{id}
+    </delete>
+</mapper>

@@ -9,27 +9,11 @@
           <span>超时 {{ overdueCount }}</span>
         </div>
       </div>
-      <a-button type="primary" size="large" class="cps-hero__action" @click="navigateToCreate">
-        <template #icon><plus-outlined /></template>
-        新建
+      <a-button size="large" class="cps-hero__action" @click="navigateToCreate">
+        <template #icon><PlusOutlined /></template>
+        新建问题
       </a-button>
     </header>
-
-    <nav class="cps-quick-entry" aria-label="快捷入口">
-      <button
-        v-for="entry in quickEntries"
-        :key="entry.label"
-        type="button"
-        class="cps-quick-entry__item"
-        :class="{ 'cps-quick-entry__item--primary': entry.primary }"
-        @click="entry.go"
-      >
-        <span class="cps-quick-entry__icon">
-          <component :is="entry.icon" />
-        </span>
-        <span class="cps-quick-entry__label">{{ entry.label }}</span>
-      </button>
-    </nav>
 
     <a-card :body-style="{ padding: '0' }" class="cps-tabs-card">
       <a-tabs v-model:activeKey="tab" class="cps-list-tabs" @change="onTabChange">
@@ -37,8 +21,41 @@
       </a-tabs>
     </a-card>
 
-    <a-spin :spinning="loading">
-      <div class="cps-list-grid">
+    <a-spin :spinning="tab === 'drafts' ? draftsLoading : tab === 'running' ? recordsLoading : loading">
+      <!-- 我的草稿：服务端暂存列表，内联在页签里 -->
+      <div v-if="tab === 'drafts'" class="cps-inline-list">
+        <a-empty v-if="!drafts.length && !draftsLoading" description="暂无草稿——新建问题页点击「暂存」即可保存" />
+        <div v-for="d in drafts" :key="d.id" class="cps-inline-list__item">
+          <div class="cps-inline-list__info">
+            <strong class="cps-inline-list__title">{{ d.title || `草稿 #${d.id}` }}</strong>
+            <span class="cps-inline-list__time">{{ formatDraftTime(d.updatedAt) }}</span>
+          </div>
+          <div class="cps-inline-list__actions">
+            <a-button type="primary" size="small" @click="restoreDraft(d.id)">继续填写</a-button>
+            <a-button size="small" danger @click="removeDraft(d.id)">删除</a-button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 执行中：IN_PROGRESS 巡检记录，可继续执行 -->
+      <div v-else-if="tab === 'running'" class="cps-inline-list">
+        <a-empty v-if="!records.length && !recordsLoading" description="暂无执行中的巡检——新建问题选择类型即可开始" />
+        <div v-for="r in records" :key="r.id" class="cps-inline-list__item">
+          <div class="cps-inline-list__info">
+            <strong class="cps-inline-list__title">
+              {{ typeLabel(r.typeCode) }}<template v-if="r.areaName"> · {{ r.areaName }}</template>
+            </strong>
+            <span class="cps-inline-list__time">
+              开始 {{ formatRecordTime(r.startedAt) }}<template v-if="r.areaCode"> · {{ r.areaCode }}</template>
+            </span>
+          </div>
+          <div class="cps-inline-list__actions">
+            <a-button type="primary" size="small" @click="resumeRecord(r.id)">继续执行</a-button>
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="cps-list-grid">
         <a-empty v-if="!items.length && !loading" description="暂无问题" class="cps-list-empty" />
         <a-row :gutter="[16, 16]">
           <a-col
@@ -57,6 +74,7 @@
                 </div>
                 <div class="cps-issue-card__badges">
                   <a-tag :color="statusMeta[issue.status].color" class="cps-pill">{{ statusMeta[issue.status].label }}</a-tag>
+                  <a-tag v-if="issue.inspectionTypeCode" color="arcoblue" class="cps-pill">{{ issue.inspectionTypeCode }}</a-tag>
                   <a-tag v-if="issue.overdue" color="red" class="cps-pill">超时</a-tag>
                 </div>
               </div>
@@ -82,29 +100,33 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { PlusOutlined, UnorderedListOutlined, SafetyCertificateOutlined, BarChartOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 
 import { listCpsIssues } from '@/api/cps/issue'
-import type { CpsIssueListItem, CpsIssueTab } from '@/types/cps'
+import { deleteCpsIssueDraft, listMyCpsIssueDrafts } from '@/api/cps/issueDraft'
+import { listCpsInspectionTypes } from '@/api/cps/inspectionType'
+import { listMyInProgressInspections } from '@/api/cps/inspectionTask'
+import type {
+  CpsInspectionRecord,
+  CpsInspectionType,
+  CpsIssueDraft,
+  CpsIssueListItem,
+  CpsIssueTab,
+} from '@/types/cps'
 import { statusMeta, issueLocation, issueCategory } from '@/utils/format'
 import { useListCacheStore } from '@/store/listCache'
 
+type TabKey = CpsIssueTab | 'drafts' | 'running'
+
 interface TabItem {
-  value: CpsIssueTab
+  value: TabKey
   label: string
 }
 
-const tabs: TabItem[] = [
-  { value: 'todo', label: '待我处理' },
-  { value: 'created', label: '我发起的' },
-  { value: 'related', label: '我参与的' },
-  { value: 'closed', label: '已关闭' },
-]
-
 const listCache = useListCacheStore()
 
-const tab = ref<CpsIssueTab>('todo')
+const tab = ref<TabKey>('todo')
 const items = ref<CpsIssueListItem[]>([])
 const loading = ref<boolean>(false)
 
@@ -115,18 +137,15 @@ const navigateToCreate = () => {
   uni.navigateTo({ url: '/views/cps/IssueCreateView' })
 }
 
-const quickEntries = [
-  { label: '新建问题', icon: PlusOutlined, primary: true, go: navigateToCreate },
-  { label: '点检任务', icon: UnorderedListOutlined, primary: false, go: () => uni.navigateTo({ url: '/views/cps/RoomCheckListView' }) },
-  { label: '初审裁决', icon: SafetyCertificateOutlined, primary: false, go: () => uni.navigateTo({ url: '/views/cps/InitialReviewView' }) },
-  { label: '评分排名', icon: BarChartOutlined, primary: false, go: () => uni.navigateTo({ url: '/views/cps/ScoreRankingView' }) },
-]
-
 const navigateToDetail = (id: number) => {
   uni.navigateTo({ url: `/views/cps/IssueDetailView?id=${id}` })
 }
 
+const isIssueTab = (key: TabKey): key is CpsIssueTab =>
+  key === 'todo' || key === 'created' || key === 'related' || key === 'closed'
+
 const load = async (force = false) => {
+  if (!isIssueTab(tab.value)) return
   // 命中缓存（且非强制刷新）时直接回显，再后台静默更新
   const cached = listCache.get(tab.value)
   const fresh = force ? false : listCache.age(tab.value) > 0 && listCache.age(tab.value) < 30_000
@@ -146,21 +165,110 @@ const load = async (force = false) => {
 }
 
 const onTabChange = () => {
-  void load()
+  if (isIssueTab(tab.value)) void load()
 }
 
-// onShow：从详情页返回时，当前 tab 列表可能已变化，强制刷新一次
+// onShow：从详情页/新建页返回时，当前 tab 列表可能已变化，强制刷新一次
 const onShowHandler = () => {
-  void load(true)
+  if (isIssueTab(tab.value)) void load(true)
 }
 
-watch(tab, () => load(), { immediate: true })
+// ============================================================
+// Phase B2：服务端草稿入口（页签内联展示）
+// ============================================================
+const draftsLoading = ref(false)
+const drafts = ref<CpsIssueDraft[]>([])
+const draftCount = computed(() => drafts.value.length)
+
+// ============================================================
+// 执行中分组：IN_PROGRESS 巡检记录（恢复现场）
+// ============================================================
+const recordsLoading = ref(false)
+const records = ref<CpsInspectionRecord[]>([])
+const recordCount = computed(() => records.value.length)
+const typeOptions = ref<CpsInspectionType[]>([])
+
+const typeLabel = (code: string) => typeOptions.value.find((t) => t.code === code)?.name ?? code
+
+const tabs = computed<TabItem[]>(() => [
+  { value: 'todo', label: '待我处理' },
+  { value: 'created', label: '我发起的' },
+  { value: 'related', label: '我参与的' },
+  { value: 'closed', label: '已关闭' },
+  { value: 'drafts', label: draftCount.value ? `我的草稿 (${draftCount.value})` : '我的草稿' },
+  { value: 'running', label: recordCount.value ? `执行中 (${recordCount.value})` : '执行中' },
+])
+
+const loadDrafts = async () => {
+  draftsLoading.value = true
+  try {
+    drafts.value = await listMyCpsIssueDrafts()
+  } catch {
+    // 草稿拉取失败不打扰主列表，静默忽略
+  } finally {
+    draftsLoading.value = false
+  }
+}
+
+const loadRecords = async () => {
+  recordsLoading.value = true
+  try {
+    records.value = await listMyInProgressInspections()
+    if (records.value.length && !typeOptions.value.length) {
+      try {
+        typeOptions.value = await listCpsInspectionTypes()
+      } catch {
+        // 类型名拿不到时回退显示编码
+      }
+    }
+  } catch {
+    // 执行中记录拉取失败不打扰主列表，静默忽略
+  } finally {
+    recordsLoading.value = false
+  }
+}
+
+const restoreDraft = (id: number) => {
+  uni.navigateTo({ url: `/views/cps/IssueCreateView?draftId=${id}` })
+}
+
+const resumeRecord = (id: number) => {
+  uni.navigateTo({ url: `/views/cps/InspectionExecuteView?recordId=${id}` })
+}
+
+watch(tab, () => {
+  if (isIssueTab(tab.value)) void load()
+  else if (tab.value === 'drafts') void loadDrafts()
+  else void loadRecords()
+}, { immediate: true })
 
 // uni-app 页面生命周期：每次显示页面触发
 import { onShow } from '@dcloudio/uni-app'
 onShow(() => {
-  if (items.value.length) onShowHandler()
+  if (isIssueTab(tab.value)) onShowHandler()
+  void loadDrafts()
+  void loadRecords()
 })
+
+const removeDraft = async (id: number) => {
+  try {
+    await deleteCpsIssueDraft(id)
+    message.success('草稿已删除')
+    await loadDrafts()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '删除失败')
+  }
+}
+
+const formatDraftTime = (t?: string) => {
+  if (!t) return '-'
+  return t.replace('T', ' ').slice(0, 16)
+}
+
+const formatRecordTime = (t?: string | null) => {
+  if (!t) return '-'
+  return t.replace('T', ' ').slice(5, 16)
+}
 </script>
 
 <style scoped>
@@ -178,11 +286,10 @@ onShow(() => {
   justify-content: space-between;
   gap: 12px;
   overflow: hidden;
-  border: 1px solid rgba(20, 184, 166, 0.22);
-  border-radius: 16px;
-  padding: 20px 24px 20px 28px;
-  background: linear-gradient(135deg, rgba(20, 184, 166, 0.96) 0%, rgba(37, 99, 235, 0.92) 66%, rgba(34, 197, 94, 0.82) 100%);
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.15);
+  border-radius: var(--cps-radius-xl);
+  padding: 20px 24px;
+  background: var(--cps-hero-bg);
+  box-shadow: var(--cps-shadow-hero);
   color: #fff;
   margin-bottom: 16px;
 }
@@ -195,13 +302,14 @@ onShow(() => {
 .cps-hero__eyebrow {
   margin: 0;
   color: rgba(255, 255, 255, 0.82);
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
 }
 
 .cps-hero h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 800;
 }
 
@@ -215,75 +323,67 @@ onShow(() => {
   display: inline-flex;
   align-items: center;
   min-height: 24px;
-  border-radius: 999px;
+  border-radius: var(--cps-radius-pill);
   padding: 0 10px;
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.16);
   font-size: 13px;
   font-weight: 700;
 }
 
 .cps-hero__action {
   background: #fff !important;
-  color: #0f766e !important;
+  color: var(--cps-teal-deep) !important;
   border: none !important;
   font-weight: 800 !important;
 }
 
-.cps-quick-entry {
+/* 页签内联列表（我的草稿 / 执行中） */
+.cps-inline-list {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
-  margin-bottom: 16px;
 }
 
-.cps-quick-entry__item {
+.cps-inline-list__item {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  padding: 14px 6px 12px;
-  background: #fff;
-  border: 1px solid rgba(20, 184, 166, 0.18);
-  border-radius: 14px;
-  cursor: pointer;
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--cps-border);
+  border-radius: var(--cps-radius-md);
+  background: var(--cps-cloud);
 }
 
-.cps-quick-entry__item:active {
-  transform: scale(0.96);
+.cps-inline-list__info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 
-.cps-quick-entry__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: #f0fdfa;
-  color: #0f766e;
-  font-size: 20px;
-}
-
-.cps-quick-entry__label {
-  font-size: 13px;
-  font-weight: 700;
+.cps-inline-list__title {
   color: #0f172a;
+  font-size: 14px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.cps-quick-entry__item--primary .cps-quick-entry__icon {
-  background: linear-gradient(135deg, #14b8a6, #0f766e);
-  color: #fff;
-  box-shadow: 0 6px 16px rgba(20, 184, 166, 0.35);
+.cps-inline-list__time {
+  color: #94a3b8;
+  font-size: 12px;
 }
 
-.cps-quick-entry__item--primary .cps-quick-entry__label {
-  color: #0f766e;
+.cps-inline-list__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .cps-tabs-card {
   margin-bottom: 16px;
-  border-radius: 12px;
+  border-radius: var(--cps-radius-lg);
   overflow: hidden;
 }
 
@@ -303,8 +403,8 @@ onShow(() => {
 .cps-issue-card {
   position: relative;
   overflow: hidden;
-  border-radius: 12px;
-  border: 1px solid rgba(20, 184, 166, 0.16);
+  border-radius: var(--cps-radius-lg);
+  border: 1px solid var(--cps-border);
   transition: transform 120ms ease;
 }
 
@@ -323,16 +423,16 @@ onShow(() => {
 }
 
 .cps-rail--blue::before {
-  background: linear-gradient(180deg, #2563eb, #60a5fa);
+  background: #2563eb;
 }
 .cps-rail--teal::before {
-  background: linear-gradient(180deg, #14b8a6, #2dd4bf);
+  background: #14b8a6;
 }
 .cps-rail--orange::before {
-  background: linear-gradient(180deg, #f97316, #fdba74);
+  background: #f97316;
 }
 .cps-rail--green::before {
-  background: linear-gradient(180deg, #22c55e, #86efac);
+  background: #22c55e;
 }
 
 .cps-issue-card :deep(.ant-card-body) {
@@ -393,8 +493,8 @@ onShow(() => {
   display: grid;
   gap: 6px;
   padding: 10px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #f0fdfa 0%, #eff6ff 100%);
+  border-radius: var(--cps-radius-md);
+  background: var(--cps-cloud);
   color: #475569;
   font-size: 13px;
   line-height: 18px;
@@ -402,7 +502,7 @@ onShow(() => {
 
 .cps-issue-card__meta b {
   display: block;
-  color: #0f766e;
+  color: var(--cps-teal-deep);
   font-size: 11px;
   font-weight: 800;
 }
@@ -414,9 +514,9 @@ onShow(() => {
   justify-content: space-between;
   gap: 8px;
   margin-top: 10px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--cps-border);
   padding-top: 10px;
-  color: #64748b;
+  color: var(--cps-muted);
   font-size: 12px;
   font-weight: 600;
 }
@@ -427,7 +527,7 @@ onShow(() => {
     padding: 20px 28px 48px;
   }
   .cps-hero h1 {
-    font-size: 24px;
+    font-size: 26px;
   }
 }
 </style>

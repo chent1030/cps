@@ -10,6 +10,7 @@ import com.company.cps.dto.CpsInspectionPlanRequest;
 import com.company.cps.mapper.CpsInspectionPlanMapper;
 import com.company.cps.mapper.CpsInspectionPlanTaskMapper;
 import com.company.cps.mapper.CpsPlanBuildRecordMapper;
+import com.company.cps.service.CpsApprovalService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,7 +42,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** D1 草稿 + D2 审核 + D3 建单引擎（AC-30 幂等）：approve 重放只产 3 任务。 */
+/** D1 草稿 + D2 审核 + D3 建单引擎（AC-30 幂等）：approve 重放幂等；草稿 tasks 非空只建勾选类型，空时三类全建。 */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class CpsInspectionPlanServiceTest {
@@ -50,12 +51,13 @@ class CpsInspectionPlanServiceTest {
     @Mock private CpsInspectionPlanTaskMapper taskMapper;
     @Mock private CpsPlanBuildRecordMapper buildRecordMapper;
     @Mock private CpsAgentFrameworkClient agentClient;
+    @Mock private CpsApprovalService approvalService;
 
     private CpsInspectionPlanService service;
 
     @BeforeEach
     void setUp() {
-        service = new CpsInspectionPlanService(planMapper, taskMapper, buildRecordMapper, agentClient, new ObjectMapper());
+        service = new CpsInspectionPlanService(planMapper, taskMapper, buildRecordMapper, agentClient, approvalService, new ObjectMapper());
     }
 
     private static CpsInspectionPlanRequest baseDraft(String sourceRunId) {
@@ -259,7 +261,7 @@ class CpsInspectionPlanServiceTest {
         when(planMapper.approveCas(any(CpsInspectionPlan.class))).thenReturn(1);
         // 关键 stub：findExistingTaskTypes 仅 INSPECT_RECTIFY 已存在
         when(taskMapper.findExistingTaskTypes(planId))
-                .thenReturn(Collections.singletonList(CpsInspectionPlanTaskType.INSPECT_RECTIFY));
+                .thenReturn(Collections.singletonList("INSPECT_RECTIFY"));
 
         CpsInspectionPlanApproveRequest req = new CpsInspectionPlanApproveRequest();
         req.setApprover("E1");
@@ -270,7 +272,7 @@ class CpsInspectionPlanServiceTest {
         assertEquals(2, result.getCreatedTasks().size());
         // 验证新建的两类不含 INSPECT_RECTIFY
         assertFalse(result.getCreatedTasks().stream()
-                .anyMatch(t -> t.getTaskType() == CpsInspectionPlanTaskType.INSPECT_RECTIFY));
+                .anyMatch(t -> "INSPECT_RECTIFY".equals(t.getTaskType())));
         verify(taskMapper, times(2)).insert(any(CpsInspectionPlanTask.class));
     }
 
@@ -313,7 +315,7 @@ class CpsInspectionPlanServiceTest {
 
         CpsInspectionPlanService.ApproveResult result = service.approve(planId, req);
         CpsInspectionPlanTask patrolTask = result.getCreatedTasks().stream()
-                .filter(t -> t.getTaskType() == CpsInspectionPlanTaskType.INSPECT_PATROL)
+                .filter(t -> "INSPECT_PATROL".equals(t.getTaskType()))
                 .findFirst().orElseThrow();
         assertEquals("夜间巡检", patrolTask.getTitle());
         assertEquals("E2001", patrolTask.getTargetEmpNo());
@@ -337,6 +339,117 @@ class CpsInspectionPlanServiceTest {
         for (CpsInspectionPlanTask t : result.getCreatedTasks()) {
             assertTrue(t.getTitle().contains("INSPECT_"));
         }
+    }
+
+    /** 选择性建单：草稿 tasks 非空 → 只建勾选类型（如仅辅房点检 INSPECT_CHECK），未勾选类型不 INSERT 不留痕。 */
+    @Test
+    void createTasksOnlyBuildsDraftSelectedTypes() {
+        long planId = 61L;
+        CpsInspectionPlan pending = plan(planId, "辅房专项点检", CpsInspectionPlanStatus.PENDING_REVIEW, 0, 1);
+        pending.setDraftContentJson("{\"tasks\":{\"INSPECT_CHECK\":{"
+                + "\"title\":\"配电房点检\",\"target_emp_no\":\"E2001\",\"target_emp_name\":\"张三\","
+                + "\"reference_object_key\":\"R001,R002\",\"reference_object_type\":\"ROOM\"}}}");
+        CpsInspectionPlan approved = plan(planId, "辅房专项点检", CpsInspectionPlanStatus.APPROVED, 1, 1);
+        // approved 同样需保留 draft JSON，否则 createPlanTasks 走第二次 findById 时丢失
+        approved.setDraftContentJson(pending.getDraftContentJson());
+        when(planMapper.findById(planId)).thenReturn(pending, approved);
+        when(planMapper.approveCas(any(CpsInspectionPlan.class))).thenReturn(1);
+        when(taskMapper.findExistingTaskTypes(planId)).thenReturn(Collections.emptyList());
+
+        CpsInspectionPlanApproveRequest req = new CpsInspectionPlanApproveRequest();
+        req.setApprover("E1");
+        req.setLockVersion(0);
+
+        CpsInspectionPlanService.ApproveResult result = service.approve(planId, req);
+        assertEquals(1, result.getCreatedTasks().size());
+        CpsInspectionPlanTask task = result.getCreatedTasks().get(0);
+        assertEquals("INSPECT_CHECK", task.getTaskType());
+        assertEquals("配电房点检", task.getTitle());
+        assertEquals("E2001", task.getTargetEmpNo());
+        assertEquals("R001,R002", task.getReferenceObjectKey());
+        verify(taskMapper, times(1)).insert(any(CpsInspectionPlanTask.class));
+        // 未勾选类型既不 INSERT 也不落建单留痕（仅 1 条 CREATED）
+        verify(buildRecordMapper, times(1)).insert(any(com.company.cps.domain.CpsPlanBuildRecord.class));
+    }
+
+    /** 选择性建单兜底：草稿 tasks 非空但无合法类型键 → 回退三类全建（坏数据不静默丢任务）。 */
+    @Test
+    void createTasksFallsBackToAllTypesWhenDraftHasNoValidKeys() {
+        long planId = 62L;
+        CpsInspectionPlan pending = plan(planId, "x", CpsInspectionPlanStatus.PENDING_REVIEW, 0, 1);
+        pending.setDraftContentJson("{\"tasks\":{\"NOT_A_TYPE\":{\"title\":\"坏键\"}}}");
+        CpsInspectionPlan approved = plan(planId, "x", CpsInspectionPlanStatus.APPROVED, 1, 1);
+        approved.setDraftContentJson(pending.getDraftContentJson());
+        when(planMapper.findById(planId)).thenReturn(pending, approved);
+        when(planMapper.approveCas(any(CpsInspectionPlan.class))).thenReturn(1);
+        when(taskMapper.findExistingTaskTypes(planId)).thenReturn(Collections.emptyList());
+
+        CpsInspectionPlanApproveRequest req = new CpsInspectionPlanApproveRequest();
+        req.setApprover("E1");
+        req.setLockVersion(0);
+
+        CpsInspectionPlanService.ApproveResult result = service.approve(planId, req);
+        assertEquals(3, result.getCreatedTasks().size());
+    }
+
+    /** Python C-07 草稿兼容：tasks 为列表形态 [{task_type,...}] → 按 task_type 键化，同样支持选择性建单。 */
+    @Test
+    void createTasksSupportsPythonListFormDraft() {
+        long planId = 63L;
+        CpsInspectionPlan pending = plan(planId, "x", CpsInspectionPlanStatus.PENDING_REVIEW, 0, 1);
+        pending.setDraftContentJson("{\"tasks\":["
+                + "{\"task_type\":\"INSPECT_CHECK\",\"priority\":\"HIGH\",\"rationale\":\"辅房风险\"},"
+                + "{\"task_type\":\"INSPECT_PATROL\",\"priority\":\"MEDIUM\",\"rationale\":\"区域巡查\"}]}");
+        CpsInspectionPlan approved = plan(planId, "x", CpsInspectionPlanStatus.APPROVED, 1, 1);
+        approved.setDraftContentJson(pending.getDraftContentJson());
+        when(planMapper.findById(planId)).thenReturn(pending, approved);
+        when(planMapper.approveCas(any(CpsInspectionPlan.class))).thenReturn(1);
+        when(taskMapper.findExistingTaskTypes(planId)).thenReturn(Collections.emptyList());
+
+        CpsInspectionPlanApproveRequest req = new CpsInspectionPlanApproveRequest();
+        req.setApprover("E1");
+        req.setLockVersion(0);
+
+        CpsInspectionPlanService.ApproveResult result = service.approve(planId, req);
+        assertEquals(2, result.getCreatedTasks().size());
+        assertEquals(0, result.getCreatedTasks().stream()
+                .filter(t -> "INSPECT_RECTIFY".equals(t.getTaskType()))
+                .count());
+        // 列表条目无 title/target_emp_no 等建单字段 → 默认值兜底（与旧行为一致）
+        for (CpsInspectionPlanTask t : result.getCreatedTasks()) {
+            assertNotNull(t.getTitle());
+            assertNull(t.getTargetEmpNo());
+        }
+    }
+
+    /** 选择性建单 recordStatus：未勾选类型 requested=false 且不计 missing，allBuilt 只看勾选范围。 */
+    @Test
+    void recordStatusMarksUnselectedTypesNotRequested() {
+        long planId = 68L;
+        CpsInspectionPlan approved = plan(planId, "辅房专项点检", CpsInspectionPlanStatus.APPROVED, 1, 1);
+        approved.setDraftContentJson("{\"tasks\":{\"INSPECT_CHECK\":{\"title\":\"配电房点检\"}}}");
+        when(planMapper.findById(planId)).thenReturn(approved);
+        CpsInspectionPlanTask check = new CpsInspectionPlanTask();
+        check.setId(911L); check.setPlanId(planId);
+        check.setTaskType("INSPECT_CHECK"); check.setTaskStatus("PENDING");
+        when(taskMapper.findByPlanId(planId)).thenReturn(Collections.singletonList(check));
+        when(buildRecordMapper.findByPlanId(planId)).thenReturn(Collections.emptyList());
+
+        com.company.cps.dto.CpsPlanRecordStatusResponse status = service.recordStatus(planId);
+
+        assertEquals(3, status.getPerType().size());
+        Map<String, com.company.cps.dto.CpsPlanRecordStatusResponse.TypeRecordStatus> byType =
+                status.getPerType().stream().collect(java.util.stream.Collectors.toMap(
+                        com.company.cps.dto.CpsPlanRecordStatusResponse.TypeRecordStatus::getTaskType, s -> s));
+        assertTrue(byType.get("INSPECT_CHECK").isRequested());
+        assertTrue(byType.get("INSPECT_CHECK").isTaskExists());
+        assertFalse(byType.get("INSPECT_RECTIFY").isRequested());
+        assertFalse(byType.get("INSPECT_PATROL").isRequested());
+        // 未勾选类型不计 missing：created=1 / failed=0 / missing=0 → allBuilt=true
+        assertEquals(1, status.getSummary().getTypesCreated());
+        assertEquals(0, status.getSummary().getTypesFailed());
+        assertEquals(0, status.getSummary().getTypesMissing());
+        assertTrue(status.getSummary().isAllBuilt());
     }
 
     @Test
@@ -415,7 +528,7 @@ class CpsInspectionPlanServiceTest {
         when(taskMapper.findExistingTaskTypes(planId)).thenReturn(Collections.emptyList());
         when(taskMapper.insert(any(CpsInspectionPlanTask.class))).thenAnswer(inv -> {
             CpsInspectionPlanTask t = inv.getArgument(0);
-            if (t.getTaskType() == CpsInspectionPlanTaskType.INSPECT_PATROL) {
+            if ("INSPECT_PATROL".equals(t.getTaskType())) {
                 throw new org.springframework.dao.DataIntegrityViolationException("mock insert failure");
             }
             return 1;
@@ -454,7 +567,7 @@ class CpsInspectionPlanServiceTest {
         when(taskMapper.findExistingTaskTypes(planId)).thenReturn(Collections.emptyList());
         when(taskMapper.insert(any(CpsInspectionPlanTask.class))).thenAnswer(inv -> {
             CpsInspectionPlanTask t = inv.getArgument(0);
-            if (t.getTaskType() == CpsInspectionPlanTaskType.INSPECT_RECTIFY) {
+            if ("INSPECT_RECTIFY".equals(t.getTaskType())) {
                 throw new org.springframework.dao.DuplicateKeyException("uk conflict");
             }
             return 1;
@@ -481,10 +594,10 @@ class CpsInspectionPlanServiceTest {
         // RECTIFY 任务在且建单成功；PATROL 任务在但最近建单失败；CHECK 任务缺失（从未建成）
         CpsInspectionPlanTask rectify = new CpsInspectionPlanTask();
         rectify.setId(901L); rectify.setPlanId(planId);
-        rectify.setTaskType(CpsInspectionPlanTaskType.INSPECT_RECTIFY); rectify.setTaskStatus("PENDING");
+        rectify.setTaskType("INSPECT_RECTIFY"); rectify.setTaskStatus("PENDING");
         CpsInspectionPlanTask patrol = new CpsInspectionPlanTask();
         patrol.setId(902L); patrol.setPlanId(planId);
-        patrol.setTaskType(CpsInspectionPlanTaskType.INSPECT_PATROL); patrol.setTaskStatus("PENDING");
+        patrol.setTaskType("INSPECT_PATROL"); patrol.setTaskStatus("PENDING");
         when(taskMapper.findByPlanId(planId)).thenReturn(Arrays.asList(rectify, patrol));
 
         com.company.cps.domain.CpsPlanBuildRecord recOk = new com.company.cps.domain.CpsPlanBuildRecord();
@@ -527,12 +640,12 @@ class CpsInspectionPlanServiceTest {
         approved.setDraftContentJson("{\"tasks\":{}}");
         when(planMapper.findById(planId)).thenReturn(approved);
         when(taskMapper.findExistingTaskTypes(planId))
-                .thenReturn(Collections.singletonList(CpsInspectionPlanTaskType.INSPECT_RECTIFY));
+                .thenReturn(Collections.singletonList("INSPECT_RECTIFY"));
 
         List<CpsInspectionPlanTask> created = service.rebuildTasks(planId, "E65");
 
         assertEquals(2, created.size());
-        assertFalse(created.stream().anyMatch(t -> t.getTaskType() == CpsInspectionPlanTaskType.INSPECT_RECTIFY));
+        assertFalse(created.stream().anyMatch(t -> "INSPECT_RECTIFY".equals(t.getTaskType())));
         ArgumentCaptor<com.company.cps.domain.CpsPlanBuildRecord> captor =
                 ArgumentCaptor.forClass(com.company.cps.domain.CpsPlanBuildRecord.class);
         verify(buildRecordMapper, times(3)).insert(captor.capture());

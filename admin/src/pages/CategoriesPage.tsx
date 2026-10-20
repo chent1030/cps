@@ -116,7 +116,7 @@ export function CategoriesPage() {
   }
 
   return <>
-    <PageHead title="问题分类" detail="一级分类可点击展开，查看并维护其下属二级分类。">
+    <PageHead title="问题分类" detail="维护一级与二级问题分类">
       <div style={{ display: 'flex', gap: 10 }}>
         <Button icon={<IconDownload />} loading={exporting} onClick={() => void exportRows()}>导出 Excel</Button>
         <Button type="primary" icon={<IconPlus />} onClick={openCreate}>新建分类</Button>
@@ -129,7 +129,7 @@ export function CategoriesPage() {
         <Button type="primary" htmlType="submit" icon={<IconFilter />}>应用筛选</Button>
       </Form>
     </Card>
-    <div style={{ marginTop: 20 }}>
+    <div style={{ marginTop: 16 }}>
       <StatePanel {...remote}>{remote.data && <Card className="table-card">
         <Table<Category>
           rowKey="id"
@@ -150,7 +150,7 @@ export function CategoriesPage() {
         <div className="pagination-wrap"><Pagination current={remote.data.page} pageSize={remote.data.pageSize} total={remote.data.total} sizeCanChange sizeOptions={[20, 50, 100]} showTotal onChange={(page, pageSize) => { setExpandedKeys([]); setChildrenByParent({}); setQuery({ ...query, page, pageSize }) }} /></div>
       </Card>}</StatePanel>
     </div>
-    <Modal title={editing ? '编辑问题分类' : '新建问题分类'} visible={visible} onCancel={closeModal} onOk={() => void save()} confirmLoading={saving} okText="保存" cancelText="取消">
+    <Modal title={editing ? '编辑问题分类' : '新建问题分类'} visible={visible} onCancel={closeModal} onOk={() => void save()} confirmLoading={saving} okText="保存" cancelText="取消" style={{ width: 640 }}>
       <Form layout="vertical">
         <Form.Item label="分类层级" required><Select value={String(form.categoryLevel)} onChange={(value) => setForm({ ...form, categoryLevel: Number(value), parentId: 0 })}><Select.Option value="1">一级分类</Select.Option><Select.Option value="2">二级分类</Select.Option></Select></Form.Item>
         {form.categoryLevel === 2 && <Form.Item label="上级分类" required><Select loading={parents.loading} value={form.parentId ? String(form.parentId) : undefined} onChange={(value) => setForm({ ...form, parentId: Number(value) })} placeholder="请选择一级分类">{parents.data?.map((item) => <Select.Option key={item.id} value={String(item.id)}>{item.categoryName}</Select.Option>)}</Select></Form.Item>}

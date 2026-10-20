@@ -68,24 +68,24 @@ export function InventoryAlertsPage() {
   ]
 
   return <>
-    <PageHead title="库存预警处理" detail={<>当库存 ≤ 阈值时触发预警事件；持续不足合并为同一事件。OPEN 状态可处理：CLOSE 需写原因，IGNORE 可写说明。</>} />
-    <Card className="filter-card" style={{ marginTop: 12 }}>
+    <PageHead title="库存预警处理" detail="库存低于阈值时触发预警" />
+    <Card className="filter-card">
       <Form layout="inline" onSubmit={() => setQuery({ ...filters, page: 1, size: query.size })} style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <Select allowClear value={filters.status || undefined} placeholder="全部状态" style={{ width: 180 }} onChange={(value) => setFilters({ ...filters, status: value ?? '' })} options={Object.entries(statusLabel).map(([value, label]) => ({ value, label }))} />
         <Button type="primary" htmlType="submit" icon={<IconFilter />}>筛选</Button>
       </Form>
     </Card>
-    <div style={{ marginTop: 20 }}>
+    <div style={{ marginTop: 16 }}>
       <StatePanel {...remote}>{remote.data && <Card className="table-card">
         <Table rowKey="id" columns={columns} data={rows} pagination={false} scroll={{ x: 1100 }} />
         <div className="pagination-wrap"><Pagination current={query.page} pageSize={query.size} total={total} showTotal onChange={(page, size) => setQuery({ ...query, page, size })} /></div>
       </Card>}</StatePanel>
     </div>
 
-    <Modal title={handleTarget?.action === 'CLOSE' ? '关闭预警' : '忽略预警'} visible={!!handleTarget} onCancel={() => setHandleTarget(null)} onOk={() => void submit()} confirmLoading={handling} okText="确认" cancelText="取消">
+    <Modal title={handleTarget?.action === 'CLOSE' ? '关闭预警' : '忽略预警'} visible={!!handleTarget} onCancel={() => setHandleTarget(null)} onOk={() => void submit()} confirmLoading={handling} okText="确认" cancelText="取消" style={{ width: 640 }}>
       <Form layout="vertical">
-        <Typography.Text>物品：{handleTarget?.event.itemName || '-'}（评估库存 {handleTarget?.event.lastEvalQty} / 阈值 {handleTarget?.event.thresholdSnapshot}）</Typography.Text>
-        <Form.Item label={handleTarget?.action === 'CLOSE' ? '关闭原因（必填）' : '忽略说明（可选）'} required={handleTarget?.action === 'CLOSE'} style={{ marginTop: 12 }}>
+        <Form.Item label="物品"><Typography.Text>{handleTarget?.event.itemName || '-'}（评估库存 {handleTarget?.event.lastEvalQty} / 阈值 {handleTarget?.event.thresholdSnapshot}）</Typography.Text></Form.Item>
+        <Form.Item label={handleTarget?.action === 'CLOSE' ? '关闭原因' : '忽略说明'} required={handleTarget?.action === 'CLOSE'}>
           <Input.TextArea value={handleReason} onChange={setHandleReason} />
         </Form.Item>
       </Form>

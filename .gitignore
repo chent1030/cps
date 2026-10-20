@@ -12,3 +12,8 @@ android/*.tsbuildinfo
 
 # tooling
 .zcode/
+
+# 本地运行产物
+*.log
+.DS_Store
+backend/app.log

@@ -18,6 +18,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+
+import java.util.Map;
+import java.util.HashMap;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -37,6 +43,15 @@ public class CpsMasterAdminController {
     @PostMapping("/auth/login")
     public CpsAdminLoginResponse login(@RequestBody CpsAdminLoginRequest request) {
         return masterDataService.login(request);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleBadArg(IllegalArgumentException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("status", 400);
+        body.put("error", "Bad Request");
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     /**
@@ -186,5 +201,20 @@ public class CpsMasterAdminController {
             return empNo.trim();
         }
         return "DEV_EMP";
+    }
+
+    /**
+     * 退出登录：记录审计日志。前端清除本地 operator 即可，不需要后端校验 token。
+     */
+    @PostMapping("/auth/logout")
+    public java.util.Map<String, Object> logout(@RequestBody java.util.Map<String, String> body) {
+        String empNo = body == null ? null : body.get("empNo");
+        String empName = body == null ? null : body.get("empName");
+        if (masterDataService != null) {
+            masterDataService.recordLogout(empNo, empName);
+        }
+        java.util.Map<String, Object> r = new java.util.HashMap<>();
+        r.put("ok", true);
+        return r;
     }
 }

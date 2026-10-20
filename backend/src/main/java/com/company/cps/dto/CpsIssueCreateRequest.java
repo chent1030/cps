@@ -4,10 +4,19 @@ import java.util.List;
 
 public class CpsIssueCreateRequest {
     private String empNo;
+    private String empName;
     private String factory;
     private String area;
     private String line;
     private String process;
+    /** 资源号：巡检现场手动录入的物理资源标识（PRD 24.2.6），必填。 */
+    private String resourceNo;
+    /** 巡检类型编码（Phase B1）：客户端从 /api/cps/inspection-types 选择，传 null 时退化为旧字段路径。 */
+    private String inspectionTypeCode;
+    /** 动态字段值（Phase B1，JSON 字符串）：与 inspectionTypeCode 的 form_schema 对应。 */
+    private String extraData;
+    /** 服务端草稿 ID（Phase B2）：提交成功后由后端归档（ACTIVE→SUBMITTED）。可空。 */
+    private Long draftId;
     private Long aiCategoryL1Id;
     private Long aiCategoryL2Id;
     private Long categoryL1Id;
@@ -20,6 +29,9 @@ public class CpsIssueCreateRequest {
     public String getEmpNo() { return empNo; }
     public void setEmpNo(String empNo) { this.empNo = empNo; }
 
+    public String getEmpName() { return empName; }
+    public void setEmpName(String empName) { this.empName = empName; }
+
     public String getFactory() { return factory; }
     public void setFactory(String factory) { this.factory = factory; }
     public String getArea() { return area; }
@@ -28,6 +40,14 @@ public class CpsIssueCreateRequest {
     public void setLine(String line) { this.line = line; }
     public String getProcess() { return process; }
     public void setProcess(String process) { this.process = process; }
+    public String getResourceNo() { return resourceNo; }
+    public void setResourceNo(String resourceNo) { this.resourceNo = resourceNo; }
+    public String getInspectionTypeCode() { return inspectionTypeCode; }
+    public void setInspectionTypeCode(String inspectionTypeCode) { this.inspectionTypeCode = inspectionTypeCode; }
+    public String getExtraData() { return extraData; }
+    public void setExtraData(String extraData) { this.extraData = extraData; }
+    public Long getDraftId() { return draftId; }
+    public void setDraftId(Long draftId) { this.draftId = draftId; }
     public Long getAiCategoryL1Id() { return aiCategoryL1Id; }
     public void setAiCategoryL1Id(Long aiCategoryL1Id) { this.aiCategoryL1Id = aiCategoryL1Id; }
     public Long getAiCategoryL2Id() { return aiCategoryL2Id; }

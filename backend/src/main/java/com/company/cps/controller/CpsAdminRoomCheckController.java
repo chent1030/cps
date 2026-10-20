@@ -1,5 +1,7 @@
 package com.company.cps.controller;
 
+import com.company.cps.dto.CpsPageResponse;
+import com.company.cps.dto.CpsRoomCheckAdminRowDto;
 import com.company.cps.dto.CpsRoomCheckRankingResponse;
 import com.company.cps.dto.CpsRoomCheckRecordResponse;
 import com.company.cps.dto.CpsRoomCheckRejudgeResponse;
@@ -51,6 +53,17 @@ public class CpsAdminRoomCheckController {
     @GetMapping("/room-check-records/{recordId}")
     public CpsRoomCheckRecordResponse recordDetail(@PathVariable Long recordId) {
         return roomCheckService.getRecordForAdmin(recordId);
+    }
+
+    /** B：管理台点检记录分页（PRD §22 追溯：状态/判定状态/房间编码过滤）。 */
+    @GetMapping("/room-check-records")
+    public CpsPageResponse<CpsRoomCheckAdminRowDto> records(
+            @RequestParam(required = false) String recordStatus,
+            @RequestParam(required = false) String judgeStatus,
+            @RequestParam(required = false) String roomCode,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int pageSize) {
+        return roomCheckService.adminPage(recordStatus, judgeStatus, roomCode, page, pageSize);
     }
 
     /**

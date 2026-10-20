@@ -6,7 +6,7 @@
 
     <sql id="BaseColumns">
         id, plan_id, task_type, title, target_emp_no, target_emp_name,
-        scheduled_at, frequency, acceptance_criteria, evidence_requirement,
+        scheduled_at, frequency, acceptance_criteria, evidence_requirement, coverage_area_codes,
         task_status, reference_issue_id, reference_object_key, reference_object_type,
         created_at, updated_at
     </sql>
@@ -22,6 +22,7 @@
         <result column="frequency" property="frequency"/>
         <result column="acceptance_criteria" property="acceptanceCriteria"/>
         <result column="evidence_requirement" property="evidenceRequirement"/>
+        <result column="coverage_area_codes" property="coverageAreaCodes"/>
         <result column="task_status" property="taskStatus"/>
         <result column="reference_issue_id" property="referenceIssueId"/>
         <result column="reference_object_key" property="referenceObjectKey"/>
@@ -46,19 +47,29 @@
     <insert id="insert" parameterType="com.company.cps.domain.CpsInspectionPlanTask" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_inspection_plan_task (
             plan_id, task_type, title, target_emp_no, target_emp_name,
-            scheduled_at, frequency, acceptance_criteria, evidence_requirement,
+            scheduled_at, frequency, acceptance_criteria, evidence_requirement, coverage_area_codes,
             task_status, reference_issue_id, reference_object_key, reference_object_type
         ) VALUES (
             #{planId}, #{taskType}, #{title}, #{targetEmpNo}, #{targetEmpName},
-            #{scheduledAt}, #{frequency}, #{acceptanceCriteria}, #{evidenceRequirement},
+            #{scheduledAt}, #{frequency}, #{acceptanceCriteria}, #{evidenceRequirement}, #{coverageAreaCodes},
             #{taskStatus}, #{referenceIssueId}, #{referenceObjectKey}, #{referenceObjectType}
         )
     </insert>
 
-    <select id="findExistingTaskTypes" resultType="com.company.cps.domain.CpsInspectionPlanTaskType">
+    <select id="findExistingTaskTypes" resultType="java.lang.String">
         SELECT task_type
         FROM cps_inspection_plan_task
         WHERE plan_id = #{planId}
+    </select>
+
+    <!-- Phase D：我的分配任务（Android 巡检任务列表）：未取消未完成，按计划时间排序 -->
+    <select id="findAssignedTasks" resultMap="taskMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM cps_inspection_plan_task
+        WHERE target_emp_no = #{targetEmpNo}
+          AND task_status IN ('PENDING', 'IN_PROGRESS')
+        ORDER BY scheduled_at ASC, id ASC
+        LIMIT 100
     </select>
 
 

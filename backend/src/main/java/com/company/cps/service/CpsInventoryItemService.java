@@ -39,9 +39,9 @@ public class CpsInventoryItemService {
                 && item.getStockQty() <= item.getAlertThreshold();
     }
 
+    /** 物品编码可选：留空自动生成（新建）或保持原编码（编辑）；用户填写时才做唯一性校验。 */
     @Transactional
     public CpsInventoryItem save(Long id, CpsInventoryItemRequest request, String operatorEmpNo) {
-        requireText(request.getItemCode(), "itemCode");
         requireText(request.getItemName(), "itemName");
         requireText(request.getUnit(), "unit");
         requireText(request.getFactory(), "factory");
@@ -61,14 +61,21 @@ public class CpsInventoryItemService {
                 ? null
                 : itemMapper.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Inventory item not found: " + id));
-        Optional<CpsInventoryItem> sameCode = itemMapper.findByCode(request.getItemCode());
-        long selfId = existing == null ? -1L : existing.getId();
-        if (sameCode.isPresent() && !sameCode.get().getId().equals(selfId)) {
-            throw new IllegalStateException("Inventory item code already exists: " + request.getItemCode());
+        String itemCode = request.getItemCode() == null ? "" : request.getItemCode().trim();
+        boolean userProvidedCode = !itemCode.isEmpty();
+        if (!userProvidedCode) {
+            itemCode = existing == null ? generateItemCode() : existing.getItemCode();
+        }
+        if (userProvidedCode) {
+            Optional<CpsInventoryItem> sameCode = itemMapper.findByCode(itemCode);
+            long selfId = existing == null ? -1L : existing.getId();
+            if (sameCode.isPresent() && !sameCode.get().getId().equals(selfId)) {
+                throw new IllegalStateException("Inventory item code already exists: " + itemCode);
+            }
         }
 
         CpsInventoryItem item = existing == null ? new CpsInventoryItem() : existing;
-        item.setItemCode(request.getItemCode());
+        item.setItemCode(itemCode);
         item.setItemName(request.getItemName());
         item.setUnit(request.getUnit());
         item.setStockQty(stockQty);
@@ -98,6 +105,13 @@ public class CpsInventoryItemService {
         if (rows != 1) {
             throw new IllegalStateException("Inventory item not found or not updated: " + id);
         }
+    }
+
+    /** 自动生成物品编码：ITEM- + 毫秒时间戳(36) + 3位随机；撞码时递归重试（概率可忽略）。 */
+    private String generateItemCode() {
+        String code = "ITEM-" + Long.toString(System.currentTimeMillis(), 36).toUpperCase()
+                + "-" + (100 + (int) (Math.random() * 900));
+        return itemMapper.findByCode(code).isPresent() ? generateItemCode() : code;
     }
 
     private static void requireText(String value, String field) {

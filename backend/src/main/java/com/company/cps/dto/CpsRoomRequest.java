@@ -7,6 +7,8 @@ public class CpsRoomRequest {
     private String roomName;
     private String roomType;
     private String riskLevel;
+    /** 房间独立配置的点检项编号（逗号分隔 itemCode）；空=按房型匹配。 */
+    private String checkItemIds;
     private String deptName;
     private String baseCode;
     private String factory;
@@ -28,6 +30,8 @@ public class CpsRoomRequest {
     public void setRoomType(String roomType) { this.roomType = roomType; }
     public String getRiskLevel() { return riskLevel; }
     public void setRiskLevel(String riskLevel) { this.riskLevel = riskLevel; }
+    public String getCheckItemIds() { return checkItemIds; }
+    public void setCheckItemIds(String checkItemIds) { this.checkItemIds = checkItemIds; }
     public String getDeptName() { return deptName; }
     public void setDeptName(String deptName) { this.deptName = deptName; }
     public String getBaseCode() { return baseCode; }

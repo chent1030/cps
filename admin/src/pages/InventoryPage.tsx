@@ -196,10 +196,10 @@ export function InventoryPage() {
   const operator = getAdminOperator()
 
   return <>
-    <PageHead title="物品台账" detail={<>台账、出入库流水与低库存预警（库存 ≤ 阈值即触发，含等于；持续不足合并为同一预警事件）。{lowStockCount > 0 && <Badge color="orangered" text={`当前 ${lowStockCount} 项低库存`} />}</>}>
+    <PageHead title="物品台账" detail={<>台账、流水与低库存预警。{lowStockCount > 0 && <Badge color="orangered" text={`当前 ${lowStockCount} 项低库存`} />}</>}>
       <Button type="primary" icon={<IconPlus />} onClick={openCreateItem}>新增物品</Button>
     </PageHead>
-    <Tabs defaultActiveTab="items" style={{ marginTop: 12 }}>
+    <Tabs defaultActiveTab="items">
       <Tabs.TabPane key="items" title="台账列表">
         <Card className="filter-card">
           <Form layout="inline" onSubmit={() => setItemQuery({ ...itemFilters })} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(140px, 1fr)) auto', gap: 12 }}>
@@ -210,7 +210,7 @@ export function InventoryPage() {
             <Button type="primary" htmlType="submit" icon={<IconFilter />}>筛选</Button>
           </Form>
         </Card>
-        <div style={{ marginTop: 20 }}>
+        <div style={{ marginTop: 16 }}>
           <StatePanel {...items}>{items.data && <Card className="table-card">
             <Table rowKey="id" columns={itemColumns} data={items.data} pagination={false} scroll={{ x: 900 }} />
           </Card>}</StatePanel>
@@ -227,7 +227,7 @@ export function InventoryPage() {
             <Button type="primary" icon={<IconPlus />} onClick={() => setTxnModalVisible(true)}>登记出入库</Button>
           </div>
         </Card>
-        <div style={{ marginTop: 20 }}>
+        <div style={{ marginTop: 16 }}>
           <StatePanel {...txns}>{txns.data && <Card className="table-card">
             <Table rowKey="id" columns={txnColumns} data={txns.data.rows} pagination={false} scroll={{ x: 1000 }} />
             <div className="pagination-wrap"><Pagination current={txnQuery.page} pageSize={txnQuery.size} total={txns.data.total} showTotal onChange={(page, size) => setTxnQuery({ ...txnQuery, page, size })} /></div>
@@ -241,7 +241,7 @@ export function InventoryPage() {
             <Button type="primary" htmlType="submit" icon={<IconFilter />}>筛选</Button>
           </Form>
         </Card>
-        <div style={{ marginTop: 20 }}>
+        <div style={{ marginTop: 16 }}>
           <StatePanel {...alerts}>{alerts.data && <Card className="table-card">
             <Table rowKey="id" columns={alertColumns} data={alerts.data.rows} pagination={false} scroll={{ x: 1100 }} />
             <div className="pagination-wrap"><Pagination current={alertQuery.page} pageSize={alertQuery.size} total={alerts.data.total} showTotal onChange={(page, size) => setAlertQuery({ ...alertQuery, page, size })} /></div>

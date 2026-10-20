@@ -65,6 +65,7 @@ public class CpsInspectionPlanResponse {
                     item.frequency = t.getFrequency();
                     item.acceptanceCriteria = t.getAcceptanceCriteria();
                     item.evidenceRequirement = t.getEvidenceRequirement();
+                    item.coverageAreaCodes = t.getCoverageAreaCodes();
                     item.taskStatus = t.getTaskStatus();
                     item.referenceIssueId = t.getReferenceIssueId();
                     item.referenceObjectKey = t.getReferenceObjectKey();
@@ -98,7 +99,8 @@ public class CpsInspectionPlanResponse {
 
     public static class TaskItem {
         private Long id;
-        private CpsInspectionPlanTaskType taskType;
+        /** Phase D：巡检类型编码（或历史枚举值 INSPECT_*） */
+        private String taskType;
         private String title;
         private String targetEmpNo;
         private String targetEmpName;
@@ -106,6 +108,8 @@ public class CpsInspectionPlanResponse {
         private String frequency;
         private String acceptanceCriteria;
         private String evidenceRequirement;
+        /** 分区域类型的覆盖区域编码（逗号分隔）；空=全部启用区域 */
+        private String coverageAreaCodes;
         private String taskStatus;
         private Long referenceIssueId;
         private String referenceObjectKey;
@@ -113,7 +117,7 @@ public class CpsInspectionPlanResponse {
         private LocalDateTime createdAt;
 
         public Long getId() { return id; }
-        public CpsInspectionPlanTaskType getTaskType() { return taskType; }
+        public String getTaskType() { return taskType; }
         public String getTitle() { return title; }
         public String getTargetEmpNo() { return targetEmpNo; }
         public String getTargetEmpName() { return targetEmpName; }
@@ -121,6 +125,7 @@ public class CpsInspectionPlanResponse {
         public String getFrequency() { return frequency; }
         public String getAcceptanceCriteria() { return acceptanceCriteria; }
         public String getEvidenceRequirement() { return evidenceRequirement; }
+        public String getCoverageAreaCodes() { return coverageAreaCodes; }
         public String getTaskStatus() { return taskStatus; }
         public Long getReferenceIssueId() { return referenceIssueId; }
         public String getReferenceObjectKey() { return referenceObjectKey; }

@@ -3,17 +3,75 @@
     <header class="cps-hero">
       <div class="cps-hero__main">
         <p class="cps-hero__eyebrow">CPS 现场巡检</p>
-        <h1>新建问题</h1>
-        <div class="cps-create-progress">
+        <h1>{{ step === 'select' ? '选择巡检类型' : '新建问题' }}</h1>
+        <div v-if="step === 'form'" class="cps-create-progress">
           <a-tag v-for="item in progressItems" :key="item.label" :color="item.done ? 'cyan' : 'default'" class="cps-progress-tag">
             {{ item.label }}
           </a-tag>
+        </div>
+        <div v-else class="cps-create-progress">
+          <a-tag color="cyan" class="cps-progress-tag">第 1 步 · 选类型</a-tag>
+          <a-tag class="cps-progress-tag">第 2 步 · 填表单</a-tag>
+          <a-tag class="cps-progress-tag">第 3 步 · 提交</a-tag>
         </div>
       </div>
       <a-tag color="blue" class="cps-hero__badge">AI 辅助</a-tag>
     </header>
 
-    <a-row :gutter="[16, 16]">
+    <!-- ============================================================ -->
+    <!-- 第一步：选择巡检类型（选完才渲染对应表单） -->
+    <!-- ============================================================ -->
+    <div v-if="step === 'select'" class="cps-type-select">
+      <a-card class="cps-card" :body-style="{ padding: '20px' }">
+        <template #title>
+          <div class="cps-card-title">
+            <div>
+              <p class="cps-card-title__sub">第一步 · 选择类型</p>
+              <h2 class="cps-card-title__main">本次巡检属于哪类问题？</h2>
+            </div>
+            <a-tag color="blue">{{ draft.inspectionTypes.length }} 种可选</a-tag>
+          </div>
+        </template>
+        <p class="cps-create-card__hint">「CPS巡检」进入标准问题上报表单；其他类型按各自配置逐项点检填写（合格判定/文本/拍照），互不混用；分区域类型（如辅房点检）先选区域再开始</p>
+        <a-spin :spinning="inspectionTypesLoading">
+          <a-empty v-if="!draft.inspectionTypes.length && !inspectionTypesLoading" description="暂无可用巡检类型，请联系管理员配置" />
+          <div v-else class="cps-type-select__grid">
+            <button
+              v-for="t in draft.inspectionTypes"
+              :key="t.code"
+              type="button"
+              class="cps-type-select__item"
+              :data-color="t.color || 'blue'"
+              :disabled="startingCustom !== null"
+              @click="onSelectInspectionType(t.code)"
+            >
+              <strong class="cps-type-select__name">
+                {{ t.name }}
+                <a-tag v-if="t.builtin === 1" color="purple" style="margin-left: 6px">内置</a-tag>
+              </strong>
+              <span class="cps-type-select__code">{{ t.code }}</span>
+              <span v-if="t.content || t.description" class="cps-type-select__desc">{{ t.content || t.description }}</span>
+              <span class="cps-type-select__go">
+                {{
+                  startingCustom === t.code
+                    ? '正在开启巡检…'
+                    : t.builtin === 1
+                      ? '上报问题 →'
+                      : t.zoneFlag === 1
+                        ? '选择区域 →'
+                        : '开始巡检 →'
+                }}
+              </span>
+            </button>
+          </div>
+        </a-spin>
+      </a-card>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 第二步：按所选类型渲染的表单 -->
+    <!-- ============================================================ -->
+    <a-row v-else :gutter="[16, 16]">
       <!-- 左列：照片 + 描述 -->
       <a-col :xs="{ span: 24 }" :lg="{ span: 12 }">
         <a-card class="cps-card" :body-style="{ padding: '16px' }">
@@ -76,7 +134,6 @@
           />
           <div class="cps-desc-toolbar">
             <a-button
-              size="small"
               :loading="transcribing"
               :disabled="transcribing"
               :danger="recording"
@@ -94,9 +151,89 @@
         </a-card>
       </a-col>
 
-      <!-- 右列：位置 + 分类 + 派发 -->
+      <!-- 右列：类型指示 + 动态字段 + 位置 + 派发 -->
       <a-col :xs="{ span: 24 }" :lg="{ span: 12 }">
-        <a-card class="cps-card" :body-style="{ padding: '16px' }">
+        <!-- 当前巡检类型（第一步已选，可切换） -->
+        <a-card class="cps-card" :body-style="{ padding: '14px 16px' }">
+          <div class="cps-type-active">
+            <div class="cps-type-active__info">
+              <p class="cps-card-title__sub">巡检类型 · 第 1 步已选</p>
+              <strong class="cps-type-active__name">
+                {{ activeTypeName || draft.inspectionTypeCode }}
+                <a-tag color="arcoblue" style="margin-left: 6px">{{ draft.inspectionTypeCode }}</a-tag>
+              </strong>
+            </div>
+            <a-button size="small" @click="switchType">切换类型</a-button>
+          </div>
+        </a-card>
+
+        <!-- Phase D2：类型配置联动 —— 巡检内容说明 -->
+        <a-card v-if="activeTypeContent" class="cps-card" :body-style="{ padding: '12px 16px' }" style="margin-top: 16px">
+          <p class="cps-type-content-banner"><strong>巡检内容：</strong>{{ activeTypeContent }}</p>
+        </a-card>
+
+        <!-- Phase D2：类型配置联动 —— 点检项填写（管理端「直挂点检项」配置驱动） -->
+        <a-card
+          v-if="typeCheckItems.length || checkItemsLoading"
+          class="cps-card"
+          :body-style="{ padding: '16px' }"
+          style="margin-top: 16px"
+        >
+          <template #title>
+            <div class="cps-card-title">
+              <div>
+                <p class="cps-card-title__sub">按类型配置点检</p>
+                <h2 class="cps-card-title__main">现场点检项</h2>
+              </div>
+              <a-tag color="cyan">{{ checkDoneCount }}/{{ typeCheckItems.length }}</a-tag>
+            </div>
+          </template>
+          <a-spin :spinning="checkItemsLoading">
+            <div v-for="(ci, idx) in typeCheckItems" :key="ci.itemCode" class="cps-check-entry" :class="{ 'cps-check-entry--done': isCheckEntryDone(ci) }">
+              <div class="cps-check-entry__head">
+                <strong>{{ idx + 1 }}. {{ ci.content }}</strong>
+                <span class="cps-check-entry__code">{{ ci.itemCode }}</span>
+              </div>
+              <p v-if="hasCheckType(ci, 'PHOTO') && ci.photoCriteria" class="cps-check-entry__criteria">
+                📷 {{ ci.photoCriteria }}（至少 {{ ci.photoMinCount ?? 1 }} 张）
+              </p>
+              <div v-if="hasCheckType(ci, 'PASS_FAIL')" class="cps-check-entry__row">
+                <a-radio-group
+                  :value="checkEntries[ci.itemCode]?.passResult ?? ''"
+                  button-style="solid"
+                  size="small"
+                  @change="(e: any) => setCheckField(ci.itemCode, 'passResult', e.target.value)"
+                >
+                  <a-radio-button value="PASS">✓ 合格</a-radio-button>
+                  <a-radio-button value="FAIL">✗ 不合格</a-radio-button>
+                </a-radio-group>
+              </div>
+              <div v-if="hasCheckType(ci, 'TEXT')" class="cps-check-entry__row">
+                <a-textarea
+                  :value="checkEntries[ci.itemCode]?.textValue ?? ''"
+                  :rows="2"
+                  :maxlength="500"
+                  :placeholder="ci.textHint || '请填写现场情况说明'"
+                  @change="(e: any) => setCheckField(ci.itemCode, 'textValue', e.target.value)"
+                />
+              </div>
+              <div v-if="hasCheckType(ci, 'PHOTO')" class="cps-check-entry__row">
+                <div class="cps-check-photos">
+                  <div v-for="(p, pi) in checkEntries[ci.itemCode]?.photos ?? []" :key="pi" class="cps-check-photo">
+                    <img :src="p.url" :alt="p.name" />
+                    <span class="cps-check-photo__del" @click.stop="removeCheckPhoto(ci.itemCode, pi)">×</span>
+                  </div>
+                  <label class="cps-check-photo__add">
+                    <input type="file" accept="image/*" multiple hidden @change="(e: any) => onCheckPhotoPick(ci.itemCode, e)" />
+                    <span>＋ {{ (checkEntries[ci.itemCode]?.photos?.length ?? 0) }}/{{ ci.photoMinCount ?? 1 }}</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </a-spin>
+        </a-card>
+
+        <a-card class="cps-card" :body-style="{ padding: '16px' }" style="margin-top: 16px">
           <template #title>
             <div class="cps-card-title">
               <div>
@@ -166,6 +303,14 @@
             </div>
           </template>
           <a-form layout="vertical">
+            <a-form-item label="资源号" required>
+              <a-input
+                v-model:value="draft.resourceNo"
+                placeholder="请输入现场资源号（设备/工位编号等）"
+                allow-clear
+                :maxlength="64"
+              />
+            </a-form-item>
             <a-form-item label="反馈人">
               <a-input :value="feedbackPersonLabel" placeholder="选择反馈人" read-only @click="feedbackPickerOpen = true">
                 <template #suffix><UserOutlined /></template>
@@ -176,10 +321,22 @@
       </a-col>
     </a-row>
 
-    <div class="cps-submit-bar">
-      <a-button type="primary" size="large" block :loading="submitting" :disabled="!canSubmit" class="cps-submit-btn" @click="submit">
-        提交并派发
-      </a-button>
+    <div v-if="step === 'form'" class="cps-submit-bar">
+      <div class="cps-submit-bar__actions">
+        <a-button
+          size="large"
+          :loading="savingDraft"
+          :disabled="!canSaveDraft"
+          class="cps-draft-btn"
+          @click="saveDraft"
+        >
+          {{ draft.draftId ? '更新暂存' : '暂存' }}
+        </a-button>
+        <a-button type="primary" size="large" :loading="submitting" :disabled="!canSubmit" class="cps-submit-btn" @click="submit">
+          提交并派发
+        </a-button>
+      </div>
+      <p v-if="draft.draftId" class="cps-draft-hint">已关联服务端草稿 #{{ draft.draftId }}，提交后将自动归档</p>
     </div>
 
     <!-- 反馈人选择弹窗（内联） -->
@@ -213,17 +370,57 @@
         </div>
       </a-spin>
     </a-modal>
+
+    <!-- 分区域类型（如辅房点检）：先选区域，再开始巡检 -->
+    <a-modal
+      :open="areaPickerOpen"
+      :title="`选择巡检区域${areaPickerType ? ` · ${areaPickerType.name}` : ''}`"
+      :width="isLandscape ? 560 : '100%'"
+      :centered="isLandscape"
+      :footer="null"
+      @update:open="(v: boolean) => (areaPickerOpen = v)"
+    >
+      <p class="cps-create-card__hint">该类型按区域执行，选定区域后将在该区域下生成点检项快照</p>
+      <a-spin :spinning="areaPickerLoading">
+        <a-empty v-if="!areaOptions.length && !areaPickerLoading" description="该类型暂无启用区域，请联系管理员配置" />
+        <div v-else class="cps-area-pick">
+          <button
+            v-for="a in areaOptions"
+            :key="a.id"
+            type="button"
+            class="cps-area-pick__item"
+            :disabled="areaPickerStarting !== null"
+            @click="startZonedInspection(a)"
+          >
+            <span class="cps-area-pick__main">
+              <strong>{{ a.areaName }}</strong>
+              <span class="cps-area-pick__meta">
+                {{ a.areaCode }}
+                <template v-if="a.lineOrRoomType"> · {{ a.lineOrRoomType }}</template>
+                <template v-if="a.process"> · {{ a.process }}</template>
+              </span>
+            </span>
+            <span class="cps-area-pick__risk" :data-risk="a.riskLevel">{{ riskLabel(a.riskLevel) }}</span>
+            <span class="cps-area-pick__go">{{ areaPickerStarting === a.id ? '正在开启…' : '开始 →' }}</span>
+          </button>
+        </div>
+      </a-spin>
+    </a-modal>
   </main>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { AudioOutlined, UserOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import type { UploadProps } from 'ant-design-vue'
 
 import { inspectCpsImage, startVoiceRecording, stopVoiceRecording } from '@/api/cps/ai'
 import { createCpsIssue } from '@/api/cps/issue'
+import { getInspectionTypeCheckItems, listCpsInspectionTypes } from '@/api/cps/inspectionType'
+import { listInspectionAreas, startInspection } from '@/api/cps/inspectionTask'
+import { getCpsIssueDraft, saveCpsIssueDraft } from '@/api/cps/issueDraft'
 import {
   getAreas,
   getFactories,
@@ -234,7 +431,7 @@ import {
   type CpsEmployeeOption,
 } from '@/api/cps/master'
 import { uploadCpsAttachment } from '@/api/cps/attachment'
-import type { CpsUploadedImage } from '@/types/cps'
+import type { CpsCheckItemInfo, CpsInspectionArea, CpsInspectionType, CpsIssueCheckResult, CpsIssueDraftData, CpsUploadedImage } from '@/types/cps'
 import { useFormDraftStore } from '@/store/formDraft'
 import { toImageUrl } from '@/utils/image'
 
@@ -243,6 +440,225 @@ const draft = useFormDraftStore()
 const submitting = ref(false)
 const inspecting = ref(false)
 const uploading = ref(false)
+
+// Phase B1/D2：巡检类型与配置联动
+const inspectionTypesLoading = ref(false)
+const activeTypeName = ref('')
+
+// 分步流程（用户反馈 #3）：select=第一步选类型，form=第二步按类型渲染表单
+const step = ref<'select' | 'form'>('select')
+
+// ===== Phase D2：类型点检项配置联动 =====
+interface CheckEntryState {
+  passResult?: 'PASS' | 'FAIL' | null
+  textValue?: string
+  photos?: { id: number; url: string; name: string }[]
+}
+const typeCheckItems = ref<CpsCheckItemInfo[]>([])
+const checkEntries = ref<Record<string, CheckEntryState>>({})
+const checkItemsLoading = ref(false)
+// Phase D3：自定义类型直接开启巡检执行的加载态
+const startingCustom = ref<string | null>(null)
+
+// ===== 分区域类型（如辅房点检）：先选区域，再开始巡检 =====
+const areaPickerOpen = ref(false)
+const areaPickerType = ref<CpsInspectionType | null>(null)
+const areaPickerLoading = ref(false)
+const areaPickerStarting = ref<number | null>(null)
+const areaOptions = ref<CpsInspectionArea[]>([])
+
+const riskLabel = (level?: string) =>
+  ({ HIGH: '高风险', MEDIUM: '中风险', LOW: '低风险' }[level ?? 'LOW'] ?? level ?? '')
+
+const openAreaPicker = async (t: CpsInspectionType) => {
+  areaPickerType.value = t
+  areaOptions.value = []
+  areaPickerOpen.value = true
+  areaPickerLoading.value = true
+  try {
+    areaOptions.value = await listInspectionAreas(t.code)
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '加载巡检区域失败')
+  } finally {
+    areaPickerLoading.value = false
+  }
+}
+
+const startZonedInspection = async (area: CpsInspectionArea) => {
+  const t = areaPickerType.value
+  if (!t || areaPickerStarting.value !== null) return
+  areaPickerStarting.value = area.id
+  try {
+    const record = await startInspection({ typeCode: t.code, areaId: area.id })
+    areaPickerOpen.value = false
+    uni.redirectTo({ url: `/views/cps/InspectionExecuteView?recordId=${record.id}` })
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '开始巡检失败（请确认该区域已配置点检项）')
+  } finally {
+    areaPickerStarting.value = null
+  }
+}
+
+/** 当前选中类型完整对象 */
+const activeType = computed(() =>
+  draft.inspectionTypes.find((x) => x.code === draft.inspectionTypeCode) ?? null,
+)
+/** 类型「巡检内容」横幅 */
+const activeTypeContent = computed(() => activeType.value?.content || '')
+
+const hasCheckType = (ci: CpsCheckItemInfo, t: string) => (ci.checkTypes || '').split(',').includes(t)
+
+const setCheckField = (itemCode: string, key: keyof CheckEntryState, value: unknown) => {
+  checkEntries.value = {
+    ...checkEntries.value,
+    [itemCode]: { ...checkEntries.value[itemCode], [key]: value },
+  }
+}
+
+const isCheckEntryDone = (ci: CpsCheckItemInfo): boolean => {
+  const entry = checkEntries.value[ci.itemCode] ?? {}
+  if (hasCheckType(ci, 'PASS_FAIL') && !entry.passResult) return false
+  if (hasCheckType(ci, 'TEXT') && !(entry.textValue ?? '').trim()) return false
+  if (hasCheckType(ci, 'PHOTO') && (entry.photos?.length ?? 0) < (ci.photoMinCount ?? 1)) return false
+  return true
+}
+
+const checkDoneCount = computed(() => typeCheckItems.value.filter(isCheckEntryDone).length)
+const checkItemsDone = computed(
+  () => typeCheckItems.value.length === 0 || typeCheckItems.value.every(isCheckEntryDone),
+)
+
+/** 拉取所选类型的点检项配置（管理端「直挂点检项」） */
+const loadTypeCheckItems = async (code: string) => {
+  checkItemsLoading.value = true
+  try {
+    typeCheckItems.value = await getInspectionTypeCheckItems(code)
+  } catch {
+    typeCheckItems.value = []
+  } finally {
+    checkItemsLoading.value = false
+  }
+}
+
+const onCheckPhotoPick = async (itemCode: string, e: Event) => {
+  const input = e.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = ''
+  if (!files.length) return
+  try {
+    const current = [...(checkEntries.value[itemCode]?.photos ?? [])]
+    for (const file of files) {
+      const uploaded = await uploadCpsAttachment(file)
+      current.push({ id: uploaded.id, url: uploaded.url, name: uploaded.name })
+    }
+    setCheckField(itemCode, 'photos', current)
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '照片上传失败')
+  }
+}
+
+const removeCheckPhoto = (itemCode: string, index: number) => {
+  const current = (checkEntries.value[itemCode]?.photos ?? []).filter((_, i) => i !== index)
+  setCheckField(itemCode, 'photos', current)
+}
+
+/** 收集点检结果（提交时并入 extraData.checkResults） */
+const collectCheckResults = (): CpsIssueCheckResult[] =>
+  typeCheckItems.value.map((ci) => {
+    const entry = checkEntries.value[ci.itemCode] ?? {}
+    return {
+      itemCode: ci.itemCode,
+      content: ci.content,
+      passResult: entry.passResult ?? null,
+      textValue: entry.textValue ?? null,
+      photoUrls: (entry.photos ?? []).map((p) => p.url),
+      photoNames: (entry.photos ?? []).map((p) => p.name),
+      photoCount: entry.photos?.length ?? 0,
+    }
+  })
+
+/** 从 extraData.checkResults 恢复填写状态（草稿/重进） */
+const hydrateCheckResults = (results: CpsIssueCheckResult[]) => {
+  const next: Record<string, CheckEntryState> = {}
+  for (const r of results ?? []) {
+    next[r.itemCode] = {
+      passResult: r.passResult ?? null,
+      textValue: r.textValue ?? '',
+      photos: (r.photoUrls ?? []).map((url, i) => ({ id: -(i + 1), url, name: r.photoNames?.[i] ?? `照片${i + 1}` })),
+    }
+  }
+  checkEntries.value = next
+}
+
+const onSelectInspectionType = async (code: string) => {
+  if (!code) {
+    draft.inspectionTypeCode = null
+    activeTypeName.value = ''
+    typeCheckItems.value = []
+    checkEntries.value = {}
+    return
+  }
+  const t = draft.inspectionTypes.find((x) => x.code === code)
+  // ===== Phase D3：按类型分流 =====
+  // 分区域类型（如辅房点检）：先弹区域选择，选定区域后开启巡检执行。
+  if (t && t.zoneFlag === 1) {
+    void openAreaPicker(t)
+    return
+  }
+  // 非内置 CPS巡检 的自定义类型：不复用问题上报表单，直接开启一次巡检执行，
+  // 跳转执行页按该类型的点检项配置逐项填写（合格/文本/拍照）并计分提交。
+  if (t && t.builtin !== 1) {
+    if (startingCustom.value) return
+    startingCustom.value = code
+    try {
+      const record = await startInspection({ typeCode: code })
+      uni.redirectTo({ url: `/views/cps/InspectionExecuteView?recordId=${record.id}` })
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '开始巡检失败（请确认该类型已配置点检项）')
+    } finally {
+      startingCustom.value = null
+    }
+    return
+  }
+  // 内置 CPS巡检：走标准问题上报流程（原表单）
+  if (draft.inspectionTypeCode === code) {
+    step.value = 'form'
+    return
+  }
+  draft.inspectionTypeCode = code
+  activeTypeName.value = t?.name || code
+  draft.extraData = {}
+  checkEntries.value = {}
+  typeCheckItems.value = []
+  step.value = 'form'
+}
+
+/** 切换类型：回到第一步；仅清空类型与点检填写，通用内容（照片/描述/位置）保留 */
+const switchType = () => {
+  draft.inspectionTypeCode = null
+  draft.extraData = {}
+  activeTypeName.value = ''
+  typeCheckItems.value = []
+  checkEntries.value = {}
+  step.value = 'select'
+}
+
+const loadInspectionTypes = async () => {
+  if (draft.inspectionTypes.length || inspectionTypesLoading.value) return
+  inspectionTypesLoading.value = true
+  try {
+    const list: CpsInspectionType[] = await listCpsInspectionTypes()
+    // Phase C/D：全量列出后端返回的可用类型（含分区域类型，如辅房点检）
+    // 内置 CPS巡检（builtin=1）排在最前
+    draft.inspectionTypes = list.sort(
+      (a, b) => (b.builtin ?? 0) - (a.builtin ?? 0) || (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
+    )
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '加载巡检类型失败')
+  } finally {
+    inspectionTypesLoading.value = false
+  }
+}
 
 // 反馈人选择器状态（内联）
 const feedbackPickerOpen = ref(false)
@@ -304,7 +720,7 @@ interface ProgressItem {
 }
 const progressItems = computed<ProgressItem[]>(() => [
   { label: '照片', done: draft.images.length >= 1 && draft.images.length <= 5 },
-  { label: '位置', done: Boolean(draft.location.factory && draft.location.area && draft.location.line && draft.location.process) },
+  { label: '位置', done: Boolean(draft.location.factory && draft.location.area && draft.location.line && draft.location.process && draft.resourceNo.trim()) },
   { label: 'AI分类', done: Boolean(draft.aiSuggestion?.aiCategoryL1Id && draft.aiSuggestion?.aiCategoryL2Id) },
   { label: '描述', done: Boolean(draft.description.trim()) },
 ])
@@ -317,10 +733,13 @@ const canSubmit = computed(
     Boolean(draft.location.area) &&
     Boolean(draft.location.line) &&
     Boolean(draft.location.process) &&
+    Boolean(draft.resourceNo.trim()) &&
+    Boolean(draft.inspectionTypeCode) &&
     Boolean(draft.aiSuggestion?.aiCategoryL1Id) &&
     Boolean(draft.aiSuggestion?.aiCategoryL2Id) &&
     Boolean(draft.description.trim()) &&
     Boolean(draft.feedbackEmpNo.trim()) &&
+    checkItemsDone.value &&
     !submitting.value,
 )
 
@@ -480,15 +899,124 @@ const onVoiceClick = async () => {
   recording.value = true
 }
 
+// ============================================================
+// Phase B2：服务端草稿（暂存 / 恢复）
+// ============================================================
+const savingDraft = ref(false)
+
+/** 暂存门槛：比提交宽松——只要填了任意内容即可暂存。 */
+const canSaveDraft = computed(
+  () =>
+    (draft.images.length > 0 ||
+      Boolean(draft.description.trim()) ||
+      Boolean(draft.resourceNo.trim()) ||
+      Boolean(draft.inspectionTypeCode) ||
+      Boolean(draft.location.factory)) &&
+    !savingDraft.value,
+)
+
+/** 把 store 序列化为服务端草稿快照（含点检项填写结果）。 */
+const serializeDraft = (): CpsIssueDraftData => ({
+  location: { ...draft.location },
+  description: draft.description,
+  resourceNo: draft.resourceNo,
+  inspectionTypeCode: draft.inspectionTypeCode,
+  extraData: {
+    ...draft.extraData,
+    ...(typeCheckItems.value.length ? { checkResults: collectCheckResults() } : {}),
+  },
+  feedbackEmpNo: draft.feedbackEmpNo,
+  feedbackPerson: draft.feedbackPerson
+    ? { empNo: draft.feedbackPerson.empNo, empName: draft.feedbackPerson.empName ?? null }
+    : null,
+  images: [...draft.images],
+  imagePreviewSources: { ...draft.imagePreviewSources },
+  aiSuggestion: draft.aiSuggestion,
+})
+
+/** 暂存（或覆盖更新）到服务端。 */
+const saveDraft = async () => {
+  if (!canSaveDraft.value) return
+  savingDraft.value = true
+  try {
+    const snapshot = serializeDraft()
+    const saved = await saveCpsIssueDraft({
+      id: draft.draftId,
+      inspectionTypeCode: snapshot.inspectionTypeCode,
+      factory: snapshot.location.factory || undefined,
+      area: snapshot.location.area || undefined,
+      draftData: JSON.stringify(snapshot),
+    })
+    draft.draftId = saved.id
+    message.success(`已暂存（草稿 #${saved.id}），可稍后从「我的草稿」继续填写`)
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '暂存失败')
+  } finally {
+    savingDraft.value = false
+  }
+}
+
+/** 从服务端草稿恢复整份表单。 */
+const restoreDraft = async (id: number) => {
+  try {
+    const remote = await getCpsIssueDraft(id)
+    let data: CpsIssueDraftData
+    try {
+      data = JSON.parse(remote.draftData) as CpsIssueDraftData
+    } catch {
+      message.error('草稿数据损坏，无法恢复')
+      return
+    }
+    draft.location = data.location ?? { factory: '', area: '', line: '', process: '' }
+    draft.description = data.description ?? ''
+    draft.resourceNo = data.resourceNo ?? ''
+    draft.inspectionTypeCode = data.inspectionTypeCode ?? null
+    draft.extraData = data.extraData ?? {}
+    draft.feedbackEmpNo = data.feedbackEmpNo ?? ''
+    draft.feedbackPerson = (data.feedbackPerson as never) ?? null
+    draft.images = data.images ?? []
+    draft.imagePreviewSources = data.imagePreviewSources ?? {}
+    draft.aiSuggestion = data.aiSuggestion ?? null
+    draft.draftId = remote.id
+    // 恢复的类型非空 → 直接进入第二步表单
+    step.value = draft.inspectionTypeCode ? 'form' : 'select'
+    // 恢复类型名与点检项配置（Phase D2），并回填点检填写结果
+    if (draft.inspectionTypeCode) {
+      const t = draft.inspectionTypes.find((x) => x.code === draft.inspectionTypeCode)
+      activeTypeName.value = t?.name || draft.inspectionTypeCode
+      await loadTypeCheckItems(draft.inspectionTypeCode)
+      const results = (draft.extraData as Record<string, unknown>).checkResults as CpsIssueCheckResult[] | undefined
+      if (results) hydrateCheckResults(results)
+    }
+    if (draft.location.factory) {
+      draft.areas = await getAreas(draft.location.factory)
+      if (draft.location.area) {
+        draft.lines = await getLines(draft.location.factory, draft.location.area)
+        draft.processes = await getProcesses(draft.location.factory, draft.location.area)
+      }
+    }
+    message.success(`已恢复草稿 #${remote.id}，继续填写`)
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '恢复草稿失败')
+  }
+}
+
 const submit = async () => {
   if (!canSubmit.value) return
   submitting.value = true
   try {
+    // Phase D2：点检项填写结果并入 extraData（与管理端类型配置联动）
+    const extraPayload: Record<string, unknown> = { ...draft.extraData }
+    if (typeCheckItems.value.length) extraPayload.checkResults = collectCheckResults()
     const result = await createCpsIssue({
       factory: draft.location.factory,
       area: draft.location.area,
       line: draft.location.line,
       process: draft.location.process,
+      resourceNo: draft.resourceNo.trim(),
+      inspectionTypeCode: draft.inspectionTypeCode ?? undefined,
+      extraData: Object.keys(extraPayload).length ? JSON.stringify(extraPayload) : undefined,
+      draftId: draft.draftId ?? undefined,
       aiCategoryL1Id: draft.aiSuggestion?.aiCategoryL1Id ?? null,
       aiCategoryL2Id: draft.aiSuggestion?.aiCategoryL2Id ?? null,
       // 创建时直接采用 AI 分类，后续在反馈回复节点由反馈人员确认/修正
@@ -513,6 +1041,25 @@ onMounted(async () => {
   if (!draft.factories.length) {
     draft.factories = await getFactories()
   }
+  await loadInspectionTypes()
+  // 恢复上次选择（如有），重置 activeTypeName 用于卡片标题；并据此决定初始步骤
+  if (draft.inspectionTypeCode) {
+    const t = draft.inspectionTypes.find((x) => x.code === draft.inspectionTypeCode)
+    if (t) activeTypeName.value = t.name
+    void loadTypeCheckItems(draft.inspectionTypeCode)
+    step.value = 'form'
+  } else {
+    step.value = 'select'
+  }
+})
+
+// 从「我的草稿」入口跳入：?draftId=x 时整包恢复（优先级高于本地内存 store）
+onLoad((query?: Record<string, string | string[] | undefined>) => {
+  const raw = Array.isArray(query?.draftId) ? query?.draftId[0] : query?.draftId
+  const draftIdParam = Number(raw)
+  if (raw !== undefined && Number.isFinite(draftIdParam) && draftIdParam > 0) {
+    void restoreDraft(draftIdParam)
+  }
 })
 </script>
 
@@ -530,11 +1077,10 @@ onMounted(async () => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  border: 1px solid rgba(20, 184, 166, 0.22);
-  border-radius: 16px;
-  padding: 20px 24px 20px 28px;
-  background: linear-gradient(135deg, rgba(20, 184, 166, 0.96) 0%, rgba(37, 99, 235, 0.92) 66%, rgba(34, 197, 94, 0.82) 100%);
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.15);
+  border-radius: var(--cps-radius-xl);
+  padding: 20px 24px;
+  background: var(--cps-hero-bg);
+  box-shadow: var(--cps-shadow-hero);
   color: #fff;
   margin-bottom: 16px;
 }
@@ -547,13 +1093,14 @@ onMounted(async () => {
 .cps-hero__eyebrow {
   margin: 0;
   color: rgba(255, 255, 255, 0.82);
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
 }
 
 .cps-hero h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 800;
 }
 
@@ -576,9 +1123,9 @@ onMounted(async () => {
 }
 
 .cps-card {
-  border-radius: 14px;
-  border: 1px solid rgba(20, 184, 166, 0.16);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  border-radius: var(--cps-radius-lg);
+  border: 1px solid var(--cps-border);
+  box-shadow: var(--cps-shadow-card);
 }
 
 .cps-card-title {
@@ -590,14 +1137,14 @@ onMounted(async () => {
 
 .cps-card-title__sub {
   margin: 0;
-  color: #0f766e;
+  color: var(--cps-teal-deep);
   font-size: 12px;
   font-weight: 800;
 }
 
 .cps-card-title__main {
   margin: 2px 0 0;
-  color: #0f172a;
+  color: var(--cps-ink);
   font-size: 18px;
   font-weight: 800;
 }
@@ -643,9 +1190,9 @@ onMounted(async () => {
 .cps-create-page :deep(.ant-upload.ant-upload-select .ant-upload) {
   width: 100%;
   padding: 18px;
-  border-radius: 12px;
-  background: #ecfeff;
-  border: 1px dashed #67e8f9;
+  border-radius: var(--cps-radius-lg);
+  background: var(--cps-mist);
+  border: 1px dashed #99f6e4;
 }
 
 .cps-uploader__plus {
@@ -756,6 +1303,313 @@ onMounted(async () => {
   font-size: 14px;
 }
 
+/* ===== 第一步：巡检类型选择 ===== */
+.cps-area-pick {
+  display: grid;
+  gap: 8px;
+}
+
+.cps-area-pick__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--cps-border);
+  border-radius: var(--cps-radius-md);
+  background: var(--cps-cloud);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cps-area-pick__item::after {
+  border: none;
+}
+
+.cps-area-pick__item:active {
+  transform: scale(0.99);
+}
+
+.cps-area-pick__item:disabled {
+  opacity: 0.6;
+}
+
+.cps-area-pick__main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cps-area-pick__main strong {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cps-area-pick__meta {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.cps-area-pick__risk {
+  flex-shrink: 0;
+  border-radius: var(--cps-radius-pill);
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(20, 184, 166, 0.12);
+  color: var(--cps-teal-deep);
+}
+
+.cps-area-pick__risk[data-risk='HIGH'] {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+}
+
+.cps-area-pick__risk[data-risk='MEDIUM'] {
+  background: rgba(249, 115, 22, 0.12);
+  color: #ea580c;
+}
+
+.cps-area-pick__go {
+  flex-shrink: 0;
+  color: var(--cps-teal-deep);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.cps-type-select__grid {
+  display: grid;
+  /* 固定列数均分：任何数量的卡片宽度都严格一致（auto-fit 会把不满一行的最后一张拉通整行，导致长短不一） */
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .cps-type-select__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .cps-type-select__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.cps-type-select__item {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+  padding: 16px;
+  border: 1.5px solid var(--cps-border);
+  border-radius: var(--cps-radius-lg);
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+  /* grid 子项默认 min-width:auto 会被长文本撑宽轨道 → 显式归零保证各列等宽 */
+  min-width: 0;
+}
+
+.cps-type-select__item::after {
+  border: none;
+}
+
+.cps-type-select__item:active {
+  transform: scale(0.98);
+}
+
+.cps-type-select__item[data-color='red'] {
+  border-top: 4px solid #ef4444;
+}
+
+.cps-type-select__item[data-color='orange'] {
+  border-top: 4px solid #f97316;
+}
+
+.cps-type-select__item[data-color='green'] {
+  border-top: 4px solid #22c55e;
+}
+
+.cps-type-select__item[data-color='blue'],
+.cps-type-select__item {
+  border-top: 4px solid #14b8a6;
+}
+
+.cps-type-select__name {
+  color: #0f172a;
+  font-size: 17px;
+  font-weight: 800;
+  overflow-wrap: break-word;
+}
+
+/* ===== Phase D2：类型配置联动（巡检内容横幅 + 点检项填写） ===== */
+.cps-type-content-banner {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.cps-check-entry {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--cps-border);
+  border-radius: var(--cps-radius-md);
+  background: var(--cps-cloud);
+}
+
+.cps-check-entry + .cps-check-entry {
+  margin-top: 10px;
+}
+
+.cps-check-entry--done {
+  border-left: 4px solid #22c55e;
+}
+
+.cps-check-entry__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cps-check-entry__head strong {
+  color: #0f172a;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.cps-check-entry__code {
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.cps-check-entry__criteria {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.cps-check-entry__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cps-check-photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.cps-check-photo {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #e2e8f0;
+}
+
+.cps-check-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cps-check-photo__del {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.68);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.cps-check-photo__add {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 1px dashed #99f6e4;
+  background: var(--cps-mist);
+  color: #0f766e;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cps-type-select__code {
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  overflow-wrap: break-word;
+}
+
+.cps-type-select__desc {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 19px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: break-word;
+}
+
+.cps-type-select__go {
+  margin-top: 2px;
+  color: var(--cps-teal-deep);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* ===== 第二步：当前类型指示卡 ===== */
+.cps-type-active {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cps-type-active__info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cps-type-active__name {
+  display: flex;
+  align-items: center;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 800;
+}
+
 .cps-create-ai {
   border-left: 4px solid #2563eb;
 }
@@ -797,8 +1651,8 @@ onMounted(async () => {
   width: 100%;
   min-height: 56px;
   padding: 8px 12px;
-  border-radius: 10px;
-  background: #f8fafc;
+  border-radius: var(--cps-radius-md);
+  background: var(--cps-cloud);
 }
 
 .cps-person-picker__option :deep(.ant-radio + span) {
@@ -832,13 +1686,37 @@ onMounted(async () => {
   background: linear-gradient(180deg, rgba(248, 250, 252, 0), #f8fafc 40%);
 }
 
+.cps-submit-bar__actions {
+  display: flex;
+  gap: 12px;
+}
+
+.cps-draft-btn {
+  flex: 0 0 34%;
+  height: 48px !important;
+  border-radius: var(--cps-radius-pill) !important;
+  border: 1.5px solid var(--cps-teal-deep) !important;
+  color: var(--cps-teal-deep) !important;
+  background: #fff !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+}
+
+.cps-draft-hint {
+  margin: 8px 0 0;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
 .cps-submit-btn {
-  height: 52px !important;
-  border-radius: 999px !important;
-  background: linear-gradient(135deg, #14b8a6 0%, #2563eb 100%) !important;
+  flex: 1 1 auto;
+  height: 48px !important;
+  border-radius: var(--cps-radius-pill) !important;
+  background: var(--cps-teal-deep) !important;
   border: none !important;
-  font-size: 18px !important;
-  font-weight: 800 !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
 }
 
 @media (min-width: 1024px) {
@@ -846,7 +1724,7 @@ onMounted(async () => {
     padding: 20px 28px 120px;
   }
   .cps-hero h1 {
-    font-size: 24px;
+    font-size: 26px;
   }
 }
 </style>

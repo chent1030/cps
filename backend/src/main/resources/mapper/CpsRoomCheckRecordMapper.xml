@@ -51,7 +51,7 @@
         SELECT <include refid="BaseColumns"/>
         FROM cps_room_check_record
         WHERE plan_task_id = #{planTaskId} AND room_id = #{roomId}
-          AND record_status IN ('PENDING', 'IN_PROGRESS')
+          AND record_status IN ('PENDING', 'IN_PROGRESS', 'AWAIT_CONFIRM')
         ORDER BY id DESC
         LIMIT 1
     </select>
@@ -99,6 +99,15 @@
         WHERE id = #{id} AND record_status = 'JUDGED'
     </update>
 
+    <!-- PRD 24.2.2/24.2.6：点检人确认/修正后锁定计分（AWAIT_CONFIRM → JUDGED；并发护栏防重复确认）。 -->
+    <update id="updateConfirmResult" parameterType="com.company.cps.domain.CpsRoomCheckRecord">
+        UPDATE cps_room_check_record
+        SET record_status = #{recordStatus},
+            judge_status = #{judgeStatus},
+            score = #{score}
+        WHERE id = #{id} AND record_status = 'AWAIT_CONFIRM'
+    </update>
+
     <!-- 判定轮数只增占位：每轮判定（含以重拍告终的轮次）前先占 attempt，重拍换照片后重提交拿新幂等键。 -->
     <update id="updateJudgeAttempt">
         UPDATE cps_room_check_record
@@ -128,6 +137,40 @@
           AND score IS NOT NULL
         GROUP BY room_id, room_code, room_name
         ORDER BY totalScore DESC, firstSubmittedAt ASC, roomCode ASC
+    </select>
+    <!-- B：admin 管理台点检记录列表（PRD §22 追溯：含明细数/不合格数/人工修正数）。 -->
+    <select id="pageRecords" resultType="com.company.cps.dto.CpsRoomCheckAdminRowDto">
+        SELECT r.id            AS id,
+               r.room_code     AS roomCode,
+               r.room_name     AS roomName,
+               r.check_emp_no  AS checkEmpNo,
+               r.check_emp_name AS checkEmpName,
+               r.record_status AS recordStatus,
+               r.judge_status  AS judgeStatus,
+               r.judge_attempt AS judgeAttempt,
+               r.score         AS score,
+               DATE_FORMAT(r.submitted_at, '%Y-%m-%d %H:%i:%s') AS submittedAt,
+               (SELECT COUNT(*) FROM cps_room_check_record_item i WHERE i.record_id = r.id) AS itemCount,
+               (SELECT COUNT(*) FROM cps_room_check_record_item i WHERE i.record_id = r.id AND i.final_result = 'FAIL') AS failCount,
+               (SELECT COUNT(*) FROM cps_room_check_record_item i WHERE i.record_id = r.id AND i.final_modified_by IS NOT NULL) AS modifiedCount
+        FROM cps_room_check_record r
+        <where>
+            <if test="recordStatus != null and recordStatus != ''">AND r.record_status = #{recordStatus}</if>
+            <if test="judgeStatus != null and judgeStatus != ''">AND r.judge_status = #{judgeStatus}</if>
+            <if test="roomCode != null and roomCode != ''">AND r.room_code LIKE CONCAT('%', #{roomCode}, '%')</if>
+        </where>
+        ORDER BY r.id DESC
+        LIMIT #{offset}, #{pageSize}
+    </select>
+
+    <select id="countRecords" resultType="long">
+        SELECT COUNT(*)
+        FROM cps_room_check_record r
+        <where>
+            <if test="recordStatus != null and recordStatus != ''">AND r.record_status = #{recordStatus}</if>
+            <if test="judgeStatus != null and judgeStatus != ''">AND r.judge_status = #{judgeStatus}</if>
+            <if test="roomCode != null and roomCode != ''">AND r.room_code LIKE CONCAT('%', #{roomCode}, '%')</if>
+        </where>
     </select>
 
 </mapper>
