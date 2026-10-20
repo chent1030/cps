@@ -79,6 +79,8 @@ const statusFallbackActions = (status: CpsIssueDetail['status']): readonly strin
     PENDING_FEEDBACK: ['REPLY_ASSIGN', 'TRANSFER'],
     PENDING_RECTIFY: ['RECTIFY', 'TRANSFER'],
     PENDING_UPLOAD_PROOF: ['UPLOAD_PROOF', 'TRANSFER'],
+    PENDING_AI_REVIEW: [],
+    PENDING_REVIEWER_CONFIG: [],
     PENDING_REVIEW: ['REVIEW_CLOSE', 'REVIEW_REJECT', 'TRANSFER'],
     CLOSED: [],
   }

@@ -29,6 +29,18 @@ export const statusMeta: Record<CpsIssueStatus, StatusMeta> = {
     rail: 'cps-rail--orange',
     tone: 'cps-pill--orange',
   },
+  PENDING_AI_REVIEW: {
+    label: 'AI 初审中',
+    color: 'cyan',
+    rail: 'cps-rail--teal',
+    tone: 'cps-pill--teal',
+  },
+  PENDING_REVIEWER_CONFIG: {
+    label: '待配置审核员',
+    color: 'gold',
+    rail: 'cps-rail--orange',
+    tone: 'cps-pill--orange',
+  },
   PENDING_REVIEW: {
     label: '待审核',
     color: 'cyan',

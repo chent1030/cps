@@ -169,7 +169,7 @@
 
           <!-- 常规模式：按节点填写 -->
           <template v-else>
-            <a-form v-if="showAnyActionFields" layout="vertical">
+            <a-form v-if="showAnyActionFields && normalActions.length" layout="vertical">
               <template v-if="showFeedbackFields">
                 <!-- 第二流程：反馈人员确认/修正问题分类（默认填入 AI 分类） -->
                 <a-form-item label="问题分类（一级）">
@@ -185,17 +185,55 @@
                   </a-radio-group>
                   <span v-if="!level2Categories.length" class="cps-muted">先选择一级分类</span>
                 </a-form-item>
-                <a-form-item label="原因分析">
-                  <a-textarea v-model:value="actionForm.reasonAnalysis" :rows="3" placeholder="填写原因分析" />
-                </a-form-item>
-                <a-form-item label="整改措施">
-                  <a-textarea v-model:value="actionForm.correctiveMeasure" :rows="3" placeholder="填写整改措施" />
-                </a-form-item>
+                <!-- v2 的原因/措施在「提交整改」时填写，反馈节点只做指派 -->
+                <template v-if="!isV2Flow">
+                  <a-form-item label="原因分析">
+                    <a-textarea v-model:value="actionForm.reasonAnalysis" :rows="3" placeholder="填写原因分析" />
+                  </a-form-item>
+                  <a-form-item label="整改措施">
+                    <a-textarea v-model:value="actionForm.correctiveMeasure" :rows="3" placeholder="填写整改措施" />
+                  </a-form-item>
+                </template>
                 <a-form-item label="责任员工">
                   <a-input :value="personLabel(actionForm.responsibleEmpNo)" placeholder="选择责任员工" read-only @click="openPersonPicker('responsibleEmpNo', '选择责任员工')">
                     <template #suffix><UserOutlined /></template>
                   </a-input>
                   <div v-if="defaultPersonHint('responsibleEmpNo')" class="cps-default-hint">已默认填入上一节点操作者，可修改</div>
+                </a-form-item>
+              </template>
+
+              <!-- v2：待整改节点直接提交整改（原因 + 短期/长期措施 + 责任员工 + 复核照片） -->
+              <template v-if="showRectifyV2Fields">
+                <a-form-item label="原因分析" required>
+                  <a-textarea v-model:value="actionForm.reasonAnalysis" :rows="3" placeholder="填写问题原因" />
+                </a-form-item>
+                <a-form-item label="短期措施" required>
+                  <a-textarea v-model:value="actionForm.shortTermMeasure" :rows="3" placeholder="立即执行的整改措施" />
+                </a-form-item>
+                <a-form-item label="长期措施" required>
+                  <a-textarea v-model:value="actionForm.longTermMeasure" :rows="3" placeholder="防止再发的长期措施" />
+                </a-form-item>
+                <a-form-item label="责任员工" required>
+                  <a-input :value="personLabel(actionForm.responsibleEmpNo)" placeholder="选择责任员工" read-only @click="openPersonPicker('responsibleEmpNo', '选择责任员工')">
+                    <template #suffix><UserOutlined /></template>
+                  </a-input>
+                  <div v-if="defaultPersonHint('responsibleEmpNo')" class="cps-default-hint">已默认填入上一节点操作者，可修改</div>
+                </a-form-item>
+                <a-form-item label="复核照片" required>
+                  <a-upload list-type="picture-card" :file-list="proofFileList" :max-count="5" :custom-request="customProofRequest" :before-upload="beforeProofUpload" :show-upload-list="false" multiple accept="image/*">
+                    <div v-if="proofImages.length < 5" class="cps-uploader__trigger">
+                      <span class="cps-uploader__plus">+</span>
+                      <span class="cps-uploader__text">{{ proofUploading ? '上传中' : '上传整改照片' }}</span>
+                    </div>
+                  </a-upload>
+                  <div class="cps-uploader__grid">
+                    <div v-for="(image, index) in proofImages" :key="image.id" class="cps-uploader__item" @click="previewProofImage(index)">
+                      <img :src="attachmentImageSources[image.id] || ''" :alt="image.name" />
+                      <span v-if="!proofUploading" class="cps-uploader__delete" @click.stop="removeProofImage(index)">×</span>
+                      <span class="cps-uploader__index">{{ index + 1 }}</span>
+                    </div>
+                  </div>
+                  <p class="cps-uploader__hint">至少 1 张、最多 5 张；提交整改后版本锁定</p>
                 </a-form-item>
               </template>
 
@@ -247,14 +285,14 @@
               </a-form-item>
             </a-form>
 
-            <a-empty v-if="!normalActions.length" description="当前节点没有可执行的操作" />
+            <a-empty v-if="!normalActions.length" :description="noActionText" />
             <div v-else class="cps-actions">
               <a-button
                 v-for="action in normalActions"
                 :key="action"
                 block
                 size="large"
-                :type="action === 'REVIEW_CLOSE' || normalActions.length === 1 ? 'primary' : 'default'"
+                :type="action === 'REVIEW_CLOSE' || action === 'SUBMIT_RECTIFICATION' || normalActions.length === 1 ? 'primary' : 'default'"
                 :danger="action === 'REVIEW_REJECT'"
                 class="cps-actions__btn"
                 :class="{ 'cps-actions__btn--success': action === 'REVIEW_CLOSE', 'cps-actions__btn--danger': action === 'REVIEW_REJECT' }"
@@ -405,6 +443,8 @@ const actionForm = ref({
   comment: '',
   categoryL1Id: null as number | null,
   categoryL2Id: null as number | null,
+  shortTermMeasure: '',
+  longTermMeasure: '',
 })
 
 const isLandscape = ref(false)
@@ -421,6 +461,8 @@ const actionLabels: Record<CpsIssueAction, string> = {
   REPLY_ASSIGN: '回复并指派',
   RECTIFY: '完成整改',
   UPLOAD_PROOF: '上传凭证',
+  SUBMIT_RECTIFICATION: '提交整改',
+  SAVE_DRAFT: '暂存整改',
   REVIEW_CLOSE: '审核通过',
   REVIEW_REJECT: '审核退回',
   TRANSFER: '转办',
@@ -431,6 +473,9 @@ const flowActionLabels: Record<string, string> = {
   REPLY_ASSIGN: '回复并指派',
   RECTIFY: '完成整改',
   UPLOAD_PROOF: '上传凭证',
+  SUBMIT_RECTIFICATION: '提交整改',
+  SAVE_DRAFT: '暂存整改',
+  REVIEWER_REASSIGN: '改配审核员',
   REVIEW_CLOSE: '审核通过',
   REVIEW_REJECT: '审核退回',
   TRANSFER: '转办',
@@ -440,6 +485,8 @@ const flowStatusLabels: Record<CpsIssueStatus, string> = {
   PENDING_FEEDBACK: '待反馈',
   PENDING_RECTIFY: '待整改',
   PENDING_UPLOAD_PROOF: '待传图',
+  PENDING_AI_REVIEW: 'AI 初审中',
+  PENDING_REVIEWER_CONFIG: '待配置审核员',
   PENDING_REVIEW: '待审核',
   CLOSED: '已关闭',
 }
@@ -447,49 +494,73 @@ const flowStatusLabels: Record<CpsIssueStatus, string> = {
 const flowActionLabel = (action: string) => flowActionLabels[action] ?? action
 const flowStatusLabel = (status: CpsIssueStatus | null) => (status ? flowStatusLabels[status] : '开始')
 
+// v2 流程：提交整改（含整改照片）→ AI 初审 → 人工审核，没有独立的「待传图」节点
+const isV2Flow = computed(() => detail.value?.flowVersion === 'v2')
 const showFeedbackFields = computed(() => detail.value?.status === 'PENDING_FEEDBACK')
-const showRectifyFields = computed(() => detail.value?.status === 'PENDING_RECTIFY')
+// v1 的「完成整改」与 v2 的「提交整改」是两套表单
+const showRectifyFields = computed(() => detail.value?.status === 'PENDING_RECTIFY' && !isV2Flow.value)
+const showRectifyV2Fields = computed(() => detail.value?.status === 'PENDING_RECTIFY' && isV2Flow.value)
 const showProofFields = computed(() => detail.value?.status === 'PENDING_UPLOAD_PROOF')
 // 复核照片卡片的空态说明：告诉用户照片该在哪个节点、哪个位置上传
 const proofEmptyText = computed(() => {
   if (!detail.value) return '暂无复核照片'
   if (detail.value.status === 'PENDING_UPLOAD_PROOF') return '还没有复核照片，在上方「当前操作」里上传'
+  if (isV2Flow.value && detail.value.status === 'PENDING_RECTIFY') return '还没有复核照片，在「当前操作」提交整改时上传'
   if (detail.value.status === 'CLOSED') return '本单没有复核照片'
-  return '复核照片在「待传图」节点由上传人提交'
+  return isV2Flow.value ? '复核照片在「提交整改」时上传' : '复核照片在「待传图」节点由上传人提交'
 })
 const showReviewFields = computed(() => detail.value?.status === 'PENDING_REVIEW')
-const workflowActions = computed<CpsIssueAction[]>(() => {
-  if (!detail.value) return []
-  return detail.value.availableActions.length ? detail.value.availableActions : statusDefaultActions[detail.value.status]
+// 后端按「当前办理人 + 状态」给出可执行动作；空数组就是不可操作，不再本地兜底，
+// 否则非办理人也会看到按钮，点下去会被后端拒绝（"Current employee is not issue handler"）。
+const workflowActions = computed<CpsIssueAction[]>(() => detail.value?.availableActions ?? [])
+const currentEmpNo = import.meta.env.VITE_CPS_EMP_NO ?? '61016968'
+const noActionText = computed(() => {
+  if (!detail.value) return '当前节点没有可执行的操作'
+  if (detail.value.status === 'CLOSED') return '本单已关闭'
+  if (detail.value.status === 'PENDING_AI_REVIEW') return 'AI 初审中，完成后流转到人工审核'
+  if (detail.value.status === 'PENDING_REVIEWER_CONFIG') return '结果已出但缺少审核员，等待管理员配置'
+  if (detail.value.currentHandlerEmpNo && detail.value.currentHandlerEmpNo !== currentEmpNo) {
+    return `当前处理人是 ${detail.value.currentHandlerEmpNo}，你无法执行操作`
+  }
+  return '当前节点没有可执行的操作'
 })
 // 转办独立成模式：开启后只填转办目标，常规操作项不再展示
 const transferAvailable = computed(() => workflowActions.value.includes('TRANSFER'))
 const normalActions = computed<CpsIssueAction[]>(() => workflowActions.value.filter((action) => action !== 'TRANSFER'))
 const showAnyActionFields = computed(
-  () => showFeedbackFields.value || showRectifyFields.value || showProofFields.value || showReviewFields.value,
+  () =>
+    showFeedbackFields.value ||
+    showRectifyFields.value ||
+    showRectifyV2Fields.value ||
+    showProofFields.value ||
+    showReviewFields.value,
 )
 
-const statusSteps: { value: CpsIssueStatus; label: string }[] = [
+const v1Steps: { value: CpsIssueStatus; label: string }[] = [
   { value: 'PENDING_FEEDBACK', label: '待反馈' },
   { value: 'PENDING_RECTIFY', label: '待整改' },
   { value: 'PENDING_UPLOAD_PROOF', label: '待传图' },
   { value: 'PENDING_REVIEW', label: '待审核' },
   { value: 'CLOSED', label: '已关闭' },
 ]
+const v2Steps: { value: CpsIssueStatus; label: string }[] = [
+  { value: 'PENDING_FEEDBACK', label: '待反馈' },
+  { value: 'PENDING_RECTIFY', label: '待整改' },
+  { value: 'PENDING_AI_REVIEW', label: 'AI 初审' },
+  { value: 'PENDING_REVIEW', label: '待审核' },
+  { value: 'CLOSED', label: '已关闭' },
+]
+const statusSteps = computed(() => (isV2Flow.value ? v2Steps : v1Steps))
 const currentStepIndex = computed(() => {
   if (!detail.value) return 0
-  const index = statusSteps.findIndex((node) => node.value === detail.value?.status)
+  const status = detail.value.status
+  // v2 的「待配置审核员」并入 AI 初审这一步展示
+  if (isV2Flow.value && status === 'PENDING_REVIEWER_CONFIG') return 2
+  const index = statusSteps.value.findIndex((node) => node.value === status)
   return index < 0 ? 0 : index
 })
 const formatDateTime = (value?: string | null) => (value ? value.replace('T', ' ').slice(0, 16) : '-')
 
-const statusDefaultActions: Record<CpsIssueStatus, CpsIssueAction[]> = {
-  PENDING_FEEDBACK: ['REPLY_ASSIGN', 'TRANSFER'],
-  PENDING_RECTIFY: ['RECTIFY', 'TRANSFER'],
-  PENDING_UPLOAD_PROOF: ['UPLOAD_PROOF', 'TRANSFER'],
-  PENDING_REVIEW: ['REVIEW_CLOSE', 'REVIEW_REJECT', 'TRANSFER'],
-  CLOSED: [],
-}
 
 const detailStatus = computed<DetailStatusMeta>(() =>
   detail.value ? { label: statusMeta[detail.value.status].label, color: statusMeta[detail.value.status].color } : { label: '待反馈', color: 'blue' },
@@ -582,6 +653,8 @@ const resetActionForm = () => {
     comment: '',
     categoryL1Id: null,
     categoryL2Id: null,
+    shortTermMeasure: '',
+    longTermMeasure: '',
   }
   defaultAppliedFields.value = new Set()
 }
@@ -692,7 +765,12 @@ const buildActionPayload = (action: CpsIssueAction) => {
     reviewerEmpName: personName(actionForm.value.reviewerEmpNo),
     rectifyRemark: actionForm.value.rectifyRemark || undefined,
     reviewOpinion: actionForm.value.reviewOpinion || undefined,
-    proofAttachmentIds: action === 'UPLOAD_PROOF' ? proofImages.value.map((image) => image.id) : undefined,
+    shortTermMeasure: actionForm.value.shortTermMeasure || undefined,
+    longTermMeasure: actionForm.value.longTermMeasure || undefined,
+    proofAttachmentIds:
+      action === 'UPLOAD_PROOF' || action === 'SUBMIT_RECTIFICATION'
+        ? proofImages.value.map((image) => image.id)
+        : undefined,
     targetEmpNo: actionForm.value.targetEmpNo || undefined,
     targetEmpName: personName(actionForm.value.targetEmpNo),
     comment: actionForm.value.comment || undefined,
@@ -708,9 +786,21 @@ const runAction = async (action: CpsIssueAction) => {
     message.warning('请选择转办目标')
     return
   }
+  if (action === 'REPLY_ASSIGN' && !actionForm.value.responsibleEmpNo) {
+    message.warning('请选择责任员工')
+    return
+  }
   if (action === 'UPLOAD_PROOF' && !proofImages.value.length) {
     message.warning('请先上传至少 1 张复核照片')
     return
+  }
+  // v2 提交整改：原因/短期措施/长期措施/责任员工/复核照片缺一不可
+  if (action === 'SUBMIT_RECTIFICATION') {
+    if (!actionForm.value.reasonAnalysis.trim()) return void message.warning('请填写原因分析')
+    if (!actionForm.value.shortTermMeasure.trim()) return void message.warning('请填写短期措施')
+    if (!actionForm.value.longTermMeasure.trim()) return void message.warning('请填写长期措施')
+    if (!actionForm.value.responsibleEmpNo) return void message.warning('请选择责任员工')
+    if (!proofImages.value.length) return void message.warning('请先上传至少 1 张复核照片')
   }
   actionLoading.value = action
   try {

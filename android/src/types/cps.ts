@@ -2,6 +2,8 @@ export type CpsIssueStatus =
   | 'PENDING_FEEDBACK'
   | 'PENDING_RECTIFY'
   | 'PENDING_UPLOAD_PROOF'
+  | 'PENDING_AI_REVIEW'
+  | 'PENDING_REVIEWER_CONFIG'
   | 'PENDING_REVIEW'
   | 'CLOSED'
 
@@ -9,6 +11,8 @@ export type CpsIssueAction =
   | 'REPLY_ASSIGN'
   | 'RECTIFY'
   | 'UPLOAD_PROOF'
+  | 'SUBMIT_RECTIFICATION'
+  | 'SAVE_DRAFT'
   | 'REVIEW_CLOSE'
   | 'REVIEW_REJECT'
   | 'TRANSFER'
@@ -214,6 +218,9 @@ export interface CpsIssueActionRequest {
   action: CpsIssueAction
   reasonAnalysis?: string
   correctiveMeasure?: string
+  /** v2 整改：短期措施 / 长期措施 */
+  shortTermMeasure?: string
+  longTermMeasure?: string
   responsibleEmpNo?: string
   responsibleEmpName?: string
   proofEmpNo?: string
@@ -266,6 +273,8 @@ export interface CpsFlowLog {
 }
 
 export interface CpsIssueDetail extends CpsIssueListItem {
+  /** 流程版本：v2 = 提交整改→AI初审→人工审核（无独立待传图节点） */
+  flowVersion?: string | null
   creatorEmpNo: string
   feedbackEmpNo: string
   responsibleEmpNo: string | null
@@ -276,6 +285,8 @@ export interface CpsIssueDetail extends CpsIssueListItem {
   reviewerEmpName?: string | null
   reasonAnalysis: string | null
   correctiveMeasure: string | null
+  shortTermMeasure?: string | null
+  longTermMeasure?: string | null
   rectifyRemark: string | null
   reviewOpinion: string | null
   closeTime: string | null
