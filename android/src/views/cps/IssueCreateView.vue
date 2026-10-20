@@ -1846,4 +1846,44 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
     font-size: 26px;
   }
 }
+/* ===== antd 组件品牌色（只在本页作用域内生效） ===== */
+.cps-create-page :deep(.ant-btn-primary:not(:disabled)) {
+  background: var(--cps-teal-deep);
+  border-color: var(--cps-teal-deep);
+  box-shadow: none;
+}
+
+.cps-create-page :deep(.ant-btn-primary:not(:disabled):hover) {
+  background: #115e59;
+  border-color: #115e59;
+}
+
+.cps-create-page :deep(.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled)) {
+  background: var(--cps-teal-deep);
+  border-color: var(--cps-teal-deep);
+  color: #fff;
+}
+
+.cps-create-page :deep(.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled)::before) {
+  background-color: var(--cps-teal-deep);
+}
+
+.cps-create-page :deep(.ant-radio-checked .ant-radio-inner) {
+  border-color: var(--cps-teal-deep);
+}
+
+.cps-create-page :deep(.ant-radio-checked .ant-radio-inner::after) {
+  background-color: var(--cps-teal-deep);
+}
+
+.cps-create-page :deep(.ant-input:focus),
+.cps-create-page :deep(.ant-input-focused),
+.cps-create-page :deep(.ant-input-affix-wrapper-focused) {
+  border-color: var(--cps-teal);
+  box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.16);
+}
+
+.cps-create-page :deep(.ant-spin-dot-item) {
+  background-color: var(--cps-teal-deep);
+}
 </style>

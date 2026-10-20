@@ -567,4 +567,27 @@ const formatRecordTime = (t?: string | null) => {
     font-size: 26px;
   }
 }
+/* ===== antd 组件品牌色（只在本页作用域内生效） ===== */
+.cps-list-page :deep(.ant-btn-primary:not(:disabled)) {
+  background: var(--cps-teal-deep);
+  border-color: var(--cps-teal-deep);
+  box-shadow: none;
+}
+
+.cps-list-page :deep(.ant-btn-primary:not(:disabled):hover) {
+  background: #115e59;
+  border-color: #115e59;
+}
+
+.cps-list-page :deep(.ant-tabs .ant-tabs-ink-bar) {
+  background: var(--cps-teal-deep);
+}
+
+.cps-list-page :deep(.ant-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn) {
+  color: var(--cps-teal-deep);
+}
+
+.cps-list-page :deep(.ant-spin-dot-item) {
+  background-color: var(--cps-teal-deep);
+}
 </style>

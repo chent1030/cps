@@ -514,4 +514,33 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 }
 
 .cps-done-result { margin-top: 16px; }
+
+/* ===== antd 组件品牌色（只在本页作用域内生效） ===== */
+.cps-execute-page :deep(.ant-btn-primary:not(:disabled)) {
+  background: var(--cps-teal-deep);
+  border-color: var(--cps-teal-deep);
+  box-shadow: none;
+}
+
+.cps-execute-page :deep(.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled)) {
+  background: var(--cps-teal-deep);
+  border-color: var(--cps-teal-deep);
+  color: #fff;
+}
+
+.cps-execute-page :deep(.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled)::before) {
+  background-color: var(--cps-teal-deep);
+}
+
+.cps-execute-page :deep(.ant-radio-checked .ant-radio-inner) {
+  border-color: var(--cps-teal-deep);
+}
+
+.cps-execute-page :deep(.ant-radio-checked .ant-radio-inner::after) {
+  background-color: var(--cps-teal-deep);
+}
+
+.cps-execute-page :deep(.ant-spin-dot-item) {
+  background-color: var(--cps-teal-deep);
+}
 </style>
