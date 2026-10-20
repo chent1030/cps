@@ -331,6 +331,8 @@ const formatRecordTime = (t?: string | null) => {
 }
 
 .cps-hero__action {
+  /* hero 为 flex-start，按钮单独在交叉轴居中，与左侧标题区对齐 */
+  align-self: center;
   background: #fff !important;
   color: var(--cps-teal-deep) !important;
   border: none !important;
