@@ -94,7 +94,7 @@
               <span>{{ index + 1 }}/{{ detail.proofAttachments.length }}</span>
             </div>
           </div>
-          <a-empty v-else description="当前节点还没有上传整改照片" />
+          <a-empty v-else :description="proofEmptyText" />
         </a-card>
 
         <a-card class="cps-card" :body-style="{ padding: '16px' }" style="margin-top: 16px">
@@ -217,8 +217,8 @@
                     <template #suffix><UserOutlined /></template>
                   </a-input>
                 </a-form-item>
-                <a-form-item label="整改照片">
-                  <!-- 整改照片上传（内联） -->
+                <a-form-item label="复核照片">
+                  <!-- 复核照片（整改凭证）上传：仅「待传图」节点可用，最多 5 张 -->
                   <a-upload list-type="picture-card" :file-list="proofFileList" :max-count="5" :custom-request="customProofRequest" :before-upload="beforeProofUpload" :show-upload-list="false" multiple accept="image/*">
                     <div v-if="proofImages.length < 5" class="cps-uploader__trigger">
                       <span class="cps-uploader__plus">+</span>
@@ -450,6 +450,13 @@ const flowStatusLabel = (status: CpsIssueStatus | null) => (status ? flowStatusL
 const showFeedbackFields = computed(() => detail.value?.status === 'PENDING_FEEDBACK')
 const showRectifyFields = computed(() => detail.value?.status === 'PENDING_RECTIFY')
 const showProofFields = computed(() => detail.value?.status === 'PENDING_UPLOAD_PROOF')
+// 复核照片卡片的空态说明：告诉用户照片该在哪个节点、哪个位置上传
+const proofEmptyText = computed(() => {
+  if (!detail.value) return '暂无复核照片'
+  if (detail.value.status === 'PENDING_UPLOAD_PROOF') return '还没有复核照片，在上方「当前操作」里上传'
+  if (detail.value.status === 'CLOSED') return '本单没有复核照片'
+  return '复核照片在「待传图」节点由上传人提交'
+})
 const showReviewFields = computed(() => detail.value?.status === 'PENDING_REVIEW')
 const workflowActions = computed<CpsIssueAction[]>(() => {
   if (!detail.value) return []
@@ -699,6 +706,10 @@ const runAction = async (action: CpsIssueAction) => {
   if (actionLoading.value) return
   if (action === 'TRANSFER' && !actionForm.value.targetEmpNo) {
     message.warning('请选择转办目标')
+    return
+  }
+  if (action === 'UPLOAD_PROOF' && !proofImages.value.length) {
+    message.warning('请先上传至少 1 张复核照片')
     return
   }
   actionLoading.value = action
