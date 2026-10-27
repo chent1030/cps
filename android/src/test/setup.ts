@@ -1,4 +1,4 @@
 import { config } from '@vue/test-utils'
 
-// antd-vue 组件按需在测试中局部注册即可，全局无需插件
+// 视图已改用 uni-app 内置控件，测试中无需注册任何全局组件库插件
 config.global.plugins = []

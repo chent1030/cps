@@ -7,6 +7,8 @@ import type { CpsSpeechField, CpsSpeechTranscriptionResult } from '@/types/cps'
  */
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 const EMP_NO = import.meta.env.VITE_CPS_EMP_NO ?? '61016968'
+// app-plus 下没有可用的 window.location.origin，缺失时回退占位 origin，避免 new URL 抛错
+const ORIGIN = typeof window !== 'undefined' && window.location ? window.location.origin : ''
 
 export const transcribeSpeech = (
   source: File | string,
@@ -48,7 +50,7 @@ const transcribeByTempPath = (
   }
   return new Promise((resolve: (value: CpsSpeechTranscriptionResult) => void, reject) => {
     uni.uploadFile({
-      url: new URL(`${API_BASE}/api/cps/speech/transcriptions`, window.location.origin).toString(),
+      url: new URL(`${API_BASE}/api/cps/speech/transcriptions`, ORIGIN || 'http://localhost').toString(),
       filePath,
       name: 'file',
       formData,

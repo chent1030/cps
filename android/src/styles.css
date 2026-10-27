@@ -1,10 +1,14 @@
+@import './styles/uni-controls.css';
+
 * {
   box-sizing: border-box;
 }
 
 html,
 body,
-#app {
+#app,
+uni-app,
+uni-page-body {
   width: 100%;
   max-width: 100%;
   min-height: 100vh;
@@ -75,22 +79,6 @@ textarea {
 button,
 a {
   -webkit-tap-highlight-color: transparent;
-}
-
-/* 触感反馈：antd 按钮按下时轻微收拢（uni-button 的反馈在各自页面内定义） */
-.ant-btn:not(.ant-btn-loading):not(:disabled):active {
-  transform: scale(0.98);
-}
-
-/* 按钮字号刻度（配合 controlHeight: 48 主 CTA / 40 标准 / 32 紧凑） */
-.cps-page .ant-btn:not(.ant-btn-sm):not(.ant-btn-lg) {
-  font-size: 15px;
-}
-.cps-page .ant-btn.ant-btn-lg {
-  font-size: 16px;
-}
-.cps-page .ant-btn.ant-btn-sm {
-  font-size: 13px;
 }
 
 /* 状态胶囊：全站唯一定义（ tones 与各页 STATUS/JUDGE META 对应） */

@@ -1,145 +1,157 @@
 <template>
-  <main class="cps-page cps-execute-page">
-    <a-spin :spinning="loading">
-      <template v-if="record">
-        <header class="cps-hero">
-          <div class="cps-hero__main">
-            <p class="cps-hero__eyebrow">巡检执行 · #{{ record.id }}</p>
-            <h1>{{ record.areaName || '整体巡检' }}</h1>
-            <div class="cps-hero__stats">
-              <span>{{ record.typeCode }}</span>
-              <span>{{ statusLabel(record.recordStatus) }}</span>
-              <span v-if="record.areaCode">{{ record.areaCode }}</span>
-              <span>进度 {{ doneCount }}/{{ items.length }}</span>
-              <span v-if="record.score != null">得分 {{ record.score }}</span>
-            </div>
-          </div>
-          <div class="cps-hero__side">
-            <a-tag :color="readonly ? 'green' : 'blue'" class="cps-hero__badge">
-              {{ readonly ? '已锁定' : '执行中' }}
-            </a-tag>
-            <a-button v-if="!readonly" size="small" class="cps-hero__switch" @click="switchType">
-              切换巡检类型
-            </a-button>
-            <a-button v-else size="small" class="cps-hero__switch" @click="backToList">
-              返回任务列表
-            </a-button>
-          </div>
-        </header>
+  <view class="cps-page cps-execute-page">
+    <view v-if="loading" class="u-loading">
+      <view class="u-loading__dot" />
+      <text class="u-loading__text">加载中…</text>
+    </view>
 
-        <!-- 点检项逐项执行 -->
-        <a-card
-          v-for="(item, index) in items"
-          :key="item.id"
-          class="cps-card cps-item-card"
-          :class="{ 'cps-item-card--done': isItemDone(item), 'cps-item-card--fail': item.passResult === 'FAIL' }"
-          :body-style="{ padding: '16px' }"
-        >
-          <template #title>
-            <div class="cps-card-title">
-              <div>
-                <p class="cps-card-title__sub">第 {{ index + 1 }} 项 · {{ item.itemCode }}</p>
-                <h2 class="cps-card-title__main">{{ item.content }}</h2>
-              </div>
-              <div class="cps-item-badges">
-                <a-tag v-for="t in splitTypes(item.checkTypes)" :key="t" :color="typeColor(t)">{{ typeLabel(t) }}</a-tag>
-                <a-tag v-if="item.deductScore" color="red">扣 {{ item.deductScore }}</a-tag>
-              </div>
-            </div>
-          </template>
+    <template v-if="record">
+      <view class="cps-hero">
+        <view class="cps-hero__main">
+          <text class="cps-hero__eyebrow">巡检执行 · #{{ record.id }}</text>
+          <text class="cps-hero__title">{{ record.areaName || '整体巡检' }}</text>
+          <view class="cps-hero__stats">
+            <text class="cps-hero__stat">{{ record.typeCode }}</text>
+            <text class="cps-hero__stat">{{ statusLabel(record.recordStatus) }}</text>
+            <text v-if="record.areaCode" class="cps-hero__stat">{{ record.areaCode }}</text>
+            <text class="cps-hero__stat">进度 {{ doneCount }}/{{ items.length }}</text>
+            <text v-if="record.score != null" class="cps-hero__stat">得分 {{ record.score }}</text>
+          </view>
+        </view>
+        <view class="cps-hero__side">
+          <text class="u-tag cps-hero__badge" :class="readonly ? 'u-tag--green' : 'u-tag--blue'">
+            {{ readonly ? '已锁定' : '执行中' }}
+          </text>
+          <button v-if="!readonly" class="u-btn u-btn--sm cps-hero__switch" @click="switchType">
+            切换巡检类型
+          </button>
+          <button v-else class="u-btn u-btn--sm cps-hero__switch" @click="backToList">
+            返回任务列表
+          </button>
+        </view>
+      </view>
 
-          <!-- 拍照判定条件提示 -->
-          <p v-if="hasType(item, 'PHOTO') && item.photoCriteria" class="cps-item-criteria">
-            📷 判定条件：{{ item.photoCriteria }}（至少 {{ item.photoMinCount ?? 1 }} 张）
-          </p>
+      <!-- 点检项逐项执行 -->
+      <view
+        v-for="(item, index) in items"
+        :key="item.id"
+        class="u-card cps-card cps-item-card"
+        :class="{ 'cps-item-card--done': isItemDone(item), 'cps-item-card--fail': item.passResult === 'FAIL' }"
+      >
+        <view class="cps-card-title">
+          <view>
+            <text class="cps-card-title__sub">第 {{ index + 1 }} 项 · {{ item.itemCode }}</text>
+            <text class="cps-card-title__main">{{ item.content }}</text>
+          </view>
+          <view class="cps-item-badges">
+            <text v-for="t in splitTypes(item.checkTypes)" :key="t" class="u-tag" :class="'u-tag--' + typeColor(t)">
+              {{ typeLabel(t) }}
+            </text>
+            <text v-if="item.deductScore" class="u-tag u-tag--red">扣 {{ item.deductScore }}</text>
+          </view>
+        </view>
 
-          <!-- 是否合格 -->
-          <div v-if="hasType(item, 'PASS_FAIL')" class="cps-item-row">
-            <span class="cps-item-label">是否合格</span>
-            <a-radio-group
-              :value="local[item.id]?.passResult ?? item.passResult ?? ''"
-              button-style="solid"
-              :disabled="readonly || savingItem === item.id"
-              @change="(e: any) => onPassChange(item, e.target.value)"
+        <!-- 拍照判定条件提示 -->
+        <text v-if="hasType(item, 'PHOTO') && item.photoCriteria" class="cps-item-criteria">
+          📷 判定条件：{{ item.photoCriteria }}（至少 {{ item.photoMinCount ?? 1 }} 张）
+        </text>
+
+        <!-- 是否合格 -->
+        <view v-if="hasType(item, 'PASS_FAIL')" class="cps-item-row">
+          <text class="cps-item-label">是否合格</text>
+          <view class="u-seg" :class="{ 'cps-seg--disabled': readonly || savingItem === item.id }">
+            <view
+              class="u-seg__item"
+              :class="{ 'u-seg__item--active': (local[item.id]?.passResult ?? item.passResult ?? '') === 'PASS' }"
+              @click="!(readonly || savingItem === item.id) && onPassChange(item, 'PASS')"
             >
-              <a-radio-button value="PASS">✓ 合格</a-radio-button>
-              <a-radio-button value="FAIL">✗ 不合格</a-radio-button>
-            </a-radio-group>
-          </div>
+              <text>✓ 合格</text>
+            </view>
+            <view
+              class="u-seg__item"
+              :class="{ 'u-seg__item--active': (local[item.id]?.passResult ?? item.passResult ?? '') === 'FAIL' }"
+              @click="!(readonly || savingItem === item.id) && onPassChange(item, 'FAIL')"
+            >
+              <text>✗ 不合格</text>
+            </view>
+          </view>
+        </view>
 
-          <!-- 文本说明 -->
-          <div v-if="hasType(item, 'TEXT')" class="cps-item-row cps-item-row--stack">
-            <span class="cps-item-label">文本说明</span>
-            <a-textarea
-              :value="local[item.id]?.textValue ?? item.textValue ?? ''"
-              :rows="2"
-              :maxlength="500"
-              :disabled="readonly"
-              :placeholder="textHint(item)"
-              @change="(e: any) => onTextChange(item, e.target.value)"
-              @blur="() => void persistItem(item)"
-            />
-          </div>
+        <!-- 文本说明 -->
+        <view v-if="hasType(item, 'TEXT')" class="cps-item-row cps-item-row--stack">
+          <text class="cps-item-label">文本说明</text>
+          <textarea
+            class="u-textarea"
+            :value="local[item.id]?.textValue ?? item.textValue ?? ''"
+            :maxlength="500"
+            :disabled="readonly"
+            :placeholder="textHint(item)"
+            auto-height
+            @input="(e: any) => onTextChange(item, String(e?.detail?.value ?? e?.target?.value ?? ''))"
+            @blur="() => void persistItem(item)"
+          />
+        </view>
 
-          <!-- 拍照 -->
-          <div v-if="hasType(item, 'PHOTO')" class="cps-item-row cps-item-row--stack">
-            <span class="cps-item-label">
-              现场照片
-              <em :class="photoCount(item) >= (item.photoMinCount ?? 1) ? 'cps-count cps-count--ok' : 'cps-count cps-count--lack'">
-                {{ photoCount(item) }}/{{ item.photoMinCount ?? 1 }}
-              </em>
-            </span>
-            <div class="cps-photo-grid">
-              <div v-for="(p, pi) in photoList(item)" :key="pi" class="cps-photo-tile">
-                <img :src="p.url" :alt="p.name" @click="previewPhoto(item, pi)" />
-                <span v-if="!readonly" class="cps-photo-del" @click.stop="removePhoto(item, pi)">×</span>
-              </div>
-              <label v-if="!readonly" class="cps-photo-add">
-                <input type="file" accept="image/*" multiple hidden @change="(e: any) => onPhotoPick(item, e)" />
-                <span class="cps-photo-add__plus">＋</span>
-                <span class="cps-photo-add__text">{{ uploadingItem === item.id ? '上传中' : '拍照/选择' }}</span>
-              </label>
-            </div>
-          </div>
+        <!-- 拍照 -->
+        <view v-if="hasType(item, 'PHOTO')" class="cps-item-row cps-item-row--stack">
+          <text class="cps-item-label">
+            现场照片
+            <text :class="photoCount(item) >= (item.photoMinCount ?? 1) ? 'cps-count cps-count--ok' : 'cps-count cps-count--lack'">
+              {{ photoCount(item) }}/{{ item.photoMinCount ?? 1 }}
+            </text>
+          </text>
+          <view class="cps-photo-grid">
+            <view
+              v-for="(p, pi) in photoList(item)"
+              :key="pi"
+              class="cps-photo-tile"
+              hover-class="u-tap"
+              @click="previewPhoto(item, pi)"
+            >
+              <image class="cps-photo__img" :src="p.url" mode="aspectFill" />
+              <text v-if="!readonly" class="cps-photo-del" @click.stop="removePhoto(item, pi)">×</text>
+            </view>
+            <view v-if="!readonly" class="cps-photo-add" hover-class="u-tap" @click="onPhotoPick(item)">
+              <text class="cps-photo-add__plus">＋</text>
+              <text class="cps-photo-add__text">{{ uploadingItem === item.id ? '上传中' : '拍照/选择' }}</text>
+            </view>
+          </view>
+        </view>
 
-          <div v-if="!readonly && (hasType(item, 'TEXT') || hasType(item, 'PHOTO'))" class="cps-item-save">
-            <a-button size="small" :loading="savingItem === item.id" @click="persistItem(item)">保存本项</a-button>
-            <span v-if="savedTip[item.id]" class="cps-saved-tip">已保存</span>
-          </div>
-        </a-card>
+        <view v-if="!readonly && (hasType(item, 'TEXT') || hasType(item, 'PHOTO'))" class="cps-item-save">
+          <button class="u-btn u-btn--sm" :disabled="savingItem === item.id" @click="persistItem(item)">保存本项</button>
+          <text v-if="savedTip[item.id]" class="cps-saved-tip">已保存</text>
+        </view>
+      </view>
 
-        <!-- 提交栏 -->
-        <div v-if="!readonly" class="cps-submit-bar">
-          <a-button
-            type="primary"
-            size="large"
-            block
-            :loading="submitting"
-            class="cps-submit-btn"
-            @click="submit"
-          >
-            提交巡检（{{ doneCount }}/{{ items.length }} 项完成）
-          </a-button>
-        </div>
+      <!-- 提交栏 -->
+      <view v-if="!readonly" class="cps-submit-bar">
+        <button
+          class="u-btn u-btn--primary u-btn--block cps-submit-btn"
+          :disabled="submitting"
+          @click="submit"
+        >
+          提交巡检（{{ doneCount }}/{{ items.length }} 项完成）
+        </button>
+      </view>
 
-        <!-- 已判定：得分横幅 -->
-        <a-result
-          v-else
-          status="success"
-          :title="`巡检已完成，得分 ${record.score ?? '-'}`"
-          :subtitle="`提交时间：${formatTime(record.submittedAt)}`"
-          class="cps-done-result"
-        />
-      </template>
-      <a-empty v-else-if="!loading" description="记录不存在或已删除" />
-    </a-spin>
-  </main>
+      <!-- 已判定：得分横幅 -->
+      <view v-else class="u-result cps-done-result">
+        <text class="u-result__icon">✅</text>
+        <text class="u-result__title">巡检已完成，得分 {{ record.score ?? '-' }}</text>
+        <text class="u-result__desc">提交时间：{{ formatTime(record.submittedAt) }}</text>
+      </view>
+    </template>
+    <view v-else-if="!loading" class="u-empty">
+      <text class="u-empty__icon">📭</text>
+      <text class="u-empty__text">记录不存在或已删除</text>
+    </view>
+  </view>
 </template>
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { message } from 'ant-design-vue'
 
 import { uploadCpsAttachment } from '@/api/cps/attachment'
 import {
@@ -148,6 +160,7 @@ import {
   submitInspection,
 } from '@/api/cps/inspectionTask'
 import type { CpsInspectionRecord, CpsInspectionRecordItem } from '@/types/cps'
+import { resolveUploadSources } from '@/utils/image'
 
 interface PhotoEntry {
   url: string
@@ -246,7 +259,7 @@ const load = async () => {
     record.value = detail.record
     items.value = detail.items
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '加载巡检记录失败')
+    uni.showToast({ title: error instanceof Error ? error.message : '加载巡检记录失败', icon: 'none' })
   } finally {
     loading.value = false
   }
@@ -262,22 +275,37 @@ const onTextChange = (item: CpsInspectionRecordItem, value: string) => {
   local[item.id] = { ...local[item.id], textValue: value }
 }
 
-const onPhotoPick = async (item: CpsInspectionRecordItem, e: Event) => {
-  const input = e.target as HTMLInputElement
-  const files = Array.from(input.files ?? [])
-  input.value = ''
-  if (!files.length) return
-  uploadingItem.value = item.id
+/** uni 相册/拍照选择：返回可上传的源（File 或临时路径），用户取消时返回空数组 */
+const pickPhotoSources = (count: number) =>
+  new Promise<ReturnType<typeof resolveUploadSources>>((resolve, reject) => {
+    uni.chooseImage({
+      count,
+      sourceType: ['camera', 'album'],
+      success: (result) => resolve(resolveUploadSources(result)),
+      fail: (err) => {
+        if (/cancel/i.test(String(err?.errMsg ?? ''))) {
+          resolve([])
+          return
+        }
+        reject(err)
+      },
+    })
+  })
+
+const onPhotoPick = async (item: CpsInspectionRecordItem) => {
   try {
+    const sources = await pickPhotoSources(9)
+    if (!sources.length) return
+    uploadingItem.value = item.id
     const current = [...photoList(item)]
-    for (const file of files) {
-      const uploaded = await uploadCpsAttachment(file)
+    for (const source of sources) {
+      const uploaded = await uploadCpsAttachment(source)
       current.push({ url: uploaded.url, name: uploaded.name })
     }
     local[item.id] = { ...local[item.id], photos: current }
     await persistItem(item)
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '照片上传失败')
+    uni.showToast({ title: error instanceof Error ? error.message : '照片上传失败', icon: 'none' })
   } finally {
     uploadingItem.value = null
   }
@@ -322,7 +350,7 @@ const persistItem = async (item: CpsInspectionRecordItem) => {
     savedTip[item.id] = true
     setTimeout(() => { savedTip[item.id] = false }, 1500)
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '保存失败')
+    uni.showToast({ title: error instanceof Error ? error.message : '保存失败', icon: 'none' })
   } finally {
     savingItem.value = null
   }
@@ -333,16 +361,16 @@ const submit = async () => {
   if (!record.value || submitting.value) return
   const missing = items.value.filter((i) => !isItemDone(i))
   if (missing.length) {
-    message.warning(`还有 ${missing.length} 项未完成：${missing[0].content.slice(0, 20)}…`)
+    uni.showToast({ title: `还有 ${missing.length} 项未完成：${missing[0].content.slice(0, 20)}…`, icon: 'none' })
     return
   }
   submitting.value = true
   try {
     const result = await submitInspection(record.value.id)
     record.value = result
-    message.success(`提交成功，得分 ${result.score ?? '-'}`)
+    uni.showToast({ title: `提交成功，得分 ${result.score ?? '-'}`, icon: 'success' })
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '提交失败')
+    uni.showToast({ title: error instanceof Error ? error.message : '提交失败', icon: 'none' })
   } finally {
     submitting.value = false
   }
@@ -377,10 +405,10 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   margin-bottom: 16px;
 }
 .cps-hero__main { display: grid; gap: 6px; }
-.cps-hero__eyebrow { margin: 0; color: rgba(255, 255, 255, 0.82); font-size: 12px; font-weight: 700; letter-spacing: 0.18em; }
-.cps-hero h1 { margin: 0; font-size: 22px; font-weight: 800; }
+.cps-hero__eyebrow { display: block; margin: 0; color: rgba(255, 255, 255, 0.82); font-size: 12px; font-weight: 700; letter-spacing: 0.18em; }
+.cps-hero__title { display: block; margin: 0; font-size: 22px; font-weight: 800; }
 .cps-hero__stats { display: flex; flex-wrap: wrap; gap: 8px; }
-.cps-hero__stats span {
+.cps-hero__stat {
   display: inline-flex;
   align-items: center;
   min-height: 24px;
@@ -390,7 +418,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   font-size: 13px;
   font-weight: 700;
 }
-.cps-hero__badge { align-self: flex-start; border-radius: 999px !important; font-weight: 800 !important; }
+.cps-hero__badge { align-self: flex-start; font-weight: 800; }
 
 /* Phase D3：hero 右侧（状态徽标 + 切换类型/返回按钮） */
 .cps-hero__side {
@@ -400,12 +428,12 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 }
 
 .cps-hero__switch {
-  border-radius: var(--cps-radius-pill) !important;
-  background: rgba(255, 255, 255, 0.16) !important;
-  border: 1px solid rgba(255, 255, 255, 0.55) !important;
-  color: #fff !important;
-  font-size: 12px !important;
-  font-weight: 700 !important;
+  border-radius: var(--cps-radius-pill);
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .cps-card {
@@ -417,12 +445,21 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 .cps-item-card--done { border-left: 4px solid #22c55e; }
 .cps-item-card--fail { border-left: 4px solid #ef4444; }
 
-.cps-card-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.cps-card-title__sub { margin: 0; color: var(--cps-teal-deep); font-size: 12px; font-weight: 800; }
-.cps-card-title__main { margin: 2px 0 0; color: var(--cps-ink); font-size: 16px; font-weight: 800; }
+.cps-card-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--cps-border);
+}
+.cps-card-title__sub { display: block; margin: 0; color: var(--cps-teal-deep); font-size: 12px; font-weight: 800; }
+.cps-card-title__main { display: block; margin: 2px 0 0; color: var(--cps-ink); font-size: 16px; font-weight: 800; }
 .cps-item-badges { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
 
 .cps-item-criteria {
+  display: block;
   margin: 0 0 10px;
   padding: 8px 10px;
   border-radius: var(--cps-radius-md);
@@ -441,7 +478,10 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 .cps-item-row--stack { display: grid; gap: 6px; }
 .cps-item-label { color: #0f172a; font-size: 14px; font-weight: 700; flex-shrink: 0; }
 
-.cps-count { font-style: normal; margin-left: 6px; font-size: 12px; font-weight: 800; }
+/* 不合格/保存中等禁用态（u-seg 全局样式之外的页面态） */
+.cps-seg--disabled { opacity: 0.5; }
+
+.cps-count { margin-left: 6px; font-size: 12px; font-weight: 800; }
 .cps-count--ok { color: #16a34a; }
 .cps-count--lack { color: #ef4444; }
 
@@ -458,7 +498,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   overflow: hidden;
   background: #e2e8f0;
 }
-.cps-photo-tile img { width: 100%; height: 100%; object-fit: cover; }
+.cps-photo__img { width: 100%; height: 100%; }
 .cps-photo-del {
   position: absolute;
   top: 4px;
@@ -485,7 +525,6 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   border: 1px dashed #99f6e4;
   background: var(--cps-mist);
   color: #0f766e;
-  cursor: pointer;
 }
 .cps-photo-add__plus { font-size: 22px; line-height: 1; }
 .cps-photo-add__text { font-size: 12px; font-weight: 700; }
@@ -505,42 +544,13 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   background: linear-gradient(180deg, rgba(248, 250, 252, 0), #f8fafc 40%);
 }
 .cps-submit-btn {
-  height: 48px !important;
-  border-radius: var(--cps-radius-pill) !important;
-  background: var(--cps-teal-deep) !important;
-  border: none !important;
-  font-size: 16px !important;
-  font-weight: 700 !important;
+  height: 48px;
+  border-radius: var(--cps-radius-pill);
+  background: var(--cps-teal-deep);
+  border: none;
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .cps-done-result { margin-top: 16px; }
-
-/* ===== antd 组件品牌色（只在本页作用域内生效） ===== */
-.cps-execute-page :deep(.ant-btn-primary:not(:disabled)) {
-  background: var(--cps-teal-deep);
-  border-color: var(--cps-teal-deep);
-  box-shadow: none;
-}
-
-.cps-execute-page :deep(.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled)) {
-  background: var(--cps-teal-deep);
-  border-color: var(--cps-teal-deep);
-  color: #fff;
-}
-
-.cps-execute-page :deep(.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled)::before) {
-  background-color: var(--cps-teal-deep);
-}
-
-.cps-execute-page :deep(.ant-radio-checked .ant-radio-inner) {
-  border-color: var(--cps-teal-deep);
-}
-
-.cps-execute-page :deep(.ant-radio-checked .ant-radio-inner::after) {
-  background-color: var(--cps-teal-deep);
-}
-
-.cps-execute-page :deep(.ant-spin-dot-item) {
-  background-color: var(--cps-teal-deep);
-}
 </style>

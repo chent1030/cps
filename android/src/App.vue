@@ -1,30 +1,21 @@
-<template>
-  <a-config-provider :locale="zhCN" :theme="theme">
-    <view>
-      <slot />
-    </view>
-  </a-config-provider>
-</template>
-
 <script setup lang="ts">
-import zhCN from 'ant-design-vue/es/locale/zh_CN'
-import dayjs from 'dayjs'
-import 'dayjs/locale/zh-cn'
-import type { ThemeConfig } from 'ant-design-vue/es/config-provider/context'
+import { onLaunch, onShow, onHide } from '@dcloudio/uni-app'
 
-dayjs.locale('zh-cn')
+// uni-app 的 App.vue 不参与视图渲染（模板会被忽略），只承载全局生命周期与全局样式。
+// 主题色统一由 src/styles.css 的 --cps-* CSS 变量提供（原先的 antd config-provider 已移除）。
+onLaunch(() => {
+  console.log('[cps] app launch')
+})
 
-const theme: ThemeConfig = {
-  token: {
-    colorPrimary: '#14b8a6',
-    colorSuccess: '#22c55e',
-    colorWarning: '#f97316',
-    colorError: '#ef4444',
-    colorInfo: '#2563eb',
-    borderRadius: 10,
-    controlHeight: 40,
-    fontFamily:
-      'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
-  },
-}
+onShow(() => {
+  console.log('[cps] app show')
+})
+
+onHide(() => {
+  console.log('[cps] app hide')
+})
 </script>
+
+<style>
+/* 全局样式统一在 src/styles.css（含 src/styles/uni-controls.css）中维护 */
+</style>

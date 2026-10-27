@@ -1,386 +1,556 @@
 <template>
-  <main v-if="detail" class="cps-page cps-detail-page">
-    <header class="cps-hero">
-      <div class="cps-hero__top">
-        <div class="cps-hero__identity">
-          <p class="cps-hero__eyebrow">CPS 巡检问题</p>
-          <h1 class="cps-hero__title">{{ detail.description }}</h1>
-        </div>
-        <div class="cps-hero__badges">
-          <a-tag :color="detailStatus.color" class="cps-pill">{{ detailStatus.label }}</a-tag>
-          <a-tag v-if="detail.overdue" color="red" class="cps-pill">超时</a-tag>
-        </div>
-      </div>
-      <div class="cps-hero__meta">
-        <span>{{ issueLocation }}</span>
-        <span>{{ issueCategory }}</span>
-        <span>提交 {{ formatDateTime(detail.submitTime) }}</span>
-      </div>
-      <ol class="cps-steps" aria-label="流程进度">
-        <li
-          v-for="(node, index) in statusSteps"
-          :key="node.value"
-          class="cps-steps__item"
-          :class="{ 'is-done': index < currentStepIndex, 'is-active': index === currentStepIndex }"
-        >
-          <span class="cps-steps__num">{{ index + 1 }}</span>
-          <span class="cps-steps__label">{{ node.label }}</span>
-        </li>
-      </ol>
-    </header>
+  <view class="cps-detail-root">
+    <view v-if="detail" class="cps-page cps-detail-page">
+      <view class="cps-hero">
+        <view class="cps-hero__top">
+          <view class="cps-hero__identity">
+            <text class="cps-hero__eyebrow">CPS 巡检问题</text>
+            <text class="cps-hero__title">{{ detail.description }}</text>
+          </view>
+          <view class="cps-hero__badges">
+            <text class="cps-pill" :class="statusMeta[detail.status].tone">{{ detailStatus.label }}</text>
+            <text v-if="detail.overdue" class="cps-pill cps-pill--red">超时</text>
+          </view>
+        </view>
+        <view class="cps-hero__meta">
+          <text class="cps-hero__meta-item">{{ issueLocation }}</text>
+          <text class="cps-hero__meta-item">{{ issueCategory }}</text>
+          <text class="cps-hero__meta-item">提交 {{ formatDateTime(detail.submitTime) }}</text>
+        </view>
+        <view class="cps-steps" aria-label="流程进度">
+          <view
+            v-for="(node, index) in statusSteps"
+            :key="node.value"
+            class="cps-steps__item"
+            :class="{ 'is-done': index < currentStepIndex, 'is-active': index === currentStepIndex }"
+          >
+            <text class="cps-steps__num">{{ index + 1 }}</text>
+            <text class="cps-steps__label">{{ node.label }}</text>
+          </view>
+        </view>
+      </view>
 
-    <a-row :gutter="[16, 16]">
-      <!-- 左列：基础信息 + 照片 + AI -->
-      <a-col :xs="{ span: 24 }" :xl="{ span: 14 }">
-        <a-card class="cps-card" :body-style="{ padding: '16px' }">
-          <template #title>
-            <div class="cps-card-title">
-              <h2 class="cps-card-title__main">处理责任</h2>
-            </div>
-          </template>
-          <a-descriptions :column="{ xs: 2, sm: 3 }" size="small" bordered>
-            <a-descriptions-item label="提交人">{{ detail.creatorEmpNo || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="当前处理人">{{ detail.currentHandlerEmpName || detail.currentHandlerEmpNo || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="反馈人">{{ detail.feedbackEmpNo || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="责任人">{{ detail.responsibleEmpNo || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="上传人">{{ detail.proofEmpNo || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="审核人">{{ detail.reviewerEmpNo || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="资源号">{{ detail.resourceNo || '-' }}</a-descriptions-item>
-            <a-descriptions-item v-if="detail.inspectionTypeCode" label="巡检类型">
-              <a-tag color="arcoblue">{{ detail.inspectionTypeCode }}</a-tag>
-            </a-descriptions-item>
-            <a-descriptions-item label="提交时间">{{ detail.submitTime || '-' }}</a-descriptions-item>
-            <a-descriptions-item v-if="detail.closeTime" label="关闭时间">{{ detail.closeTime }}</a-descriptions-item>
-          </a-descriptions>
-        </a-card>
+      <view class="cps-detail-layout">
+        <!-- 左列：基础信息 + 照片 + AI -->
+        <view class="cps-col-main">
+          <view class="u-card u-card--pad-none cps-card">
+            <view class="cps-card__head">
+              <view class="cps-card-title">
+                <text class="cps-card-title__main">处理责任</text>
+              </view>
+            </view>
+            <view class="cps-card__body">
+              <view class="u-desc">
+                <view class="u-desc__row">
+                  <text class="u-desc__label">提交人</text>
+                  <text class="u-desc__value">{{ detail.creatorEmpNo || '-' }}</text>
+                </view>
+                <view class="u-desc__row">
+                  <text class="u-desc__label">当前处理人</text>
+                  <text class="u-desc__value">{{ detail.currentHandlerEmpName || detail.currentHandlerEmpNo || '-' }}</text>
+                </view>
+                <view class="u-desc__row">
+                  <text class="u-desc__label">反馈人</text>
+                  <text class="u-desc__value">{{ detail.feedbackEmpNo || '-' }}</text>
+                </view>
+                <view class="u-desc__row">
+                  <text class="u-desc__label">责任人</text>
+                  <text class="u-desc__value">{{ detail.responsibleEmpNo || '-' }}</text>
+                </view>
+                <view class="u-desc__row">
+                  <text class="u-desc__label">上传人</text>
+                  <text class="u-desc__value">{{ detail.proofEmpNo || '-' }}</text>
+                </view>
+                <view class="u-desc__row">
+                  <text class="u-desc__label">审核人</text>
+                  <text class="u-desc__value">{{ detail.reviewerEmpNo || '-' }}</text>
+                </view>
+                <view class="u-desc__row">
+                  <text class="u-desc__label">资源号</text>
+                  <text class="u-desc__value">{{ detail.resourceNo || '-' }}</text>
+                </view>
+                <view v-if="detail.inspectionTypeCode" class="u-desc__row">
+                  <text class="u-desc__label">巡检类型</text>
+                  <view class="u-desc__value">
+                    <text class="u-tag u-tag--blue">{{ detail.inspectionTypeCode }}</text>
+                  </view>
+                </view>
+                <view class="u-desc__row">
+                  <text class="u-desc__label">提交时间</text>
+                  <text class="u-desc__value">{{ detail.submitTime || '-' }}</text>
+                </view>
+                <view v-if="detail.closeTime" class="u-desc__row">
+                  <text class="u-desc__label">关闭时间</text>
+                  <text class="u-desc__value">{{ detail.closeTime }}</text>
+                </view>
+              </view>
+            </view>
+          </view>
 
-        <a-card class="cps-card" :body-style="{ padding: '16px' }" style="margin-top: 16px">
-          <template #title>
-            <div class="cps-card-title">
-              <h2 class="cps-card-title__main">问题现场</h2>
-              <a-tag color="blue">{{ detail.issueAttachments.length }} 张</a-tag>
-            </div>
-          </template>
-          <div v-if="detail.issueAttachments.length" class="cps-photo-grid">
-            <div
-              v-for="(image, index) in detail.issueAttachments"
-              :key="image.id"
-              class="cps-photo-tile"
-              :class="{ 'cps-photo-tile--lead': detail.issueAttachments.length > 1 && index === 0 }"
-              @click="previewAttachments(detail.issueAttachments, index)"
-            >
-              <img :src="attachmentImageSources[image.id] || ''" :alt="image.fileName" />
-              <span>{{ index + 1 }}/{{ detail.issueAttachments.length }}</span>
-            </div>
-          </div>
-          <a-empty v-else description="当前问题还没有现场照片" />
-        </a-card>
+          <view class="u-card u-card--pad-none cps-card">
+            <view class="cps-card__head">
+              <view class="cps-card-title">
+                <text class="cps-card-title__main">问题现场</text>
+                <text class="u-tag u-tag--blue">{{ detail.issueAttachments.length }} 张</text>
+              </view>
+            </view>
+            <view class="cps-card__body">
+              <view v-if="detail.issueAttachments.length" class="cps-photo-grid">
+                <view
+                  v-for="(image, index) in detail.issueAttachments"
+                  :key="image.id"
+                  class="cps-photo-tile"
+                  :class="{ 'cps-photo-tile--lead': detail.issueAttachments.length > 1 && index === 0 }"
+                  hover-class="u-tap"
+                  @click="previewAttachments(detail.issueAttachments, index)"
+                >
+                  <image class="cps-photo-tile__img" mode="aspectFill" :src="attachmentImageSources[image.id] || ''" />
+                  <text class="cps-photo-tile__index">{{ index + 1 }}/{{ detail.issueAttachments.length }}</text>
+                </view>
+              </view>
+              <view v-else class="u-empty">
+                <text class="u-empty__icon">📭</text>
+                <text class="u-empty__text">当前问题还没有现场照片</text>
+              </view>
+            </view>
+          </view>
 
-        <a-card class="cps-card" :body-style="{ padding: '16px' }" style="margin-top: 16px">
-          <template #title>
-            <div class="cps-card-title">
-              <h2 class="cps-card-title__main">复核照片</h2>
-              <a-tag color="green">{{ detail.proofAttachments.length }} 张</a-tag>
-            </div>
-          </template>
-          <div v-if="detail.proofAttachments.length" class="cps-photo-grid">
-            <div
-              v-for="(image, index) in detail.proofAttachments"
-              :key="image.id"
-              class="cps-photo-tile"
-              @click="previewAttachments(detail.proofAttachments, index)"
-            >
-              <img :src="attachmentImageSources[image.id] || ''" :alt="image.fileName" />
-              <span>{{ index + 1 }}/{{ detail.proofAttachments.length }}</span>
-            </div>
-          </div>
-          <a-empty v-else :description="proofEmptyText" />
-        </a-card>
+          <view class="u-card u-card--pad-none cps-card">
+            <view class="cps-card__head">
+              <view class="cps-card-title">
+                <text class="cps-card-title__main">复核照片</text>
+                <text class="u-tag u-tag--green">{{ detail.proofAttachments.length }} 张</text>
+              </view>
+            </view>
+            <view class="cps-card__body">
+              <view v-if="detail.proofAttachments.length" class="cps-photo-grid">
+                <view
+                  v-for="(image, index) in detail.proofAttachments"
+                  :key="image.id"
+                  class="cps-photo-tile"
+                  hover-class="u-tap"
+                  @click="previewAttachments(detail.proofAttachments, index)"
+                >
+                  <image class="cps-photo-tile__img" mode="aspectFill" :src="attachmentImageSources[image.id] || ''" />
+                  <text class="cps-photo-tile__index">{{ index + 1 }}/{{ detail.proofAttachments.length }}</text>
+                </view>
+              </view>
+              <view v-else class="u-empty">
+                <text class="u-empty__icon">📭</text>
+                <text class="u-empty__text">{{ proofEmptyText }}</text>
+              </view>
+            </view>
+          </view>
 
-        <a-card class="cps-card" :body-style="{ padding: '16px' }" style="margin-top: 16px">
-          <template #title>
-            <div class="cps-card-title">
-              <h2 class="cps-card-title__main">原因措施</h2>
-            </div>
-          </template>
-          <div class="cps-ai-grid">
-            <div class="cps-ai-item">
-              <span class="cps-ai-item__label">AI 分类</span>
-              <strong class="cps-ai-item__value">{{ aiCategory }}</strong>
-            </div>
-            <div class="cps-ai-item">
-              <span class="cps-ai-item__label">人工分类</span>
-              <strong class="cps-ai-item__value">{{ issueCategory }}</strong>
-            </div>
-            <div class="cps-ai-item">
-              <span class="cps-ai-item__label">AI 原因</span>
-              <p class="cps-ai-item__text">{{ detail.aiSuggestion?.reasonSuggestion || '-' }}</p>
-            </div>
-            <div class="cps-ai-item">
-              <span class="cps-ai-item__label">AI 措施</span>
-              <p class="cps-ai-item__text">{{ detail.aiSuggestion?.measureSuggestion || '-' }}</p>
-            </div>
-            <div class="cps-ai-item">
-              <span class="cps-ai-item__label">人工原因</span>
-              <p class="cps-ai-item__text">{{ detail.reasonAnalysis || '-' }}</p>
-            </div>
-            <div class="cps-ai-item">
-              <span class="cps-ai-item__label">人工措施</span>
-              <p class="cps-ai-item__text">{{ detail.correctiveMeasure || '-' }}</p>
-            </div>
-          </div>
-        </a-card>
-      </a-col>
+          <view class="u-card u-card--pad-none cps-card">
+            <view class="cps-card__head">
+              <view class="cps-card-title">
+                <text class="cps-card-title__main">原因措施</text>
+              </view>
+            </view>
+            <view class="cps-card__body">
+              <view class="cps-ai-grid">
+                <view class="cps-ai-item">
+                  <text class="cps-ai-item__label">AI 分类</text>
+                  <text class="cps-ai-item__value">{{ aiCategory }}</text>
+                </view>
+                <view class="cps-ai-item">
+                  <text class="cps-ai-item__label">人工分类</text>
+                  <text class="cps-ai-item__value">{{ issueCategory }}</text>
+                </view>
+                <view class="cps-ai-item">
+                  <text class="cps-ai-item__label">AI 原因</text>
+                  <text class="cps-ai-item__text">{{ detail.aiSuggestion?.reasonSuggestion || '-' }}</text>
+                </view>
+                <view class="cps-ai-item">
+                  <text class="cps-ai-item__label">AI 措施</text>
+                  <text class="cps-ai-item__text">{{ detail.aiSuggestion?.measureSuggestion || '-' }}</text>
+                </view>
+                <view class="cps-ai-item">
+                  <text class="cps-ai-item__label">人工原因</text>
+                  <text class="cps-ai-item__text">{{ detail.reasonAnalysis || '-' }}</text>
+                </view>
+                <view class="cps-ai-item">
+                  <text class="cps-ai-item__label">人工措施</text>
+                  <text class="cps-ai-item__text">{{ detail.correctiveMeasure || '-' }}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
 
-      <!-- 右列：节点处理 + 流转记录（横屏并排，竖屏置顶） -->
-      <a-col :xs="{ span: 24 }" :xl="{ span: 10 }" class="cps-col-action">
-        <a-card class="cps-card" :body-style="{ padding: '16px' }">
-          <template #title>
-            <div class="cps-card-title">
-              <h2 class="cps-card-title__main">当前操作</h2>
-              <div v-if="transferAvailable" class="cps-mode-switch">
-                <span class="cps-mode-switch__label" :class="{ 'is-on': transferMode }">转办</span>
-                <a-switch v-model:checked="transferMode" size="small" />
-              </div>
-            </div>
-          </template>
+        <!-- 右列：节点处理 + 流转记录（横屏并排，竖屏置顶） -->
+        <view class="cps-col-action">
+          <view class="u-card u-card--pad-none cps-card">
+            <view class="cps-card__head">
+              <view class="cps-card-title">
+                <text class="cps-card-title__main">当前操作</text>
+                <view v-if="transferAvailable" class="cps-mode-switch">
+                  <text class="cps-mode-switch__label" :class="{ 'is-on': transferMode }">转办</text>
+                  <switch :checked="transferMode" color="#14b8a6" @change="(e: any) => (transferMode = Boolean(e.detail.value))" />
+                </view>
+              </view>
+            </view>
 
-          <!-- 转办模式：只填转办目标，常规处理输入全部隐藏 -->
-          <template v-if="transferMode">
-            <div class="cps-mode-hint">
-              <strong>转交给他人处理</strong>
-              <span>当前节点将直接转交，无需填写常规处理内容</span>
-            </div>
-            <a-form layout="vertical">
-              <a-form-item label="转办目标" required>
-                <a-input :value="personLabel(actionForm.targetEmpNo)" placeholder="选择转办目标" read-only @click="openPersonPicker('targetEmpNo', '选择转办目标')">
-                  <template #suffix><UserOutlined /></template>
-                </a-input>
-              </a-form-item>
-              <a-form-item label="转办说明">
-                <a-textarea v-model:value="actionForm.comment" :rows="3" placeholder="说明转办原因，便于接收人跟进" />
-              </a-form-item>
-            </a-form>
-            <div class="cps-actions">
-              <a-button block size="large" type="primary" class="cps-actions__btn" :loading="actionLoading === 'TRANSFER'" @click="runAction('TRANSFER')">确认转办</a-button>
-              <a-button block size="large" class="cps-actions__btn" :disabled="actionLoading === 'TRANSFER'" @click="cancelTransfer">取消</a-button>
-            </div>
-          </template>
-
-          <!-- 常规模式：按节点填写 -->
-          <template v-else>
-            <a-form v-if="showAnyActionFields && normalActions.length" layout="vertical">
-              <template v-if="showFeedbackFields">
-                <!-- 第二流程：反馈人员确认/修正问题分类（默认填入 AI 分类） -->
-                <a-form-item label="问题分类（一级）">
-                  <a-radio-group :value="actionForm.categoryL1Id ?? undefined" button-style="solid" class="cps-selector-group" @change="(e: any) => onSelectCategoryL1(Number(e.target.value))">
-                    <a-radio-button v-for="item in level1Categories" :key="item.value" :value="Number(item.value)">{{ item.label }}</a-radio-button>
-                  </a-radio-group>
-                  <span v-if="!level1Categories.length" class="cps-muted">暂无一级分类</span>
-                  <div class="cps-default-hint">默认采用 AI 识别分类，可确认或修正</div>
-                </a-form-item>
-                <a-form-item label="问题分类（二级）">
-                  <a-radio-group :value="actionForm.categoryL2Id ?? undefined" button-style="solid" class="cps-selector-group" @change="(e: any) => onSelectCategoryL2(Number(e.target.value))">
-                    <a-radio-button v-for="item in level2Categories" :key="item.value" :value="Number(item.value)">{{ item.label }}</a-radio-button>
-                  </a-radio-group>
-                  <span v-if="!level2Categories.length" class="cps-muted">先选择一级分类</span>
-                </a-form-item>
-                <!-- v2 的原因/措施在「提交整改」时填写，反馈节点只做指派 -->
-                <template v-if="!isV2Flow">
-                  <a-form-item label="原因分析">
-                    <a-textarea v-model:value="actionForm.reasonAnalysis" :rows="3" placeholder="填写原因分析" />
-                  </a-form-item>
-                  <a-form-item label="整改措施">
-                    <a-textarea v-model:value="actionForm.correctiveMeasure" :rows="3" placeholder="填写整改措施" />
-                  </a-form-item>
-                </template>
-                <a-form-item label="责任员工">
-                  <a-input :value="personLabel(actionForm.responsibleEmpNo)" placeholder="选择责任员工" read-only @click="openPersonPicker('responsibleEmpNo', '选择责任员工')">
-                    <template #suffix><UserOutlined /></template>
-                  </a-input>
-                  <div v-if="defaultPersonHint('responsibleEmpNo')" class="cps-default-hint">已默认填入上一节点操作者，可修改</div>
-                </a-form-item>
+            <view class="cps-card__body">
+              <!-- 转办模式：只填转办目标，常规处理输入全部隐藏 -->
+              <template v-if="transferMode">
+                <view class="cps-mode-hint">
+                  <text class="cps-mode-hint__title">转交给他人处理</text>
+                  <text class="cps-mode-hint__text">当前节点将直接转交，无需填写常规处理内容</text>
+                </view>
+                <view class="cps-form">
+                  <view class="u-field">
+                    <text class="u-field__label">转办目标<text class="u-field__req">*</text></text>
+                    <view class="u-field__control">
+                      <view class="u-input cps-input-trigger" hover-class="u-tap" @click="openPersonPicker('targetEmpNo', '选择转办目标')">
+                        <text class="cps-input-trigger__text" :class="{ 'cps-input-trigger__text--placeholder': !actionForm.targetEmpNo }">{{ personLabel(actionForm.targetEmpNo) || '选择转办目标' }}</text>
+                        <text class="cps-input-trigger__icon">👤</text>
+                      </view>
+                    </view>
+                  </view>
+                  <view class="u-field">
+                    <text class="u-field__label">转办说明</text>
+                    <view class="u-field__control">
+                      <textarea v-model="actionForm.comment" class="u-textarea" :maxlength="-1" auto-height placeholder="说明转办原因，便于接收人跟进" />
+                    </view>
+                  </view>
+                </view>
+                <view class="cps-actions">
+                  <button class="u-btn u-btn--primary u-btn--block cps-actions__btn" :disabled="actionLoading === 'TRANSFER'" @click="runAction('TRANSFER')">确认转办</button>
+                  <button class="u-btn u-btn--block cps-actions__btn" :disabled="actionLoading === 'TRANSFER'" @click="cancelTransfer">取消</button>
+                </view>
               </template>
 
-              <!-- v2：待整改节点直接提交整改（原因 + 短期/长期措施 + 责任员工 + 复核照片） -->
-              <template v-if="showRectifyV2Fields">
-                <a-form-item label="原因分析" required>
-                  <a-textarea v-model:value="actionForm.reasonAnalysis" :rows="3" placeholder="填写问题原因" />
-                </a-form-item>
-                <a-form-item label="短期措施" required>
-                  <a-textarea v-model:value="actionForm.shortTermMeasure" :rows="3" placeholder="立即执行的整改措施" />
-                </a-form-item>
-                <a-form-item label="长期措施" required>
-                  <a-textarea v-model:value="actionForm.longTermMeasure" :rows="3" placeholder="防止再发的长期措施" />
-                </a-form-item>
-                <a-form-item label="责任员工" required>
-                  <a-input :value="personLabel(actionForm.responsibleEmpNo)" placeholder="选择责任员工" read-only @click="openPersonPicker('responsibleEmpNo', '选择责任员工')">
-                    <template #suffix><UserOutlined /></template>
-                  </a-input>
-                  <div v-if="defaultPersonHint('responsibleEmpNo')" class="cps-default-hint">已默认填入上一节点操作者，可修改</div>
-                </a-form-item>
-                <a-form-item label="复核照片" required>
-                  <a-upload list-type="picture-card" :file-list="proofFileList" :max-count="5" :custom-request="customProofRequest" :before-upload="beforeProofUpload" :show-upload-list="false" multiple accept="image/*">
-                    <div v-if="proofImages.length < 5" class="cps-uploader__trigger">
-                      <span class="cps-uploader__plus">+</span>
-                      <span class="cps-uploader__text">{{ proofUploading ? '上传中' : '上传整改照片' }}</span>
-                    </div>
-                  </a-upload>
-                  <div class="cps-uploader__grid">
-                    <div v-for="(image, index) in proofImages" :key="image.id" class="cps-uploader__item" @click="previewProofImage(index)">
-                      <img :src="attachmentImageSources[image.id] || ''" :alt="image.name" />
-                      <span v-if="!proofUploading" class="cps-uploader__delete" @click.stop="removeProofImage(index)">×</span>
-                      <span class="cps-uploader__index">{{ index + 1 }}</span>
-                    </div>
-                  </div>
-                  <p class="cps-uploader__hint">至少 1 张、最多 5 张；提交整改后版本锁定</p>
-                </a-form-item>
+              <!-- 常规模式：按节点填写 -->
+              <template v-else>
+                <view v-if="showAnyActionFields && normalActions.length" class="cps-form">
+                  <template v-if="showFeedbackFields">
+                    <!-- 第二流程：反馈人员确认/修正问题分类（默认填入 AI 分类） -->
+                    <view class="u-field">
+                      <text class="u-field__label">问题分类（一级）</text>
+                      <view class="u-field__control">
+                        <view class="u-seg cps-selector-group">
+                          <view
+                            v-for="item in level1Categories"
+                            :key="item.value"
+                            class="u-seg__item"
+                            :class="{ 'u-seg__item--active': actionForm.categoryL1Id === Number(item.value) }"
+                            @click="onSelectCategoryL1(Number(item.value))"
+                          >
+                            <text>{{ item.label }}</text>
+                          </view>
+                        </view>
+                        <text v-if="!level1Categories.length" class="cps-muted">暂无一级分类</text>
+                        <text class="cps-default-hint">默认采用 AI 识别分类，可确认或修正</text>
+                      </view>
+                    </view>
+                    <view class="u-field">
+                      <text class="u-field__label">问题分类（二级）</text>
+                      <view class="u-field__control">
+                        <view class="u-seg cps-selector-group">
+                          <view
+                            v-for="item in level2Categories"
+                            :key="item.value"
+                            class="u-seg__item"
+                            :class="{ 'u-seg__item--active': actionForm.categoryL2Id === Number(item.value) }"
+                            @click="onSelectCategoryL2(Number(item.value))"
+                          >
+                            <text>{{ item.label }}</text>
+                          </view>
+                        </view>
+                        <text v-if="!level2Categories.length" class="cps-muted">先选择一级分类</text>
+                      </view>
+                    </view>
+                    <!-- v2 的原因/措施在「提交整改」时填写，反馈节点只做指派 -->
+                    <template v-if="!isV2Flow">
+                      <view class="u-field">
+                        <text class="u-field__label">原因分析</text>
+                        <view class="u-field__control">
+                          <textarea v-model="actionForm.reasonAnalysis" class="u-textarea" :maxlength="-1" auto-height placeholder="填写原因分析" />
+                        </view>
+                      </view>
+                      <view class="u-field">
+                        <text class="u-field__label">整改措施</text>
+                        <view class="u-field__control">
+                          <textarea v-model="actionForm.correctiveMeasure" class="u-textarea" :maxlength="-1" auto-height placeholder="填写整改措施" />
+                        </view>
+                      </view>
+                    </template>
+                    <view class="u-field">
+                      <text class="u-field__label">责任员工</text>
+                      <view class="u-field__control">
+                        <view class="u-input cps-input-trigger" hover-class="u-tap" @click="openPersonPicker('responsibleEmpNo', '选择责任员工')">
+                          <text class="cps-input-trigger__text" :class="{ 'cps-input-trigger__text--placeholder': !actionForm.responsibleEmpNo }">{{ personLabel(actionForm.responsibleEmpNo) || '选择责任员工' }}</text>
+                          <text class="cps-input-trigger__icon">👤</text>
+                        </view>
+                        <text v-if="defaultPersonHint('responsibleEmpNo')" class="cps-default-hint">已默认填入上一节点操作者，可修改</text>
+                      </view>
+                    </view>
+                  </template>
+
+                  <!-- v2：待整改节点直接提交整改（原因 + 短期/长期措施 + 责任员工 + 复核照片） -->
+                  <template v-if="showRectifyV2Fields">
+                    <view class="u-field">
+                      <text class="u-field__label">原因分析<text class="u-field__req">*</text></text>
+                      <view class="u-field__control">
+                        <textarea v-model="actionForm.reasonAnalysis" class="u-textarea" :maxlength="-1" auto-height placeholder="填写问题原因" />
+                      </view>
+                    </view>
+                    <view class="u-field">
+                      <text class="u-field__label">短期措施<text class="u-field__req">*</text></text>
+                      <view class="u-field__control">
+                        <textarea v-model="actionForm.shortTermMeasure" class="u-textarea" :maxlength="-1" auto-height placeholder="立即执行的整改措施" />
+                      </view>
+                    </view>
+                    <view class="u-field">
+                      <text class="u-field__label">长期措施<text class="u-field__req">*</text></text>
+                      <view class="u-field__control">
+                        <textarea v-model="actionForm.longTermMeasure" class="u-textarea" :maxlength="-1" auto-height placeholder="防止再发的长期措施" />
+                      </view>
+                    </view>
+                    <view class="u-field">
+                      <text class="u-field__label">责任员工<text class="u-field__req">*</text></text>
+                      <view class="u-field__control">
+                        <view class="u-input cps-input-trigger" hover-class="u-tap" @click="openPersonPicker('responsibleEmpNo', '选择责任员工')">
+                          <text class="cps-input-trigger__text" :class="{ 'cps-input-trigger__text--placeholder': !actionForm.responsibleEmpNo }">{{ personLabel(actionForm.responsibleEmpNo) || '选择责任员工' }}</text>
+                          <text class="cps-input-trigger__icon">👤</text>
+                        </view>
+                        <text v-if="defaultPersonHint('responsibleEmpNo')" class="cps-default-hint">已默认填入上一节点操作者，可修改</text>
+                      </view>
+                    </view>
+                    <view class="u-field">
+                      <text class="u-field__label">复核照片<text class="u-field__req">*</text></text>
+                      <view class="u-field__control">
+                        <view class="cps-uploader">
+                          <view v-if="proofImages.length < 5" class="cps-uploader__trigger" hover-class="u-tap" @click="chooseProofImages">
+                            <text class="cps-uploader__plus">+</text>
+                            <text class="cps-uploader__text">{{ proofUploading ? '上传中' : '上传整改照片' }}</text>
+                          </view>
+                          <view class="cps-uploader__grid">
+                            <view
+                              v-for="(image, index) in proofImages"
+                              :key="image.id"
+                              class="cps-uploader__item"
+                              hover-class="u-tap"
+                              @click="previewProofImage(index)"
+                            >
+                              <image class="cps-uploader__img" mode="aspectFill" :src="attachmentImageSources[image.id] || ''" />
+                              <text v-if="!proofUploading" class="cps-uploader__delete" @click.stop="removeProofImage(index)">×</text>
+                              <text class="cps-uploader__index">{{ index + 1 }}</text>
+                            </view>
+                          </view>
+                        </view>
+                        <text class="cps-uploader__hint">至少 1 张、最多 5 张；提交整改后版本锁定</text>
+                      </view>
+                    </view>
+                  </template>
+
+                  <template v-if="showRectifyFields">
+                    <view class="u-field">
+                      <text class="u-field__label">整改说明</text>
+                      <view class="u-field__control">
+                        <textarea v-model="actionForm.rectifyRemark" class="u-textarea" :maxlength="-1" auto-height placeholder="填写整改说明" />
+                      </view>
+                    </view>
+                    <view class="u-field">
+                      <text class="u-field__label">上传人</text>
+                      <view class="u-field__control">
+                        <view class="u-input cps-input-trigger" hover-class="u-tap" @click="openPersonPicker('proofEmpNo', '选择上传人')">
+                          <text class="cps-input-trigger__text" :class="{ 'cps-input-trigger__text--placeholder': !actionForm.proofEmpNo }">{{ personLabel(actionForm.proofEmpNo) || '选择上传人' }}</text>
+                          <text class="cps-input-trigger__icon">👤</text>
+                        </view>
+                        <text v-if="defaultPersonHint('proofEmpNo')" class="cps-default-hint">已默认填入上一节点操作者，可修改</text>
+                      </view>
+                    </view>
+                  </template>
+
+                  <template v-if="showProofFields">
+                    <view class="u-field">
+                      <text class="u-field__label">审核人</text>
+                      <view class="u-field__control">
+                        <view class="u-input cps-input-trigger" hover-class="u-tap" @click="openPersonPicker('reviewerEmpNo', '选择审核人')">
+                          <text class="cps-input-trigger__text" :class="{ 'cps-input-trigger__text--placeholder': !actionForm.reviewerEmpNo }">{{ personLabel(actionForm.reviewerEmpNo) || '选择审核人' }}</text>
+                          <text class="cps-input-trigger__icon">👤</text>
+                        </view>
+                      </view>
+                    </view>
+                    <view class="u-field">
+                      <text class="u-field__label">复核照片</text>
+                      <view class="u-field__control">
+                        <!-- 复核照片（整改凭证）上传：仅「待传图」节点可用，最多 5 张 -->
+                        <view class="cps-uploader">
+                          <view v-if="proofImages.length < 5" class="cps-uploader__trigger" hover-class="u-tap" @click="chooseProofImages">
+                            <text class="cps-uploader__plus">+</text>
+                            <text class="cps-uploader__text">{{ proofUploading ? '上传中' : '上传整改图片' }}</text>
+                          </view>
+                          <view class="cps-uploader__grid">
+                            <view
+                              v-for="(image, index) in proofImages"
+                              :key="image.id"
+                              class="cps-uploader__item"
+                              hover-class="u-tap"
+                              @click="previewProofImage(index)"
+                            >
+                              <image class="cps-uploader__img" mode="aspectFill" :src="attachmentImageSources[image.id] || ''" />
+                              <text v-if="!proofUploading" class="cps-uploader__delete" @click.stop="removeProofImage(index)">×</text>
+                              <text class="cps-uploader__index">{{ index + 1 }}</text>
+                            </view>
+                          </view>
+                        </view>
+                        <text class="cps-uploader__hint">最多上传 5 张</text>
+                      </view>
+                    </view>
+                  </template>
+
+                  <template v-if="showReviewFields">
+                    <view class="u-field">
+                      <text class="u-field__label">审核意见</text>
+                      <view class="u-field__control">
+                        <textarea v-model="actionForm.reviewOpinion" class="u-textarea" :maxlength="-1" auto-height placeholder="填写审核意见" />
+                      </view>
+                    </view>
+                  </template>
+
+                  <view class="u-field">
+                    <text class="u-field__label">流转备注</text>
+                    <view class="u-field__control">
+                      <textarea v-model="actionForm.comment" class="u-textarea" :maxlength="-1" auto-height placeholder="填写备注" />
+                    </view>
+                  </view>
+                </view>
+
+                <view v-if="!normalActions.length" class="u-empty">
+                  <text class="u-empty__icon">📭</text>
+                  <text class="u-empty__text">{{ noActionText }}</text>
+                </view>
+                <view v-else class="cps-actions">
+                  <button
+                    v-for="action in normalActions"
+                    :key="action"
+                    class="u-btn u-btn--block cps-actions__btn"
+                    :class="{
+                      'u-btn--primary': action === 'REVIEW_CLOSE' || action === 'SUBMIT_RECTIFICATION' || normalActions.length === 1,
+                      'cps-actions__btn--success': action === 'REVIEW_CLOSE',
+                      'cps-actions__btn--danger': action === 'REVIEW_REJECT',
+                    }"
+                    :disabled="actionLoading === action"
+                    @click="runAction(action)"
+                  >
+                    {{ actionLabels[action] }}
+                  </button>
+                </view>
+                <text v-if="transferAvailable" class="cps-action-tip">需要转交他人处理？打开右上角「转办」开关</text>
               </template>
+            </view>
+          </view>
 
-              <template v-if="showRectifyFields">
-                <a-form-item label="整改说明">
-                  <a-textarea v-model:value="actionForm.rectifyRemark" :rows="3" placeholder="填写整改说明" />
-                </a-form-item>
-                <a-form-item label="上传人">
-                  <a-input :value="personLabel(actionForm.proofEmpNo)" placeholder="选择上传人" read-only @click="openPersonPicker('proofEmpNo', '选择上传人')">
-                    <template #suffix><UserOutlined /></template>
-                  </a-input>
-                  <div v-if="defaultPersonHint('proofEmpNo')" class="cps-default-hint">已默认填入上一节点操作者，可修改</div>
-                </a-form-item>
-              </template>
+          <view class="u-card u-card--pad-none cps-card">
+            <view class="cps-card__head">
+              <view class="cps-card-title">
+                <text class="cps-card-title__main">处理轨迹</text>
+              </view>
+            </view>
+            <view class="cps-card__body">
+              <!-- 流程时间线（内联） -->
+              <view v-if="!detail.flowLogs.length" class="u-empty">
+                <text class="u-empty__icon">📭</text>
+                <text class="u-empty__text">暂无流转记录</text>
+              </view>
+              <view v-else class="u-timeline cps-flow">
+                <view
+                  v-for="(log, index) in detail.flowLogs"
+                  :key="`${log.action}-${log.createdAt}-${index}`"
+                  class="u-timeline__item cps-flow__item"
+                  :class="{ 'u-timeline__item--last': index === detail.flowLogs.length - 1 }"
+                >
+                  <view
+                    class="u-timeline__dot cps-flow__dot"
+                    :class="{ 'is-last': index === detail.flowLogs.length - 1 }"
+                  />
+                  <view class="u-timeline__body">
+                    <view class="u-timeline__head cps-flow__head">
+                      <text class="u-timeline__title cps-flow__title">{{ flowActionLabel(log.action) }}</text>
+                      <text class="u-timeline__time cps-flow__time">{{ log.createdAt }}</text>
+                    </view>
+                    <text class="u-timeline__desc cps-flow__line">{{ flowStatusLabel(log.fromStatus) }} 至 {{ flowStatusLabel(log.toStatus) }}</text>
+                    <text class="u-timeline__desc cps-flow__line">操作人：{{ log.operatorEmpNo }}</text>
+                    <text v-if="log.comment" class="u-timeline__desc cps-flow__comment">{{ log.comment }}</text>
+                  </view>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
 
-              <template v-if="showProofFields">
-                <a-form-item label="审核人">
-                  <a-input :value="personLabel(actionForm.reviewerEmpNo)" placeholder="选择审核人" read-only @click="openPersonPicker('reviewerEmpNo', '选择审核人')">
-                    <template #suffix><UserOutlined /></template>
-                  </a-input>
-                </a-form-item>
-                <a-form-item label="复核照片">
-                  <!-- 复核照片（整改凭证）上传：仅「待传图」节点可用，最多 5 张 -->
-                  <a-upload list-type="picture-card" :file-list="proofFileList" :max-count="5" :custom-request="customProofRequest" :before-upload="beforeProofUpload" :show-upload-list="false" multiple accept="image/*">
-                    <div v-if="proofImages.length < 5" class="cps-uploader__trigger">
-                      <span class="cps-uploader__plus">+</span>
-                      <span class="cps-uploader__text">{{ proofUploading ? '上传中' : '上传整改图片' }}</span>
-                    </div>
-                  </a-upload>
-                  <div class="cps-uploader__grid">
-                    <div v-for="(image, index) in proofImages" :key="image.id" class="cps-uploader__item" @click="previewProofImage(index)">
-                      <img :src="attachmentImageSources[image.id] || ''" :alt="image.name" />
-                      <span v-if="!proofUploading" class="cps-uploader__delete" @click.stop="removeProofImage(index)">×</span>
-                      <span class="cps-uploader__index">{{ index + 1 }}</span>
-                    </div>
-                  </div>
-                  <p class="cps-uploader__hint">最多上传 5 张</p>
-                </a-form-item>
-              </template>
+    <view v-else class="cps-page">
+      <view class="u-loading cps-page-loading">
+        <view class="u-loading__dot" />
+        <text class="u-loading__text">加载中…</text>
+      </view>
+    </view>
 
-              <template v-if="showReviewFields">
-                <a-form-item label="审核意见">
-                  <a-textarea v-model:value="actionForm.reviewOpinion" :rows="3" placeholder="填写审核意见" />
-                </a-form-item>
-              </template>
-
-              <a-form-item label="流转备注">
-                <a-textarea v-model:value="actionForm.comment" :rows="2" placeholder="填写备注" />
-              </a-form-item>
-            </a-form>
-
-            <a-empty v-if="!normalActions.length" :description="noActionText" />
-            <div v-else class="cps-actions">
-              <a-button
-                v-for="action in normalActions"
-                :key="action"
-                block
-                size="large"
-                :type="action === 'REVIEW_CLOSE' || action === 'SUBMIT_RECTIFICATION' || normalActions.length === 1 ? 'primary' : 'default'"
-                :danger="action === 'REVIEW_REJECT'"
-                class="cps-actions__btn"
-                :class="{ 'cps-actions__btn--success': action === 'REVIEW_CLOSE', 'cps-actions__btn--danger': action === 'REVIEW_REJECT' }"
-                :loading="actionLoading === action"
-                @click="runAction(action)"
+    <!-- 人员选择弹窗（内联） -->
+    <view v-if="personPickerOpen" class="u-modal-mask" @click.self="personPickerOpen = false">
+      <view class="u-modal cps-person-picker" :class="{ 'cps-person-picker--wide': isLandscape }">
+        <view class="u-modal__head cps-person-picker__head">
+          <text class="cps-person-picker__title">{{ personPickerTitle }}</text>
+          <text class="cps-person-picker__close" hover-class="u-tap" @click="personPickerOpen = false">×</text>
+        </view>
+        <view class="u-modal__body">
+          <view class="u-search cps-person-picker__search">
+            <input
+              v-model="personKeyword"
+              class="u-search__input"
+              :maxlength="-1"
+              placeholder="输入姓名或工号搜索"
+              confirm-type="search"
+              @confirm="onSearchPeople"
+            />
+            <button class="u-search__btn" :disabled="personSearching" @click="onSearchPeople">搜索</button>
+          </view>
+          <view v-if="personSearching" class="u-loading">
+            <view class="u-loading__dot" />
+            <text class="u-loading__text">搜索中…</text>
+          </view>
+          <view class="cps-person-picker__body">
+            <view v-if="!pickerPeople.length" class="u-empty">
+              <text class="u-empty__icon">📭</text>
+              <text class="u-empty__text">未找到人员，请调整关键词后搜索</text>
+            </view>
+            <view class="cps-person-picker__group">
+              <view
+                v-for="person in pickerPeople"
+                :key="person.empNo"
+                class="cps-person-picker__option"
+                :class="{ 'cps-person-picker__option--active': actionForm[personPickerField] === person.empNo }"
+                hover-class="u-tap"
+                @click="onSelectPerson(person.empNo)"
               >
-                {{ actionLabels[action] }}
-              </a-button>
-            </div>
-            <p v-if="transferAvailable" class="cps-action-tip">需要转交他人处理？打开右上角「转办」开关</p>
-          </template>
-        </a-card>
-
-        <a-card class="cps-card" :body-style="{ padding: '16px' }" style="margin-top: 16px">
-          <template #title>
-            <div class="cps-card-title">
-              <h2 class="cps-card-title__main">处理轨迹</h2>
-            </div>
-          </template>
-          <!-- 流程时间线（内联） -->
-          <a-empty v-if="!detail.flowLogs.length" description="暂无流转记录" />
-          <a-timeline v-else>
-            <a-timeline-item v-for="(log, index) in detail.flowLogs" :key="`${log.action}-${log.createdAt}-${index}`" :color="index === detail.flowLogs.length - 1 ? 'blue' : 'cyan'">
-              <template #dot>
-                <span class="cps-flow__dot" :class="{ 'is-last': index === detail.flowLogs.length - 1 }" />
-              </template>
-              <div class="cps-flow__head">
-                <strong>{{ flowActionLabel(log.action) }}</strong>
-                <time>{{ log.createdAt }}</time>
-              </div>
-              <p class="cps-flow__line">{{ flowStatusLabel(log.fromStatus) }} 至 {{ flowStatusLabel(log.toStatus) }}</p>
-              <p class="cps-flow__line">操作人：{{ log.operatorEmpNo }}</p>
-              <p v-if="log.comment" class="cps-flow__comment">{{ log.comment }}</p>
-            </a-timeline-item>
-          </a-timeline>
-        </a-card>
-      </a-col>
-    </a-row>
-  </main>
-
-  <main v-else class="cps-page">
-    <a-spin class="cps-page-loading" />
-  </main>
-
-  <!-- 人员选择弹窗（内联） -->
-  <a-modal
-    :open="personPickerOpen"
-    :title="personPickerTitle"
-    :width="isLandscape ? 520 : '100%'"
-    :centered="isLandscape"
-    :footer="null"
-    :destroy-on-close="false"
-    @update:open="(v: boolean) => (personPickerOpen = v)"
-  >
-    <a-input-search
-      v-model:value="personKeyword"
-      placeholder="输入姓名或工号搜索"
-      allow-clear
-      enter-button="搜索"
-      :loading="personSearching"
-      class="cps-person-picker__search"
-      @search="onSearchPeople"
-    />
-    <a-spin :spinning="personSearching">
-      <div class="cps-person-picker__body">
-        <a-empty v-if="!pickerPeople.length" description="未找到人员，请调整关键词后搜索" />
-        <a-radio-group :value="actionForm[personPickerField]" class="cps-person-picker__group" @change="(e: any) => onSelectPerson(e.target.value)">
-          <a-radio v-for="person in pickerPeople" :key="person.empNo" :value="person.empNo" class="cps-person-picker__option">
-            <strong>{{ person.empName || person.empNo }}</strong>
-            <span>{{ person.empNo }}</span>
-          </a-radio>
-        </a-radio-group>
-      </div>
-    </a-spin>
-  </a-modal>
+                <text class="cps-person-picker__radio">{{ actionForm[personPickerField] === person.empNo ? '●' : '○' }}</text>
+                <view class="cps-person-picker__info">
+                  <text class="cps-person-picker__name">{{ person.empName || person.empNo }}</text>
+                  <text class="cps-person-picker__no">{{ person.empNo }}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { UserOutlined } from '@ant-design/icons-vue'
-import { message } from 'ant-design-vue'
-import type { UploadProps } from 'ant-design-vue'
 
 import { executeCpsIssueAction, getCpsIssueDetail } from '@/api/cps/issue'
 import { getCategories, searchCpsEmployees, type CpsEmployeeOption, type CpsOption } from '@/api/cps/master'
-import { uploadCpsAttachment } from '@/api/cps/attachment'
-import { loadAttachmentImageSources } from '@/utils/image'
+import { uploadCpsAttachment, type CpsAttachmentUploadSource } from '@/api/cps/attachment'
+import { loadAttachmentImageSources, resolveUploadSources } from '@/utils/image'
 import { statusMeta, issueLocation as formatLocation, issueCategory as formatCategory, personLabel as formatPersonLabel } from '@/utils/format'
 import { resolveDefaultPersons, type ActionPersonField } from '@/utils/personDefault'
 import type {
@@ -449,11 +619,15 @@ const actionForm = ref({
 
 const isLandscape = ref(false)
 const updateOrientation = () => {
-  isLandscape.value = typeof window !== 'undefined' && window.innerWidth >= 1200
+  if (typeof uni === 'undefined') return
+  isLandscape.value = uni.getSystemInfoSync().windowWidth >= 1200
 }
-if (typeof window !== 'undefined') {
+if (typeof uni !== 'undefined') {
   updateOrientation()
-  window.addEventListener('resize', updateOrientation)
+  uni.onWindowResize(updateOrientation)
+  onUnmounted(() => {
+    uni.offWindowResize(updateOrientation)
+  })
 }
 
 // 标签字典（内联）
@@ -600,15 +774,6 @@ const pickerPeople = computed<CpsEmployeeOption[]>(() => {
   }
   return knownPeople.value
 })
-
-const proofFileList = computed(() =>
-  proofImages.value.map((image) => ({
-    uid: String(image.id),
-    name: image.name,
-    status: 'done' as const,
-    url: attachmentImageSources.value[image.id],
-  })),
-)
 
 const personLabel = (empNo: string) => {
   if (!empNo) return ''
@@ -786,32 +951,32 @@ const buildActionPayload = (action: CpsIssueAction) => {
 const runAction = async (action: CpsIssueAction) => {
   if (actionLoading.value) return
   if (action === 'TRANSFER' && !actionForm.value.targetEmpNo) {
-    message.warning('请选择转办目标')
+    uni.showToast({ title: '请选择转办目标', icon: 'none' })
     return
   }
   if (action === 'REPLY_ASSIGN' && !actionForm.value.responsibleEmpNo) {
-    message.warning('请选择责任员工')
+    uni.showToast({ title: '请选择责任员工', icon: 'none' })
     return
   }
   if (action === 'UPLOAD_PROOF' && !proofImages.value.length) {
-    message.warning('请先上传至少 1 张复核照片')
+    uni.showToast({ title: '请先上传至少 1 张复核照片', icon: 'none' })
     return
   }
   // v2 提交整改：原因/短期措施/长期措施/责任员工/复核照片缺一不可
   if (action === 'SUBMIT_RECTIFICATION') {
-    if (!actionForm.value.reasonAnalysis.trim()) return void message.warning('请填写原因分析')
-    if (!actionForm.value.shortTermMeasure.trim()) return void message.warning('请填写短期措施')
-    if (!actionForm.value.longTermMeasure.trim()) return void message.warning('请填写长期措施')
-    if (!actionForm.value.responsibleEmpNo) return void message.warning('请选择责任员工')
-    if (!proofImages.value.length) return void message.warning('请先上传至少 1 张复核照片')
+    if (!actionForm.value.reasonAnalysis.trim()) return void uni.showToast({ title: '请填写原因分析', icon: 'none' })
+    if (!actionForm.value.shortTermMeasure.trim()) return void uni.showToast({ title: '请填写短期措施', icon: 'none' })
+    if (!actionForm.value.longTermMeasure.trim()) return void uni.showToast({ title: '请填写长期措施', icon: 'none' })
+    if (!actionForm.value.responsibleEmpNo) return void uni.showToast({ title: '请选择责任员工', icon: 'none' })
+    if (!proofImages.value.length) return void uni.showToast({ title: '请先上传至少 1 张复核照片', icon: 'none' })
   }
   actionLoading.value = action
   try {
     await executeCpsIssueAction(issueId.value, buildActionPayload(action))
-    message.success(action === 'TRANSFER' ? '已转办' : '操作成功')
+    uni.showToast({ title: action === 'TRANSFER' ? '已转办' : '操作成功', icon: 'success' })
     await load()
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '操作失败')
+    uni.showToast({ title: error instanceof Error ? error.message : '操作失败', icon: 'none' })
   } finally {
     actionLoading.value = null
   }
@@ -840,27 +1005,34 @@ const previewProofImage = (index: number) => {
 }
 
 // 整改照片上传（内联）
-const beforeProofUpload: UploadProps['beforeUpload'] = (_file, fileList) => {
-  const remaining = Math.max(5 - proofImages.value.length, 0)
-  if (fileList.length > remaining) return false
-  return true
-}
-
-const customProofRequest: UploadProps['customRequest'] = async (options) => {
-  const { file, onSuccess, onError } = options
+const uploadProofImages = async (sources: CpsAttachmentUploadSource[]) => {
+  if (!sources.length) return
   proofUploading.value = true
   try {
-    const uploaded = await uploadCpsAttachment(file as File)
-    proofImages.value = [...proofImages.value, uploaded]
-    // 同步加载预览源
-    const sources = await loadAttachmentImageSources([{ id: uploaded.id, fileUrl: uploaded.url, fileName: uploaded.name }])
-    attachmentImageSources.value = { ...attachmentImageSources.value, ...sources }
-    onSuccess?.({}, file as any)
+    for (const source of sources) {
+      const uploaded = await uploadCpsAttachment(source)
+      proofImages.value = [...proofImages.value, uploaded]
+      // 同步加载预览源
+      const previewSources = await loadAttachmentImageSources([{ id: uploaded.id, fileUrl: uploaded.url, fileName: uploaded.name }])
+      attachmentImageSources.value = { ...attachmentImageSources.value, ...previewSources }
+    }
   } catch (error) {
-    onError?.(error as any)
+    uni.showToast({ title: error instanceof Error ? error.message : '照片上传失败', icon: 'none' })
   } finally {
     proofUploading.value = false
   }
+}
+
+const chooseProofImages = () => {
+  const remaining = Math.max(5 - proofImages.value.length, 0)
+  if (!remaining || proofUploading.value) return
+  uni.chooseImage({
+    count: remaining,
+    sourceType: ['camera', 'album'],
+    success: (result) => {
+      void uploadProofImages(resolveUploadSources(result))
+    },
+  })
 }
 
 const removeProofImage = (index: number) => {
@@ -901,7 +1073,12 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   gap: 12px;
 }
 
+.cps-hero__identity {
+  min-width: 0;
+}
+
 .cps-hero__eyebrow {
+  display: block;
   margin: 0;
   color: rgba(255, 255, 255, 0.82);
   font-size: 12px;
@@ -909,8 +1086,9 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   letter-spacing: 0.18em;
 }
 
-.cps-hero h1 {
-  margin: 6px 0 0;
+.cps-hero__title {
+  display: block;
+  margin-top: 6px;
   font-size: 22px;
   font-weight: 800;
   line-height: 1.45;
@@ -931,7 +1109,6 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   gap: 6px;
   margin: 16px 0 0;
   padding: 0;
-  list-style: none;
   overflow-x: auto;
 }
 
@@ -986,7 +1163,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   gap: 8px;
 }
 
-.cps-hero__meta span {
+.cps-hero__meta-item {
   flex: 0 1 auto;
   max-width: 100%;
   overflow: hidden;
@@ -1000,32 +1177,51 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   text-overflow: ellipsis;
 }
 
-.cps-pill {
-  border-radius: var(--cps-radius-pill) !important;
-  font-weight: 700 !important;
-  margin: 0 !important;
+/* 两列布局（≥1200px 并排，窄屏单列） */
+.cps-detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.cps-col-main,
+.cps-col-action {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
 }
 
 .cps-card {
   border-radius: var(--cps-radius-lg);
   border: 1px solid var(--cps-border);
   box-shadow: var(--cps-shadow-card);
+  overflow: hidden;
 }
 
-.cps-card :deep(.ant-card-head) {
+.cps-card__head {
+  display: flex;
+  align-items: center;
   min-height: 54px;
   padding: 0 16px;
   border-bottom: 1px solid var(--cps-border);
 }
 
+.cps-card__body {
+  padding: 16px;
+}
+
 .cps-card-title {
   display: flex;
+  width: 100%;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
 .cps-card-title__main {
+  display: block;
   margin: 0;
   color: #0f172a;
   font-size: 17px;
@@ -1054,13 +1250,12 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   grid-row: span 2;
 }
 
-.cps-photo-tile img {
+.cps-photo-tile__img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
 }
 
-.cps-photo-tile span {
+.cps-photo-tile__index {
   position: absolute;
   right: 6px;
   bottom: 6px;
@@ -1095,6 +1290,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 }
 
 .cps-ai-item__label {
+  display: block;
   color: #64748b;
   font-size: 12px;
   font-weight: 700;
@@ -1109,6 +1305,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 }
 
 .cps-ai-item__text {
+  display: block;
   margin: 6px 0 0;
   color: var(--cps-ink-2);
   font-size: 14px;
@@ -1117,6 +1314,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 }
 
 .cps-default-hint {
+  display: block;
   margin-top: 4px;
   color: #0f766e;
   font-size: 12px;
@@ -1124,51 +1322,66 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 
 /* 分类选择器（第二流程反馈节点） */
 .cps-selector-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.cps-selector-group :deep(.ant-radio-button-wrapper) {
-  border-radius: var(--cps-radius-pill);
-  border: 1px solid var(--cps-border-strong);
-  height: 36px;
-  line-height: 34px;
-  padding: 0 16px;
-}
-
-.cps-selector-group :deep(.ant-radio-button-wrapper:not(:first-child))::before {
-  display: none;
+  width: 100%;
 }
 
 .cps-muted {
+  display: block;
   color: #64748b;
   font-size: 14px;
 }
 
+/* 表单容器（替代 a-form vertical） */
+.cps-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* 只读输入触发器（人员选择） */
+.cps-input-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cps-input-trigger__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--cps-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cps-input-trigger__text--placeholder {
+  color: #94a3b8;
+}
+
+.cps-input-trigger__icon {
+  flex: none;
+  font-size: 15px;
+  line-height: 1;
+}
+
 /* 整改照片上传（内联） */
+.cps-uploader {
+  display: grid;
+  gap: 12px;
+}
+
 .cps-uploader__trigger {
   display: grid;
   align-items: center;
   justify-items: center;
   gap: 4px;
   width: 100%;
-  height: 100%;
-  color: #0f766e;
-}
-
-.cps-detail-page :deep(.ant-upload.ant-upload-select) {
-  width: 100%;
-  height: auto;
-  margin-bottom: 12px;
-}
-
-.cps-detail-page :deep(.ant-upload.ant-upload-select .ant-upload) {
-  width: 100%;
   padding: 18px;
   border-radius: var(--cps-radius-lg);
   background: var(--cps-mist);
   border: 1px dashed #99f6e4;
+  color: #0f766e;
 }
 
 .cps-uploader__plus {
@@ -1185,7 +1398,6 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 12px;
-  margin-top: 12px;
 }
 
 .cps-uploader__item {
@@ -1198,10 +1410,9 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   cursor: pointer;
 }
 
-.cps-uploader__item img {
+.cps-uploader__img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
 }
 
 .cps-uploader__delete {
@@ -1238,6 +1449,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 }
 
 .cps-uploader__hint {
+  display: block;
   margin: 8px 0 0;
   color: #64748b;
   font-size: 13px;
@@ -1270,18 +1482,21 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   background: var(--cps-mist);
 }
 
-.cps-mode-hint strong {
+.cps-mode-hint__title {
+  display: block;
   color: var(--cps-teal-deep);
   font-size: 14px;
   font-weight: 800;
 }
 
-.cps-mode-hint span {
+.cps-mode-hint__text {
+  display: block;
   color: #64748b;
   font-size: 12px;
 }
 
 .cps-action-tip {
+  display: block;
   margin: 12px 0 0;
   color: #94a3b8;
   font-size: 12px;
@@ -1293,13 +1508,14 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
+  margin-top: 14px;
 }
 
 .cps-actions__btn {
-  height: 48px !important;
-  border-radius: var(--cps-radius-lg) !important;
-  font-size: 16px !important;
-  font-weight: 700 !important;
+  min-height: 48px;
+  border-radius: var(--cps-radius-lg);
+  font-size: 16px;
+  font-weight: 700;
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
 
@@ -1310,6 +1526,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 .cps-actions__btn--success {
   background: var(--cps-success-deep) !important;
   border-color: var(--cps-success-deep) !important;
+  color: #fff !important;
 }
 
 .cps-actions__btn--danger {
@@ -1318,52 +1535,50 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   color: var(--cps-danger-deep) !important;
 }
 
-.cps-actions__btn--danger:hover {
-  background: #fecaca !important;
-}
-
 /* 流程时间线（内联） */
-.cps-flow__dot {
-  display: inline-block;
+.cps-flow .cps-flow__dot {
   width: 14px;
   height: 14px;
-  border-radius: 999px;
+  margin-top: 5px;
   border: 3px solid #ccfbf1;
+  border-radius: 999px;
   background: #14b8a6;
+  box-shadow: none;
 }
 
-.cps-flow__dot.is-last {
+.cps-flow .cps-flow__dot.is-last {
   border-color: #dbeafe;
   background: #2563eb;
 }
 
-.cps-flow__head {
-  display: flex;
+.cps-flow .cps-flow__head {
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
 }
 
-.cps-flow__head strong {
+.cps-flow .cps-flow__title {
   color: #0f172a;
   font-size: 15px;
   font-weight: 800;
 }
 
-.cps-flow__head time {
+.cps-flow .cps-flow__time {
   color: #64748b;
   font-size: 13px;
 }
 
-.cps-flow__line {
+.cps-flow .cps-flow__line {
+  display: block;
   margin: 0;
   color: #64748b;
   font-size: 13px;
   line-height: 20px;
 }
 
-.cps-flow__comment {
+.cps-flow .cps-flow__comment {
+  display: block;
   margin-top: 6px;
   padding: 8px 10px;
   border-radius: var(--cps-radius-sm);
@@ -1373,8 +1588,47 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
 }
 
 /* 人员选择弹窗（内联） */
+.cps-person-picker {
+  max-width: 100%;
+}
+
+.cps-person-picker--wide {
+  max-width: 520px;
+}
+
+.cps-person-picker__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cps-person-picker__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--cps-ink);
+  font-size: 16px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cps-person-picker__close {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--cps-cloud);
+  color: var(--cps-muted);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 28px;
+  text-align: center;
+}
+
 .cps-person-picker__search {
-  margin-bottom: 16px;
+  flex: none;
 }
 
 .cps-person-picker__body {
@@ -1400,28 +1654,42 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   background: var(--cps-cloud);
 }
 
-.cps-person-picker__option :deep(.ant-radio + span) {
+.cps-person-picker__option--active {
+  background: var(--cps-mist);
+  box-shadow: inset 0 0 0 1px var(--cps-teal);
+}
+
+.cps-person-picker__radio {
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1;
+  text-align: center;
+}
+
+.cps-person-picker__option--active .cps-person-picker__radio {
+  color: var(--cps-teal-deep);
+}
+
+.cps-person-picker__info {
   display: grid;
   gap: 2px;
   padding-right: 8px;
 }
 
-.cps-person-picker__option :deep(strong) {
+.cps-person-picker__name {
   color: #0f172a;
   font-size: 15px;
   font-weight: 700;
   line-height: 22px;
 }
 
-.cps-person-picker__option :deep(span:not(.ant-radio)) {
+.cps-person-picker__no {
   color: #64748b;
   font-size: 13px;
   line-height: 18px;
 }
 
 .cps-page-loading {
-  display: flex;
-  justify-content: center;
   margin-top: 64px;
 }
 
@@ -1430,6 +1698,10 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
     max-width: 1280px;
     padding: 20px 28px 56px;
   }
+
+  .cps-detail-layout {
+    grid-template-columns: minmax(0, 14fr) minmax(0, 10fr);
+  }
 }
 
 /* 竖屏/窄屏：把「当前操作」提到最前，现场处理不用滑到底 */
@@ -1437,49 +1709,5 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   .cps-detail-page .cps-col-action {
     order: -1;
   }
-}
-/* ===== antd 组件品牌色（只在本页作用域内生效） ===== */
-.cps-detail-page :deep(.ant-btn-primary:not(:disabled)) {
-  background: var(--cps-teal-deep);
-  border-color: var(--cps-teal-deep);
-  box-shadow: none;
-}
-
-.cps-detail-page :deep(.ant-btn-primary:not(:disabled):hover) {
-  background: #115e59;
-  border-color: #115e59;
-}
-
-.cps-detail-page :deep(.ant-switch.ant-switch-checked) {
-  background: var(--cps-teal-deep);
-}
-
-.cps-detail-page :deep(.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled)) {
-  background: var(--cps-teal-deep);
-  border-color: var(--cps-teal-deep);
-  color: #fff;
-}
-
-.cps-detail-page :deep(.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled)::before) {
-  background-color: var(--cps-teal-deep);
-}
-
-.cps-detail-page :deep(.ant-radio-checked .ant-radio-inner) {
-  border-color: var(--cps-teal-deep);
-}
-
-.cps-detail-page :deep(.ant-radio-checked .ant-radio-inner::after) {
-  background-color: var(--cps-teal-deep);
-}
-
-.cps-detail-page :deep(.ant-input:focus),
-.cps-detail-page :deep(.ant-input-focused),
-.cps-detail-page :deep(.ant-input-affix-wrapper-focused) {
-  border-color: var(--cps-teal);
-  box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.16);
-}
-
-.cps-detail-page :deep(.ant-spin-dot-item) {
-  background-color: var(--cps-teal-deep);
 }
 </style>

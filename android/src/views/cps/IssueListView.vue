@@ -1,120 +1,127 @@
 <template>
-  <main class="cps-page cps-list-page">
-    <header class="cps-hero">
-      <div class="cps-hero__main">
-        <p class="cps-hero__eyebrow">问题闭环工作台</p>
-        <h1>我的问题</h1>
-        <div class="cps-hero__stats">
-          <span>待处理 {{ todoCount }}</span>
-          <span>超时 {{ overdueCount }}</span>
-        </div>
-      </div>
-      <a-button size="large" class="cps-hero__action" @click="navigateToCreate">
-        <template #icon><PlusOutlined /></template>
-        新建问题
-      </a-button>
-    </header>
+  <view class="cps-page cps-list-page">
+    <view class="cps-hero">
+      <view class="cps-hero__main">
+        <text class="cps-hero__eyebrow">问题闭环工作台</text>
+        <text class="cps-hero__title">我的问题</text>
+        <view class="cps-hero__stats">
+          <text class="cps-hero__stat">待处理 {{ todoCount }}</text>
+          <text class="cps-hero__stat">超时 {{ overdueCount }}</text>
+        </view>
+      </view>
+      <button class="u-btn u-btn--primary cps-hero__action" @click="navigateToCreate">＋ 新建问题</button>
+    </view>
 
-    <a-card :body-style="{ padding: '0' }" class="cps-tabs-card">
-      <a-tabs v-model:activeKey="tab" class="cps-list-tabs" @change="onTabChange">
-        <a-tab-pane v-for="item in tabs" :key="item.value">
-          <template #tab>
-            <span class="cps-tab-label">
-              {{ item.label }}
-              <a-badge
-                v-if="item.count > 0"
-                :count="item.count"
-                :overflow-count="99"
-                class="cps-tab-badge"
-                :number-style="{ backgroundColor: '#14b8a6', boxShadow: 'none', fontSize: '11px', height: '17px', lineHeight: '17px', minWidth: '17px', padding: '0 5px' }"
-              />
-            </span>
-          </template>
-        </a-tab-pane>
-      </a-tabs>
-    </a-card>
+    <view class="u-card u-card--pad-none cps-tabs-card">
+      <view class="u-tabs cps-list-tabs">
+        <view
+          v-for="item in tabs"
+          :key="item.value"
+          class="u-tabs__item cps-tab"
+          :class="{ 'u-tabs__item--active': tab === item.value }"
+          @click="selectTab(item.value)"
+        >
+          <text class="cps-tab__label">{{ item.label }}</text>
+          <text v-if="item.count > 0" class="u-badge cps-tab__badge">{{ item.count > 99 ? '99+' : item.count }}</text>
+        </view>
+      </view>
+    </view>
 
-    <a-spin :spinning="tab === 'drafts' ? draftsLoading : tab === 'running' ? recordsLoading : loading">
-      <!-- 我的草稿：服务端暂存列表，内联在页签里 -->
-      <div v-if="tab === 'drafts'" class="cps-inline-list">
-        <a-empty v-if="!drafts.length && !draftsLoading" description="暂无草稿——新建问题页点击「暂存」即可保存" />
-        <div v-for="d in drafts" :key="d.id" class="cps-inline-list__item">
-          <div class="cps-inline-list__info">
-            <strong class="cps-inline-list__title">{{ d.title || `草稿 #${d.id}` }}</strong>
-            <span class="cps-inline-list__time">{{ formatDraftTime(d.updatedAt) }}</span>
-          </div>
-          <div class="cps-inline-list__actions">
-            <a-button type="primary" size="small" @click="restoreDraft(d.id)">继续填写</a-button>
-            <a-button size="small" danger @click="removeDraft(d.id)">删除</a-button>
-          </div>
-        </div>
-      </div>
+    <view v-if="currentLoading" class="u-loading">
+      <view class="u-loading__dot" />
+      <text class="u-loading__text">加载中…</text>
+    </view>
 
-      <!-- 执行中：IN_PROGRESS 巡检记录，可继续执行 -->
-      <div v-else-if="tab === 'running'" class="cps-inline-list">
-        <a-empty v-if="!records.length && !recordsLoading" description="暂无执行中的巡检——新建问题选择类型即可开始" />
-        <div v-for="r in records" :key="r.id" class="cps-inline-list__item">
-          <div class="cps-inline-list__info">
-            <strong class="cps-inline-list__title">
-              {{ typeLabel(r.typeCode) }}<template v-if="r.areaName"> · {{ r.areaName }}</template>
-            </strong>
-            <span class="cps-inline-list__time">
-              开始 {{ formatRecordTime(r.startedAt) }}<template v-if="r.areaCode"> · {{ r.areaCode }}</template>
-            </span>
-          </div>
-          <div class="cps-inline-list__actions">
-            <a-button type="primary" size="small" @click="resumeRecord(r.id)">继续执行</a-button>
-          </div>
-        </div>
-      </div>
+    <!-- 我的草稿：服务端暂存列表，内联在页签里 -->
+    <view v-if="tab === 'drafts'" class="cps-inline-list">
+      <view v-if="!drafts.length && !draftsLoading" class="u-empty">
+        <text class="u-empty__icon">📭</text>
+        <text class="u-empty__text">暂无草稿——新建问题页点击「暂存」即可保存</text>
+      </view>
+      <view v-for="d in drafts" :key="d.id" class="cps-inline-list__item">
+        <view class="cps-inline-list__info">
+          <text class="cps-inline-list__title">{{ d.title || `草稿 #${d.id}` }}</text>
+          <text class="cps-inline-list__time">{{ formatDraftTime(d.updatedAt) }}</text>
+        </view>
+        <view class="cps-inline-list__actions">
+          <button class="u-btn u-btn--primary u-btn--sm" @click="restoreDraft(d.id)">继续填写</button>
+          <button class="u-btn u-btn--danger u-btn--sm" @click="removeDraft(d.id)">删除</button>
+        </view>
+      </view>
+    </view>
 
-      <div v-else class="cps-list-grid">
-        <a-empty v-if="!items.length && !loading" description="暂无问题" class="cps-list-empty" />
-        <a-row :gutter="[16, 16]">
-          <a-col
-            v-for="issue in items"
-            :key="issue.id"
-            :xs="{ span: 24 }"
-            :sm="{ span: 12 }"
-            :lg="{ span: 8 }"
-            :xl="{ span: 6 }"
-          >
-            <a-card hoverable class="cps-issue-card" :class="statusMeta[issue.status].rail" @click="navigateToDetail(issue.id)">
-              <div class="cps-issue-card__head">
-                <div class="cps-issue-card__identity">
-                  <span class="cps-issue-card__eyebrow">巡检单</span>
-                  <strong class="cps-issue-card__no">巡检问题</strong>
-                </div>
-                <div class="cps-issue-card__badges">
-                  <a-tag :color="statusMeta[issue.status].color" class="cps-pill">{{ statusMeta[issue.status].label }}</a-tag>
-                  <a-tag v-if="issue.inspectionTypeCode" color="arcoblue" class="cps-pill">{{ issue.inspectionTypeCode }}</a-tag>
-                  <a-tag v-if="issue.overdue" color="red" class="cps-pill">超时</a-tag>
-                </div>
-              </div>
+    <!-- 执行中：IN_PROGRESS 巡检记录，可继续执行 -->
+    <view v-else-if="tab === 'running'" class="cps-inline-list">
+      <view v-if="!records.length && !recordsLoading" class="u-empty">
+        <text class="u-empty__icon">📭</text>
+        <text class="u-empty__text">暂无执行中的巡检——新建问题选择类型即可开始</text>
+      </view>
+      <view v-for="r in records" :key="r.id" class="cps-inline-list__item">
+        <view class="cps-inline-list__info">
+          <text class="cps-inline-list__title">
+            {{ typeLabel(r.typeCode) }}<text v-if="r.areaName"> · {{ r.areaName }}</text>
+          </text>
+          <text class="cps-inline-list__time">
+            开始 {{ formatRecordTime(r.startedAt) }}<text v-if="r.areaCode"> · {{ r.areaCode }}</text>
+          </text>
+        </view>
+        <view class="cps-inline-list__actions">
+          <button class="u-btn u-btn--primary u-btn--sm" @click="resumeRecord(r.id)">继续执行</button>
+        </view>
+      </view>
+    </view>
 
-              <p class="cps-issue-card__desc">{{ issue.description }}</p>
+    <view v-else class="cps-list-grid">
+      <view v-if="!items.length && !loading" class="u-empty cps-list-empty">
+        <text class="u-empty__icon">📭</text>
+        <text class="u-empty__text">暂无问题</text>
+      </view>
+      <view class="u-grid">
+        <view
+          v-for="issue in items"
+          :key="issue.id"
+          class="u-card cps-issue-card"
+          :class="statusMeta[issue.status].rail"
+          hover-class="u-tap"
+          @click="navigateToDetail(issue.id)"
+        >
+          <view class="cps-issue-card__head">
+            <view class="cps-issue-card__identity">
+              <text class="cps-issue-card__eyebrow">巡检单</text>
+              <text class="cps-issue-card__no">巡检问题</text>
+            </view>
+            <view class="cps-issue-card__badges">
+              <text class="cps-pill" :class="statusMeta[issue.status].tone">{{ statusMeta[issue.status].label }}</text>
+              <text v-if="issue.inspectionTypeCode" class="cps-pill cps-pill--blue">{{ issue.inspectionTypeCode }}</text>
+              <text v-if="issue.overdue" class="cps-pill cps-pill--red">超时</text>
+            </view>
+          </view>
 
-              <div class="cps-issue-card__meta">
-                <span><b>位置</b>{{ issueLocation(issue) }}</span>
-                <span><b>分类</b>{{ issueCategory(issue) }}</span>
-              </div>
+          <text class="cps-issue-card__desc">{{ issue.description }}</text>
 
-              <div class="cps-issue-card__foot">
-                <span>处理人 {{ issue.currentHandlerEmpName || issue.currentHandlerEmpNo || '-' }}</span>
-                <time>{{ issue.submitTime }}</time>
-              </div>
-            </a-card>
-          </a-col>
-        </a-row>
-      </div>
-    </a-spin>
-  </main>
+          <view class="cps-issue-card__meta">
+            <view class="cps-issue-card__meta-item">
+              <text class="cps-issue-card__meta-label">位置</text>
+              <text class="cps-issue-card__meta-value">{{ issueLocation(issue) }}</text>
+            </view>
+            <view class="cps-issue-card__meta-item">
+              <text class="cps-issue-card__meta-label">分类</text>
+              <text class="cps-issue-card__meta-value">{{ issueCategory(issue) }}</text>
+            </view>
+          </view>
+
+          <view class="cps-issue-card__foot">
+            <text class="cps-issue-card__handler">处理人 {{ issue.currentHandlerEmpName || issue.currentHandlerEmpNo || '-' }}</text>
+            <text class="cps-issue-card__time">{{ issue.submitTime }}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { PlusOutlined } from '@ant-design/icons-vue'
-import { message } from 'ant-design-vue'
 
 import { listCpsIssues, getCpsIssueCounts } from '@/api/cps/issue'
 import { deleteCpsIssueDraft, listMyCpsIssueDrafts } from '@/api/cps/issueDraft'
@@ -174,7 +181,7 @@ const load = async (force = false) => {
     items.value = result
     listCache.set(tab.value, result)
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '加载失败')
+    uni.showToast({ title: error instanceof Error ? error.message : '加载失败', icon: 'none' })
   } finally {
     loading.value = false
   }
@@ -214,6 +221,20 @@ const tabs = computed<TabItem[]>(() => [
   { value: 'drafts', label: '我的草稿', count: draftCount.value },
   { value: 'running', label: '执行中', count: recordCount.value },
 ])
+
+// 当前页签对应的加载态（替代 a-spin 的 spinning 计算）
+const currentLoading = computed(() => {
+  if (tab.value === 'drafts') return draftsLoading.value
+  if (tab.value === 'running') return recordsLoading.value
+  return loading.value
+})
+
+// 页签切换：值不变时不重复触发（保持原 antd @change 语义）
+const selectTab = (value: TabKey) => {
+  if (tab.value === value) return
+  tab.value = value
+  onTabChange()
+}
 
 const loadCounts = async () => {
   try {
@@ -278,10 +299,10 @@ onShow(() => {
 const removeDraft = async (id: number) => {
   try {
     await deleteCpsIssueDraft(id)
-    message.success('草稿已删除')
+    uni.showToast({ title: '草稿已删除', icon: 'success' })
     await loadDrafts()
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '删除失败')
+    uni.showToast({ title: error instanceof Error ? error.message : '删除失败', icon: 'none' })
   }
 }
 
@@ -325,17 +346,18 @@ const formatRecordTime = (t?: string | null) => {
 }
 
 .cps-hero__eyebrow {
-  margin: 0;
+  display: block;
   color: rgba(255, 255, 255, 0.82);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.18em;
 }
 
-.cps-hero h1 {
-  margin: 0;
+.cps-hero__title {
+  display: block;
   font-size: 24px;
   font-weight: 800;
+  line-height: 1.3;
 }
 
 .cps-hero__stats {
@@ -344,7 +366,7 @@ const formatRecordTime = (t?: string | null) => {
   gap: 8px;
 }
 
-.cps-hero__stats span {
+.cps-hero__stat {
   display: inline-flex;
   align-items: center;
   min-height: 24px;
@@ -365,14 +387,18 @@ const formatRecordTime = (t?: string | null) => {
 }
 
 /* 页签内联列表（我的草稿 / 执行中） */
-.cps-tab-label {
+.cps-tab {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-.cps-tab-badge {
+.cps-tab__label {
   line-height: 1;
+}
+
+.cps-tab__badge {
+  margin-left: 6px;
 }
 
 .cps-inline-list {
@@ -424,9 +450,8 @@ const formatRecordTime = (t?: string | null) => {
   overflow: hidden;
 }
 
-.cps-list-tabs :deep(.ant-tabs-nav) {
-  margin: 0;
-  padding: 0 16px;
+.cps-list-tabs {
+  border-bottom: none;
 }
 
 .cps-list-grid {
@@ -442,11 +467,8 @@ const formatRecordTime = (t?: string | null) => {
   overflow: hidden;
   border-radius: var(--cps-radius-lg);
   border: 1px solid var(--cps-border);
+  padding: 16px 16px 16px 20px;
   transition: transform 120ms ease;
-}
-
-.cps-issue-card:hover {
-  transform: translateY(-2px);
 }
 
 .cps-issue-card::before {
@@ -470,10 +492,6 @@ const formatRecordTime = (t?: string | null) => {
 }
 .cps-rail--green::before {
   background: #22c55e;
-}
-
-.cps-issue-card :deep(.ant-card-body) {
-  padding: 16px 16px 16px 20px;
 }
 
 .cps-issue-card__head {
@@ -508,19 +526,13 @@ const formatRecordTime = (t?: string | null) => {
   justify-content: flex-end;
 }
 
-.cps-pill {
-  border-radius: 999px !important;
-  font-weight: 700 !important;
-  margin: 0 !important;
-}
-
 .cps-issue-card__desc {
+  display: -webkit-box;
   margin: 0 0 10px;
   color: #0f172a;
   font-size: 14px;
   font-weight: 600;
   line-height: 22px;
-  display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -537,11 +549,20 @@ const formatRecordTime = (t?: string | null) => {
   line-height: 18px;
 }
 
-.cps-issue-card__meta b {
+.cps-issue-card__meta-item {
+  display: block;
+}
+
+.cps-issue-card__meta-label {
   display: block;
   color: var(--cps-teal-deep);
   font-size: 11px;
   font-weight: 800;
+}
+
+.cps-issue-card__meta-value {
+  display: block;
+  color: #475569;
 }
 
 .cps-issue-card__foot {
@@ -558,36 +579,17 @@ const formatRecordTime = (t?: string | null) => {
   font-weight: 600;
 }
 
+.cps-issue-card__time {
+  color: var(--cps-muted);
+}
+
 /* 平板横屏：卡片更紧凑，列表 hero 缩小 */
 @media (min-width: 1024px) {
   .cps-page {
     padding: 20px 28px 48px;
   }
-  .cps-hero h1 {
+  .cps-hero__title {
     font-size: 26px;
   }
-}
-/* ===== antd 组件品牌色（只在本页作用域内生效） ===== */
-.cps-list-page :deep(.ant-btn-primary:not(:disabled)) {
-  background: var(--cps-teal-deep);
-  border-color: var(--cps-teal-deep);
-  box-shadow: none;
-}
-
-.cps-list-page :deep(.ant-btn-primary:not(:disabled):hover) {
-  background: #115e59;
-  border-color: #115e59;
-}
-
-.cps-list-page :deep(.ant-tabs .ant-tabs-ink-bar) {
-  background: var(--cps-teal-deep);
-}
-
-.cps-list-page :deep(.ant-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn) {
-  color: var(--cps-teal-deep);
-}
-
-.cps-list-page :deep(.ant-spin-dot-item) {
-  background-color: var(--cps-teal-deep);
 }
 </style>

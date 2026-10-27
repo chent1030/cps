@@ -1,415 +1,463 @@
 <template>
-  <main class="cps-page cps-create-page">
-    <header class="cps-hero">
-      <div class="cps-hero__main">
-        <p class="cps-hero__eyebrow">CPS 现场巡检</p>
-        <h1>{{ step === 'select' ? '选择巡检类型' : '新建问题' }}</h1>
-        <ol class="cps-steps">
-          <li
+  <view class="cps-page cps-create-page">
+    <view class="cps-hero">
+      <view class="cps-hero__main">
+        <text class="cps-hero__eyebrow">CPS 现场巡检</text>
+        <text class="cps-hero__title">{{ step === 'select' ? '选择巡检类型' : '新建问题' }}</text>
+        <view class="cps-steps">
+          <view
             v-for="(label, index) in stepLabels"
             :key="label"
             class="cps-steps__item"
             :class="{ 'is-active': stepIndex === index, 'is-done': stepIndex > index }"
           >
-            <span class="cps-steps__num">{{ index + 1 }}</span>
-            <span class="cps-steps__label">{{ label }}</span>
-          </li>
-        </ol>
-      </div>
-      <a-tag color="blue" class="cps-hero__badge">AI 辅助</a-tag>
-    </header>
+            <text class="cps-steps__num">{{ index + 1 }}</text>
+            <text class="cps-steps__label">{{ label }}</text>
+          </view>
+        </view>
+      </view>
+      <text class="cps-pill cps-pill--blue cps-hero__badge">AI 辅助</text>
+    </view>
 
     <!-- ============================================================ -->
     <!-- 第一步：选择巡检类型（选完才渲染对应表单） -->
     <!-- ============================================================ -->
-    <div v-if="step === 'select'" class="cps-type-select">
-      <a-card class="cps-card" :body-style="{ padding: '20px' }">
-        <template #title>
-          <div class="cps-card-title">
-            <h2 class="cps-card-title__main">本次巡检属于哪类问题？</h2>
-            <a-tag color="blue">{{ typeCountLabel }}</a-tag>
-          </div>
-        </template>
-        <p class="cps-create-card__hint">「CPS巡检」进入标准问题上报表单；其他类型按各自配置逐项点检填写（合格判定/文本/拍照），互不混用；分区域类型（如辅房点检）先选区域再开始</p>
-        <a-input-search
-          v-model:value="typeKeyword"
-          class="cps-type-search"
-          placeholder="搜索巡检类型名称或编码"
-          allow-clear
-          :disabled="!draft.inspectionTypes.length"
-        />
-        <a-spin :spinning="inspectionTypesLoading">
-          <a-empty v-if="!draft.inspectionTypes.length && !inspectionTypesLoading" description="暂无可用巡检类型，请联系管理员配置" />
-          <div v-else-if="!filteredTypes.length" class="cps-type-empty">没有匹配「{{ typeKeyword }}」的类型</div>
-          <div v-else class="cps-type-select__grid">
-            <button
-              v-for="t in filteredTypes"
-              :key="t.code"
-              type="button"
-              class="cps-type-select__item"
-              :data-color="t.color || 'blue'"
-              :disabled="startingCustom !== null"
-              @click="onSelectInspectionType(t.code)"
-            >
-              <span class="cps-type-select__head">
-                <strong class="cps-type-select__name">{{ t.name }}</strong>
-                <a-tag v-if="t.builtin === 1" color="purple" class="cps-type-select__tag">内置</a-tag>
-              </span>
-              <span class="cps-type-select__code">{{ t.code }}</span>
-              <span v-if="t.content || t.description" class="cps-type-select__desc">{{ t.content || t.description }}</span>
-              <span class="cps-type-select__go">
-                <span>{{ typeActionLabel(t) }}</span>
-                <span class="cps-type-select__arrow" aria-hidden="true">→</span>
-              </span>
-            </button>
-          </div>
-        </a-spin>
-      </a-card>
-    </div>
+    <view v-if="step === 'select'" class="cps-type-select">
+      <view class="u-card cps-card cps-card--pad-lg">
+        <view class="cps-card-title">
+          <text class="cps-card-title__main">本次巡检属于哪类问题？</text>
+          <text class="cps-pill cps-pill--blue">{{ typeCountLabel }}</text>
+        </view>
+        <text class="cps-create-card__hint">「CPS巡检」进入标准问题上报表单；其他类型按各自配置逐项点检填写（合格判定/文本/拍照），互不混用；分区域类型（如辅房点检）先选区域再开始</text>
+        <view class="u-search cps-type-search">
+          <input
+            v-model="typeKeyword"
+            class="u-input u-search__input"
+            type="text"
+            placeholder="搜索巡检类型名称或编码"
+            :disabled="!draft.inspectionTypes.length"
+          />
+          <text v-if="typeKeyword" class="u-search__clear" @click="typeKeyword = ''">×</text>
+        </view>
+        <view v-if="inspectionTypesLoading" class="u-loading">
+          <view class="u-loading__dot" />
+          <text class="u-loading__text">加载中…</text>
+        </view>
+        <view v-if="!draft.inspectionTypes.length && !inspectionTypesLoading" class="u-empty">
+          <text class="u-empty__icon">📭</text>
+          <text class="u-empty__text">暂无可用巡检类型，请联系管理员配置</text>
+        </view>
+        <text v-else-if="!filteredTypes.length" class="cps-type-empty">没有匹配「{{ typeKeyword }}」的类型</text>
+        <view v-else class="cps-type-select__grid">
+          <button
+            v-for="t in filteredTypes"
+            :key="t.code"
+            class="cps-type-select__item"
+            :data-color="t.color || 'blue'"
+            :disabled="startingCustom !== null"
+            @click="onSelectInspectionType(t.code)"
+          >
+            <view class="cps-type-select__head">
+              <text class="cps-type-select__name">{{ t.name }}</text>
+              <text v-if="t.builtin === 1" class="cps-pill cps-pill--purple cps-type-select__tag">内置</text>
+            </view>
+            <text class="cps-type-select__code">{{ t.code }}</text>
+            <text v-if="t.content || t.description" class="cps-type-select__desc">{{ t.content || t.description }}</text>
+            <view class="cps-type-select__go">
+              <text class="cps-type-select__go-label">{{ typeActionLabel(t) }}</text>
+              <text class="cps-type-select__arrow">→</text>
+            </view>
+          </button>
+        </view>
+      </view>
+    </view>
 
     <!-- ============================================================ -->
     <!-- 第二步：按所选类型渲染的表单 -->
     <!-- ============================================================ -->
-    <a-row v-else :gutter="[16, 16]">
+    <view v-else class="cps-create-layout">
       <!-- 左列：照片 + 描述 -->
-      <a-col :xs="{ span: 24 }" :lg="{ span: 12 }">
-        <a-card class="cps-card" :body-style="{ padding: '16px' }">
-          <template #title>
-            <div class="cps-card-title">
-              <h2 class="cps-card-title__main">问题照片</h2>
-              <a-tag color="blue">{{ draft.images.length }}/5</a-tag>
-            </div>
-          </template>
-          <p class="cps-create-card__hint">最多上传 5 张，仅第 1 张参与 AI 识别</p>
+      <view class="cps-create-layout__col">
+        <view class="u-card cps-card">
+          <view class="cps-card-title">
+            <text class="cps-card-title__main">问题照片</text>
+            <text class="cps-pill cps-pill--blue">{{ draft.images.length }}/5</text>
+          </view>
+          <text class="cps-create-card__hint">最多上传 5 张，仅第 1 张参与 AI 识别</text>
 
-          <a-upload
-            list-type="picture-card"
-            :file-list="uploadFileList"
-            :max-count="5"
-            :custom-request="customRequest"
-            :before-upload="beforeUpload"
-            :show-upload-list="false"
-            multiple
-            accept="image/*"
-          >
-            <div v-if="draft.images.length < 5" class="cps-uploader__trigger">
-              <span class="cps-uploader__plus">+</span>
-              <span class="cps-uploader__text">{{ uploading ? '上传中' : '上传图片' }}</span>
-            </div>
-          </a-upload>
-
-          <div class="cps-uploader__grid">
-            <div
+          <view class="cps-uploader__grid">
+            <view
               v-for="(image, index) in draft.images"
               :key="image.id"
               class="cps-uploader__item"
               @click="onPreviewImage(index)"
             >
-              <img :src="draft.imagePreviewSources[image.id] || ''" :alt="image.name" />
-              <span v-if="!uploading" class="cps-uploader__delete" @click.stop="onRemoveImage(index)">×</span>
-              <span class="cps-uploader__index">{{ index + 1 }}</span>
-            </div>
-          </div>
-        </a-card>
+              <image class="cps-uploader__img" :src="draft.imagePreviewSources[image.id] || ''" mode="aspectFill" />
+              <text v-if="!uploading" class="cps-uploader__delete" @click.stop="onRemoveImage(index)">×</text>
+              <text class="cps-uploader__index">{{ index + 1 }}</text>
+            </view>
+            <button
+              v-if="draft.images.length < 5"
+              class="cps-uploader__add"
+              :disabled="uploading"
+              @click="pickImages"
+            >
+              <text class="cps-uploader__plus">＋</text>
+              <text class="cps-uploader__text">{{ uploading ? '上传中' : '上传图片' }}</text>
+            </button>
+          </view>
+        </view>
 
-        <a-card class="cps-card" :body-style="{ padding: '16px' }" style="margin-top: 16px">
-          <template #title>
-            <div class="cps-card-title">
-              <h2 class="cps-card-title__main">现场情况</h2>
-            </div>
-          </template>
-          <a-textarea
-            v-model:value="draft.description"
-            :rows="5"
+        <view class="u-card cps-card">
+          <view class="cps-card-title">
+            <text class="cps-card-title__main">现场情况</text>
+          </view>
+          <textarea
+            v-model="draft.description"
+            class="u-textarea"
+            auto-height
             :maxlength="500"
-            show-count
             placeholder="请输入现场问题描述"
           />
-          <div class="cps-desc-toolbar">
-            <a-button
-              :loading="transcribing"
+          <text class="cps-desc-count">{{ draft.description.length }}/500</text>
+          <view class="cps-desc-toolbar">
+            <button
+              class="u-btn u-btn--ghost u-btn--sm"
+              :class="{ 'u-btn--danger': recording }"
               :disabled="transcribing"
-              :danger="recording"
               @click="onVoiceClick"
             >
-              <template #icon>
-                <AudioOutlined v-if="!recording && !transcribing" />
-              </template>
-              <span v-if="transcribing">识别中</span>
-              <span v-else-if="recording">停止录音</span>
-              <span v-else>语音输入</span>
-            </a-button>
-            <span v-if="recording" class="cps-voice-hint">正在录音，再次点击「停止录音」结束并识别…</span>
-          </div>
-        </a-card>
-      </a-col>
+              <text v-if="transcribing">🎤 识别中</text>
+              <text v-else-if="recording">🎤 停止录音</text>
+              <text v-else>🎤 语音输入</text>
+            </button>
+            <text v-if="recording" class="cps-voice-hint">正在录音，再次点击「停止录音」结束并识别…</text>
+          </view>
+        </view>
+      </view>
 
       <!-- 右列：类型指示 + 动态字段 + 位置 + 派发 -->
-      <a-col :xs="{ span: 24 }" :lg="{ span: 12 }">
+      <view class="cps-create-layout__col">
         <!-- 当前巡检类型（第一步已选，可切换） -->
-        <a-card class="cps-card" :body-style="{ padding: '14px 16px' }">
-          <div class="cps-type-active">
-            <div class="cps-type-active__info">
-              <span class="cps-type-active__label">当前巡检类型</span>
-              <strong class="cps-type-active__name">
-                {{ activeTypeName || draft.inspectionTypeCode }}
-                <span class="cps-type-active__code">{{ draft.inspectionTypeCode }}</span>
-              </strong>
-            </div>
-            <a-button size="small" @click="switchType">切换类型</a-button>
-          </div>
-        </a-card>
+        <view class="u-card cps-card cps-card--pad-x">
+          <view class="cps-type-active">
+            <view class="cps-type-active__info">
+              <text class="cps-type-active__label">当前巡检类型</text>
+              <view class="cps-type-active__name">
+                <text class="cps-type-active__value">{{ activeTypeName || draft.inspectionTypeCode }}</text>
+                <text class="cps-type-active__code">{{ draft.inspectionTypeCode }}</text>
+              </view>
+            </view>
+            <button class="u-btn u-btn--ghost u-btn--sm" @click="switchType">切换类型</button>
+          </view>
+        </view>
 
         <!-- Phase D2：类型配置联动 —— 巡检内容说明 -->
-        <a-card v-if="activeTypeContent" class="cps-card" :body-style="{ padding: '12px 16px' }" style="margin-top: 16px">
-          <p class="cps-type-content-banner"><strong>巡检内容：</strong>{{ activeTypeContent }}</p>
-        </a-card>
+        <view v-if="activeTypeContent" class="u-card cps-card cps-card--pad-sm">
+          <text class="cps-type-content-banner"><text class="cps-type-content-banner__label">巡检内容：</text>{{ activeTypeContent }}</text>
+        </view>
 
         <!-- Phase D2：类型配置联动 —— 点检项填写（管理端「直挂点检项」配置驱动） -->
-        <a-card
-          v-if="typeCheckItems.length || checkItemsLoading"
-          class="cps-card"
-          :body-style="{ padding: '16px' }"
-          style="margin-top: 16px"
-        >
-          <template #title>
-            <div class="cps-card-title">
-              <h2 class="cps-card-title__main">现场点检项</h2>
-              <a-tag color="cyan">{{ checkDoneCount }}/{{ typeCheckItems.length }}</a-tag>
-            </div>
-          </template>
-          <a-spin :spinning="checkItemsLoading">
-            <div v-for="(ci, idx) in typeCheckItems" :key="ci.itemCode" class="cps-check-entry" :class="{ 'cps-check-entry--done': isCheckEntryDone(ci) }">
-              <div class="cps-check-entry__head">
-                <strong>{{ idx + 1 }}. {{ ci.content }}</strong>
-                <span class="cps-check-entry__code">{{ ci.itemCode }}</span>
-              </div>
-              <p v-if="hasCheckType(ci, 'PHOTO') && ci.photoCriteria" class="cps-check-entry__criteria">
-                📷 {{ ci.photoCriteria }}（至少 {{ ci.photoMinCount ?? 1 }} 张）
-              </p>
-              <div v-if="hasCheckType(ci, 'PASS_FAIL')" class="cps-check-entry__row">
-                <a-radio-group
-                  :value="checkEntries[ci.itemCode]?.passResult ?? ''"
-                  button-style="solid"
-                  size="small"
-                  @change="(e: any) => setCheckField(ci.itemCode, 'passResult', e.target.value)"
-                >
-                  <a-radio-button value="PASS">✓ 合格</a-radio-button>
-                  <a-radio-button value="FAIL">✗ 不合格</a-radio-button>
-                </a-radio-group>
-              </div>
-              <div v-if="hasCheckType(ci, 'TEXT')" class="cps-check-entry__row">
-                <a-textarea
-                  :value="checkEntries[ci.itemCode]?.textValue ?? ''"
-                  :rows="2"
-                  :maxlength="500"
-                  :placeholder="ci.textHint || '请填写现场情况说明'"
-                  @change="(e: any) => setCheckField(ci.itemCode, 'textValue', e.target.value)"
-                />
-              </div>
-              <div v-if="hasCheckType(ci, 'PHOTO')" class="cps-check-entry__row">
-                <div class="cps-check-photos">
-                  <div v-for="(p, pi) in checkEntries[ci.itemCode]?.photos ?? []" :key="pi" class="cps-check-photo">
-                    <img :src="p.url" :alt="p.name" />
-                    <span class="cps-check-photo__del" @click.stop="removeCheckPhoto(ci.itemCode, pi)">×</span>
-                  </div>
-                  <label class="cps-check-photo__add">
-                    <input type="file" accept="image/*" multiple hidden @change="(e: any) => onCheckPhotoPick(ci.itemCode, e)" />
-                    <span>＋ {{ (checkEntries[ci.itemCode]?.photos?.length ?? 0) }}/{{ ci.photoMinCount ?? 1 }}</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-          </a-spin>
-        </a-card>
-
-        <a-card class="cps-card" :body-style="{ padding: '16px' }" style="margin-top: 16px">
-          <template #title>
-            <div class="cps-card-title">
-              <h2 class="cps-card-title__main">工厂 / 区域 / 拉线 / 工序</h2>
-            </div>
-          </template>
-
-          <div class="cps-selector">
-            <div class="cps-selector-row">
-              <span class="cps-selector-label">工厂</span>
-              <a-radio-group :value="draft.location.factory" button-style="solid" class="cps-selector-group" @change="(e: any) => onSelectFactory(e.target.value)">
-                <a-radio-button v-for="item in draft.factories" :key="item.value" :value="String(item.value)">{{ item.label }}</a-radio-button>
-              </a-radio-group>
-              <span v-if="!draft.factories.length" class="cps-muted">暂无工厂数据</span>
-            </div>
-
-            <div class="cps-selector-row">
-              <span class="cps-selector-label">区域</span>
-              <a-radio-group :value="draft.location.area" button-style="solid" class="cps-selector-group" @change="(e: any) => onSelectArea(e.target.value)">
-                <a-radio-button v-for="item in draft.areas" :key="item.value" :value="String(item.value)">{{ item.label }}</a-radio-button>
-              </a-radio-group>
-              <span v-if="!draft.areas.length" class="cps-muted">先选择工厂</span>
-            </div>
-
-            <div v-if="draft.location.area" class="cps-selector-row">
-              <span class="cps-selector-label">拉线</span>
-              <a-radio-group :value="draft.location.line" button-style="solid" class="cps-selector-group" @change="(e: any) => onSelectLine(e.target.value)">
-                <a-radio-button v-for="item in draft.lines" :key="item.value" :value="String(item.value)">{{ item.label }}</a-radio-button>
-              </a-radio-group>
-              <span v-if="!draft.lines.length" class="cps-muted">暂无拉线数据</span>
-            </div>
-
-            <div v-if="draft.location.area" class="cps-selector-row">
-              <span class="cps-selector-label">工序</span>
-              <a-radio-group :value="draft.location.process" button-style="solid" class="cps-selector-group" @change="(e: any) => onSelectProcess(e.target.value)">
-                <a-radio-button v-for="item in draft.processes" :key="item.value" :value="String(item.value)">{{ item.label }}</a-radio-button>
-              </a-radio-group>
-              <span v-if="!draft.processes.length" class="cps-muted">暂无工序数据</span>
-            </div>
-          </div>
-        </a-card>
-
-        <a-alert v-if="inspecting" type="info" show-icon message="AI 正在识别首张图片，请稍候" style="margin-top: 16px" />
-
-        <a-card v-if="aiSuggestionSummary" class="cps-card cps-create-ai" :body-style="{ padding: '16px' }" style="margin-top: 16px">
-          <template #title>
-            <div class="cps-card-title">
-              <h2 class="cps-card-title__main">原因措施</h2>
-              <a-tag color="blue">可修改</a-tag>
-            </div>
-          </template>
-          <pre class="cps-create-ai__pre">{{ aiSuggestionSummary }}</pre>
-        </a-card>
-
-        <a-card class="cps-card" :body-style="{ padding: '16px' }" style="margin-top: 16px">
-          <template #title>
-            <div class="cps-card-title">
-              <h2 class="cps-card-title__main">整改安排</h2>
-            </div>
-          </template>
-          <a-form layout="vertical">
-            <a-form-item label="资源号" required>
-              <a-input
-                v-model:value="draft.resourceNo"
-                placeholder="请输入现场资源号（设备/工位编号等）"
-                allow-clear
-                :maxlength="64"
+        <view v-if="typeCheckItems.length || checkItemsLoading" class="u-card cps-card">
+          <view class="cps-card-title">
+            <text class="cps-card-title__main">现场点检项</text>
+            <text class="cps-pill cps-pill--teal">{{ checkDoneCount }}/{{ typeCheckItems.length }}</text>
+          </view>
+          <view v-if="checkItemsLoading" class="u-loading">
+            <view class="u-loading__dot" />
+            <text class="u-loading__text">加载中…</text>
+          </view>
+          <view
+            v-for="(ci, idx) in typeCheckItems"
+            :key="ci.itemCode"
+            class="cps-check-entry"
+            :class="{ 'cps-check-entry--done': isCheckEntryDone(ci) }"
+          >
+            <view class="cps-check-entry__head">
+              <text class="cps-check-entry__title">{{ idx + 1 }}. {{ ci.content }}</text>
+              <text class="cps-check-entry__code">{{ ci.itemCode }}</text>
+            </view>
+            <text v-if="hasCheckType(ci, 'PHOTO') && ci.photoCriteria" class="cps-check-entry__criteria">
+              📷 {{ ci.photoCriteria }}（至少 {{ ci.photoMinCount ?? 1 }} 张）
+            </text>
+            <view v-if="hasCheckType(ci, 'PASS_FAIL')" class="cps-check-entry__row">
+              <view class="u-seg">
+                <text
+                  class="u-seg__item"
+                  :class="{ 'u-seg__item--active': checkEntries[ci.itemCode]?.passResult === 'PASS' }"
+                  @click="setCheckField(ci.itemCode, 'passResult', 'PASS')"
+                >✓ 合格</text>
+                <text
+                  class="u-seg__item"
+                  :class="{ 'u-seg__item--active': checkEntries[ci.itemCode]?.passResult === 'FAIL' }"
+                  @click="setCheckField(ci.itemCode, 'passResult', 'FAIL')"
+                >✗ 不合格</text>
+              </view>
+            </view>
+            <view v-if="hasCheckType(ci, 'TEXT')" class="cps-check-entry__row">
+              <textarea
+                class="u-textarea"
+                auto-height
+                :value="checkEntries[ci.itemCode]?.textValue ?? ''"
+                :maxlength="500"
+                :placeholder="ci.textHint || '请填写现场情况说明'"
+                @input="(event: any) => setCheckField(ci.itemCode, 'textValue', event.detail.value)"
               />
-            </a-form-item>
-            <a-form-item label="整改人">
-              <a-input :value="feedbackPersonLabel" placeholder="选择整改人" read-only @click="feedbackPickerOpen = true">
-                <template #suffix><UserOutlined /></template>
-              </a-input>
-            </a-form-item>
-          </a-form>
-        </a-card>
-      </a-col>
-    </a-row>
+            </view>
+            <view v-if="hasCheckType(ci, 'PHOTO')" class="cps-check-entry__row">
+              <view class="cps-check-photos">
+                <view v-for="(p, pi) in checkEntries[ci.itemCode]?.photos ?? []" :key="pi" class="cps-check-photo">
+                  <image class="cps-check-photo__img" :src="p.url" mode="aspectFill" />
+                  <text class="cps-check-photo__del" @click.stop="removeCheckPhoto(ci.itemCode, pi)">×</text>
+                </view>
+                <button class="cps-check-photo__add" @click="onCheckPhotoPick(ci.itemCode)">
+                  <text>＋ {{ (checkEntries[ci.itemCode]?.photos?.length ?? 0) }}/{{ ci.photoMinCount ?? 1 }}</text>
+                </button>
+              </view>
+            </view>
+          </view>
+        </view>
 
-    <div v-if="step === 'form'" class="cps-submit-bar">
-      <div class="cps-submit-bar__progress">
-        <span v-for="item in progressItems" :key="item.label" class="cps-progress-chip" :class="{ 'is-done': item.done }">
+        <view class="u-card cps-card">
+          <view class="cps-card-title">
+            <text class="cps-card-title__main">工厂 / 区域 / 拉线 / 工序</text>
+          </view>
+
+          <view class="cps-selector">
+            <view class="cps-selector-row">
+              <text class="cps-selector-label">工厂</text>
+              <view class="u-seg cps-selector-group">
+                <text
+                  v-for="item in draft.factories"
+                  :key="item.value"
+                  class="u-seg__item"
+                  :class="{ 'u-seg__item--active': draft.location.factory === String(item.value) }"
+                  @click="onSelectFactory(String(item.value))"
+                >{{ item.label }}</text>
+              </view>
+              <text v-if="!draft.factories.length" class="cps-muted">暂无工厂数据</text>
+            </view>
+
+            <view class="cps-selector-row">
+              <text class="cps-selector-label">区域</text>
+              <view class="u-seg cps-selector-group">
+                <text
+                  v-for="item in draft.areas"
+                  :key="item.value"
+                  class="u-seg__item"
+                  :class="{ 'u-seg__item--active': draft.location.area === String(item.value) }"
+                  @click="onSelectArea(String(item.value))"
+                >{{ item.label }}</text>
+              </view>
+              <text v-if="!draft.areas.length" class="cps-muted">先选择工厂</text>
+            </view>
+
+            <view v-if="draft.location.area" class="cps-selector-row">
+              <text class="cps-selector-label">拉线</text>
+              <view class="u-seg cps-selector-group">
+                <text
+                  v-for="item in draft.lines"
+                  :key="item.value"
+                  class="u-seg__item"
+                  :class="{ 'u-seg__item--active': draft.location.line === String(item.value) }"
+                  @click="onSelectLine(String(item.value))"
+                >{{ item.label }}</text>
+              </view>
+              <text v-if="!draft.lines.length" class="cps-muted">暂无拉线数据</text>
+            </view>
+
+            <view v-if="draft.location.area" class="cps-selector-row">
+              <text class="cps-selector-label">工序</text>
+              <view class="u-seg cps-selector-group">
+                <text
+                  v-for="item in draft.processes"
+                  :key="item.value"
+                  class="u-seg__item"
+                  :class="{ 'u-seg__item--active': draft.location.process === String(item.value) }"
+                  @click="onSelectProcess(String(item.value))"
+                >{{ item.label }}</text>
+              </view>
+              <text v-if="!draft.processes.length" class="cps-muted">暂无工序数据</text>
+            </view>
+          </view>
+        </view>
+
+        <view v-if="inspecting" class="u-alert u-alert--info">
+          <text class="u-alert__icon">ℹ</text>
+          <text class="u-alert__text">AI 正在识别首张图片，请稍候</text>
+        </view>
+
+        <view v-if="aiSuggestionSummary" class="u-card cps-card cps-create-ai">
+          <view class="cps-card-title">
+            <text class="cps-card-title__main">原因措施</text>
+            <text class="cps-pill cps-pill--blue">可修改</text>
+          </view>
+          <text class="cps-create-ai__pre">{{ aiSuggestionSummary }}</text>
+        </view>
+
+        <view class="u-card cps-card">
+          <view class="cps-card-title">
+            <text class="cps-card-title__main">整改安排</text>
+          </view>
+          <view class="cps-form">
+            <view class="u-field">
+              <text class="u-field__label">资源号<text class="u-field__req">*</text></text>
+              <view class="u-field__control">
+                <input
+                  v-model="draft.resourceNo"
+                  class="u-input"
+                  type="text"
+                  placeholder="请输入现场资源号（设备/工位编号等）"
+                  :maxlength="64"
+                />
+              </view>
+            </view>
+            <view class="u-field">
+              <text class="u-field__label">整改人</text>
+              <view class="u-field__control">
+                <view class="u-input cps-person-field" @click="feedbackPickerOpen = true">
+                  <text class="cps-person-field__value" :class="{ 'cps-person-field__placeholder': !feedbackPersonLabel }">
+                    {{ feedbackPersonLabel || '选择整改人' }}
+                  </text>
+                  <text class="cps-person-field__icon">👤</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view v-if="step === 'form'" class="cps-submit-bar">
+      <view class="cps-submit-bar__progress">
+        <text
+          v-for="item in progressItems"
+          :key="item.label"
+          class="cps-progress-chip"
+          :class="{ 'is-done': item.done }"
+        >
           {{ item.done ? '✓' : '·' }} {{ item.label }}
-        </span>
-      </div>
-      <div class="cps-submit-bar__actions">
-        <a-button
-          size="large"
-          :loading="savingDraft"
-          :disabled="!canSaveDraft"
-          class="cps-draft-btn"
+        </text>
+      </view>
+      <view class="cps-submit-bar__actions">
+        <button
+          class="u-btn u-btn--ghost"
+          :disabled="!canSaveDraft || savingDraft"
           @click="saveDraft"
         >
-          {{ draft.draftId ? '更新暂存' : '暂存' }}
-        </a-button>
-        <a-button type="primary" size="large" :loading="submitting" :disabled="!canSubmit" class="cps-submit-btn" @click="submit">
-          提交并派发
-        </a-button>
-      </div>
-      <p v-if="draft.draftId" class="cps-draft-hint">已关联服务端草稿 #{{ draft.draftId }}，提交后将自动归档</p>
-    </div>
+          {{ savingDraft ? '保存中…' : draft.draftId ? '更新暂存' : '暂存' }}
+        </button>
+        <button class="u-btn u-btn--primary" :disabled="!canSubmit || submitting" @click="submit">
+          {{ submitting ? '提交中…' : '提交并派发' }}
+        </button>
+      </view>
+      <text v-if="draft.draftId" class="cps-draft-hint">已关联服务端草稿 #{{ draft.draftId }}，提交后将自动归档</text>
+    </view>
 
     <!-- 反馈人选择弹窗（内联） -->
-    <a-modal
-      :open="feedbackPickerOpen"
-      title="选择整改人"
-      :width="isLandscape ? 520 : '100%'"
-      :centered="isLandscape"
-      :footer="null"
-      :destroy-on-close="false"
-      @update:open="(v: boolean) => (feedbackPickerOpen = v)"
-    >
-      <a-input-search
-        v-model:value="feedbackKeyword"
-        placeholder="输入姓名或工号搜索"
-        allow-clear
-        enter-button="搜索"
-        :loading="feedbackSearching"
-        class="cps-person-picker__search"
-        @search="onSearchFeedback"
-      />
-      <a-spin :spinning="feedbackSearching">
-        <div class="cps-person-picker__body">
-          <a-empty v-if="!feedbackPeople.length" description="未找到人员，请调整关键词后搜索" />
-          <a-radio-group :value="draft.feedbackEmpNo" class="cps-person-picker__group" @change="(e: any) => onSelectFeedback(e.target.value)">
-            <a-radio v-for="person in feedbackPeople" :key="person.empNo" :value="person.empNo" class="cps-person-picker__option">
-              <strong>{{ person.empName || person.empNo }}</strong>
-              <span>{{ person.empNo }}</span>
-            </a-radio>
-          </a-radio-group>
-        </div>
-      </a-spin>
-    </a-modal>
+    <view v-if="feedbackPickerOpen" class="u-modal-mask" @click.self="feedbackPickerOpen = false">
+      <view class="u-modal" :style="{ maxWidth: isLandscape ? '520px' : '100%' }">
+        <view class="u-modal__head">
+          <text class="u-modal__title">选择整改人</text>
+          <text class="u-modal__close" @click="feedbackPickerOpen = false">×</text>
+        </view>
+        <view class="u-modal__body">
+          <view class="u-search cps-person-picker__search">
+            <input
+              v-model="feedbackKeyword"
+              class="u-input u-search__input"
+              type="text"
+              placeholder="输入姓名或工号搜索"
+              @confirm="onSearchFeedback"
+            />
+            <button class="u-search__btn" :disabled="feedbackSearching" @click="onSearchFeedback">搜索</button>
+          </view>
+          <view v-if="feedbackSearching" class="u-loading">
+            <view class="u-loading__dot" />
+            <text class="u-loading__text">搜索中…</text>
+          </view>
+          <view class="cps-person-picker__body">
+            <view v-if="!feedbackPeople.length" class="u-empty">
+              <text class="u-empty__icon">📭</text>
+              <text class="u-empty__text">未找到人员，请调整关键词后搜索</text>
+            </view>
+            <view v-else class="cps-person-picker__group">
+              <view
+                v-for="person in feedbackPeople"
+                :key="person.empNo"
+                class="cps-person-picker__option"
+                :class="{ 'cps-person-picker__option--active': draft.feedbackEmpNo === person.empNo }"
+                @click="onSelectFeedback(person.empNo)"
+              >
+                <text class="cps-person-picker__radio">{{ draft.feedbackEmpNo === person.empNo ? '●' : '○' }}</text>
+                <view class="cps-person-picker__text">
+                  <text class="cps-person-picker__name">{{ person.empName || person.empNo }}</text>
+                  <text class="cps-person-picker__no">{{ person.empNo }}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
 
     <!-- 分区域类型（如辅房点检）：先选区域，再开始巡检 -->
-    <a-modal
-      :open="areaPickerOpen"
-      :title="`选择巡检区域${areaPickerType ? ` · ${areaPickerType.name}` : ''}`"
-      :width="isLandscape ? 560 : '100%'"
-      :centered="isLandscape"
-      :footer="null"
-      @update:open="(v: boolean) => (areaPickerOpen = v)"
-    >
-      <p class="cps-create-card__hint">该类型按区域执行，选定区域后将在该区域下生成点检项快照</p>
-      <a-input-search
-        v-model:value="areaKeyword"
-        class="cps-area-search"
-        placeholder="搜索区域名称、编码或房型"
-        allow-clear
-        :disabled="!areaOptions.length"
-      />
-      <a-spin :spinning="areaPickerLoading">
-        <a-empty v-if="!areaOptions.length && !areaPickerLoading" description="该类型暂无启用区域，请联系管理员配置" />
-        <div v-else-if="!filteredAreas.length" class="cps-type-empty">没有匹配「{{ areaKeyword }}」的区域</div>
-        <div v-else class="cps-area-pick">
-          <button
-            v-for="a in filteredAreas"
-            :key="a.id"
-            type="button"
-            class="cps-area-pick__item"
-            :disabled="areaPickerStarting !== null"
-            @click="startZonedInspection(a)"
-          >
-            <span class="cps-area-pick__main">
-              <strong>{{ a.areaName }}</strong>
-              <span class="cps-area-pick__meta">
-                {{ a.areaCode }}
-                <template v-if="a.lineOrRoomType"> · {{ a.lineOrRoomType }}</template>
-                <template v-if="a.process"> · {{ a.process }}</template>
-              </span>
-            </span>
-            <span class="cps-area-pick__risk" :data-risk="a.riskLevel">{{ riskLabel(a.riskLevel) }}</span>
-            <span class="cps-area-pick__go">{{ areaPickerStarting === a.id ? '正在开启…' : '开始 →' }}</span>
-          </button>
-        </div>
-      </a-spin>
-    </a-modal>
-  </main>
+    <view v-if="areaPickerOpen" class="u-modal-mask" @click.self="areaPickerOpen = false">
+      <view class="u-modal" :style="{ maxWidth: isLandscape ? '560px' : '100%' }">
+        <view class="u-modal__head">
+          <text class="u-modal__title">选择巡检区域{{ areaPickerType ? ` · ${areaPickerType.name}` : '' }}</text>
+          <text class="u-modal__close" @click="areaPickerOpen = false">×</text>
+        </view>
+        <view class="u-modal__body">
+          <text class="cps-create-card__hint">该类型按区域执行，选定区域后将在该区域下生成点检项快照</text>
+          <view class="u-search cps-area-search">
+            <input
+              v-model="areaKeyword"
+              class="u-input u-search__input"
+              type="text"
+              placeholder="搜索区域名称、编码或房型"
+              :disabled="!areaOptions.length"
+            />
+            <text v-if="areaKeyword" class="u-search__clear" @click="areaKeyword = ''">×</text>
+          </view>
+          <view v-if="areaPickerLoading" class="u-loading">
+            <view class="u-loading__dot" />
+            <text class="u-loading__text">加载中…</text>
+          </view>
+          <view v-if="!areaOptions.length && !areaPickerLoading" class="u-empty">
+            <text class="u-empty__icon">📭</text>
+            <text class="u-empty__text">该类型暂无启用区域，请联系管理员配置</text>
+          </view>
+          <text v-else-if="!filteredAreas.length" class="cps-type-empty">没有匹配「{{ areaKeyword }}」的区域</text>
+          <view v-else class="cps-area-pick">
+            <button
+              v-for="a in filteredAreas"
+              :key="a.id"
+              class="cps-area-pick__item"
+              :disabled="areaPickerStarting !== null"
+              @click="startZonedInspection(a)"
+            >
+              <view class="cps-area-pick__main">
+                <text class="cps-area-pick__name">{{ a.areaName }}</text>
+                <view class="cps-area-pick__meta">
+                  <text class="cps-area-pick__meta-text">{{ a.areaCode }}</text>
+                  <text v-if="a.lineOrRoomType" class="cps-area-pick__meta-text"> · {{ a.lineOrRoomType }}</text>
+                  <text v-if="a.process" class="cps-area-pick__meta-text"> · {{ a.process }}</text>
+                </view>
+              </view>
+              <text class="cps-area-pick__risk" :data-risk="a.riskLevel">{{ riskLabel(a.riskLevel) }}</text>
+              <text class="cps-area-pick__go">{{ areaPickerStarting === a.id ? '正在开启…' : '开始 →' }}</text>
+            </button>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { AudioOutlined, UserOutlined } from '@ant-design/icons-vue'
-import { message } from 'ant-design-vue'
-import type { UploadProps } from 'ant-design-vue'
-
 import { inspectCpsImage, startVoiceRecording, stopVoiceRecording } from '@/api/cps/ai'
 import { createCpsIssue } from '@/api/cps/issue'
 import { getInspectionTypeCheckItems, listCpsInspectionTypes } from '@/api/cps/inspectionType'
@@ -424,10 +472,10 @@ import {
   searchCpsEmployees,
   type CpsEmployeeOption,
 } from '@/api/cps/master'
-import { uploadCpsAttachment } from '@/api/cps/attachment'
+import { uploadCpsAttachment, type CpsAttachmentUploadSource } from '@/api/cps/attachment'
 import type { CpsCheckItemInfo, CpsInspectionArea, CpsInspectionType, CpsIssueCheckResult, CpsIssueDraftData, CpsUploadedImage } from '@/types/cps'
 import { useFormDraftStore } from '@/store/formDraft'
-import { toImageUrl } from '@/utils/image'
+import { resolveUploadSources, toImageUrl } from '@/utils/image'
 
 const draft = useFormDraftStore()
 
@@ -489,7 +537,7 @@ const openAreaPicker = async (t: CpsInspectionType) => {
   try {
     areaOptions.value = await listInspectionAreas(t.code)
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '加载巡检区域失败')
+    uni.showToast({ title: error instanceof Error ? error.message : '加载巡检区域失败', icon: 'none' })
   } finally {
     areaPickerLoading.value = false
   }
@@ -504,7 +552,7 @@ const startZonedInspection = async (area: CpsInspectionArea) => {
     areaPickerOpen.value = false
     uni.redirectTo({ url: `/views/cps/InspectionExecuteView?recordId=${record.id}` })
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '开始巡检失败（请确认该区域已配置点检项）')
+    uni.showToast({ title: error instanceof Error ? error.message : '开始巡检失败（请确认该区域已配置点检项）', icon: 'none' })
   } finally {
     areaPickerStarting.value = null
   }
@@ -551,20 +599,30 @@ const loadTypeCheckItems = async (code: string) => {
   }
 }
 
-const onCheckPhotoPick = async (itemCode: string, e: Event) => {
-  const input = e.target as HTMLInputElement
-  const files = Array.from(input.files ?? [])
-  input.value = ''
-  if (!files.length) return
+/** 调起 uni 图片选择（拍照 / 相册），返回可上传的源 */
+const chooseUploadSources = (count: number) =>
+  new Promise<CpsAttachmentUploadSource[]>((resolve) => {
+    uni.chooseImage({
+      count,
+      sizeType: ['compressed'],
+      sourceType: ['camera', 'album'],
+      success: (result) => resolve(resolveUploadSources(result)),
+      fail: () => resolve([]),
+    })
+  })
+
+const onCheckPhotoPick = async (itemCode: string) => {
+  const sources = await chooseUploadSources(9)
+  if (!sources.length) return
   try {
     const current = [...(checkEntries.value[itemCode]?.photos ?? [])]
-    for (const file of files) {
-      const uploaded = await uploadCpsAttachment(file)
+    for (const source of sources) {
+      const uploaded = await uploadCpsAttachment(source)
       current.push({ id: uploaded.id, url: uploaded.url, name: uploaded.name })
     }
     setCheckField(itemCode, 'photos', current)
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '照片上传失败')
+    uni.showToast({ title: error instanceof Error ? error.message : '照片上传失败', icon: 'none' })
   }
 }
 
@@ -625,7 +683,7 @@ const onSelectInspectionType = async (code: string) => {
       const record = await startInspection({ typeCode: code })
       uni.redirectTo({ url: `/views/cps/InspectionExecuteView?recordId=${record.id}` })
     } catch (error) {
-      message.error(error instanceof Error ? error.message : '开始巡检失败（请确认该类型已配置点检项）')
+      uni.showToast({ title: error instanceof Error ? error.message : '开始巡检失败（请确认该类型已配置点检项）', icon: 'none' })
     } finally {
       startingCustom.value = null
     }
@@ -665,7 +723,7 @@ const loadInspectionTypes = async () => {
       (a, b) => (b.builtin ?? 0) - (a.builtin ?? 0) || (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
     )
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '加载巡检类型失败')
+    uni.showToast({ title: error instanceof Error ? error.message : '加载巡检类型失败', icon: 'none' })
   } finally {
     inspectionTypesLoading.value = false
   }
@@ -681,13 +739,15 @@ const feedbackCandidates = ref<CpsEmployeeOption[]>([])
 
 // 横竖屏断点：lg 以上视为横屏（平板宽屏）
 const isLandscape = ref(false)
-const updateOrientation = () => {
-  isLandscape.value = window.innerWidth >= 992
+const updateOrientation = (size?: { size?: { windowWidth?: number } }) => {
+  const width = size?.size?.windowWidth ?? uni.getSystemInfoSync().windowWidth
+  isLandscape.value = width >= 992
 }
-if (typeof window !== 'undefined') {
-  updateOrientation()
-  window.addEventListener('resize', updateOrientation)
-}
+updateOrientation()
+uni.onWindowResize(updateOrientation)
+onUnmounted(() => {
+  uni.offWindowResize(updateOrientation)
+})
 
 const aiSuggestionSummary = computed(() => {
   if (!draft.aiSuggestion) return ''
@@ -715,15 +775,6 @@ const feedbackPeople = computed<CpsEmployeeOption[]>(() => {
   }
   return feedbackCandidates.value
 })
-
-const uploadFileList = computed(() =>
-  draft.images.map((image) => ({
-    uid: String(image.id),
-    name: image.name,
-    status: 'done' as const,
-    url: draft.imagePreviewSources[image.id],
-  })),
-)
 
 interface ProgressItem {
   label: string
@@ -853,29 +904,27 @@ watch(feedbackPickerOpen, (v) => {
   }
 })
 
-// 图片上传
-const beforeUpload: UploadProps['beforeUpload'] = (_file, fileList) => {
+// 图片上传：uni.chooseImage 逐张串行上传，保持选择顺序（首张仍触发 AI 识别）
+const pickImages = async () => {
   const remaining = Math.max(5 - draft.images.length, 0)
-  if (fileList.length > remaining) return false
-  return true
-}
-
-const customRequest: UploadProps['customRequest'] = async (options) => {
-  const { file, onSuccess, onError } = options
-  const shouldInspectFirst = draft.images.length === 0
+  if (!remaining) return
+  const sources = await chooseUploadSources(remaining)
+  if (!sources.length) return
   uploading.value = true
   try {
-    const uploaded = await uploadCpsAttachment(file as File)
-    draft.images = [...draft.images, uploaded]
-    // 直接使用后端返回的 /api/cps/attachments/{id}/content 路径作为预览地址，
-    // 免掉 base64 转换与 /api/cps/attachments/base64 接口（已下线）。
-    draft.imagePreviewSources = { ...draft.imagePreviewSources, [uploaded.id]: uploaded.url }
-    onSuccess?.({}, file as any)
-    if (shouldInspectFirst) {
-      await onFirstImageReady(uploaded.id)
+    for (const source of sources) {
+      const shouldInspectFirst = draft.images.length === 0
+      const uploaded = await uploadCpsAttachment(source)
+      draft.images = [...draft.images, uploaded]
+      // 直接使用后端返回的 /api/cps/attachments/{id}/content 路径作为预览地址，
+      // 免掉 base64 转换与 /api/cps/attachments/base64 接口（已下线）。
+      draft.imagePreviewSources = { ...draft.imagePreviewSources, [uploaded.id]: uploaded.url }
+      if (shouldInspectFirst) {
+        await onFirstImageReady(uploaded.id)
+      }
     }
   } catch (error) {
-    onError?.(error as any)
+    uni.showToast({ title: error instanceof Error ? error.message : '图片上传失败', icon: 'none' })
   } finally {
     uploading.value = false
   }
@@ -920,10 +969,10 @@ const onVoiceClick = async () => {
       if (text.trim()) {
         draft.description = [draft.description.trim(), text.trim()].filter(Boolean).join('\n')
       } else {
-        message.info('未识别到语音内容')
+        uni.showToast({ title: '未识别到语音内容', icon: 'none' })
       }
     } catch (error) {
-      message.error(error instanceof Error ? error.message : '语音识别失败')
+      uni.showToast({ title: error instanceof Error ? error.message : '语音识别失败', icon: 'none' })
     } finally {
       transcribing.value = false
     }
@@ -933,7 +982,7 @@ const onVoiceClick = async () => {
   if (transcribing.value) return
   const started = await startVoiceRecording()
   if (!started) {
-    message.error('当前环境不支持语音录入')
+    uni.showToast({ title: '当前环境不支持语音录入', icon: 'none' })
     return
   }
   recording.value = true
@@ -988,9 +1037,9 @@ const saveDraft = async () => {
       draftData: JSON.stringify(snapshot),
     })
     draft.draftId = saved.id
-    message.success(`已暂存（草稿 #${saved.id}），可稍后从「我的草稿」继续填写`)
+    uni.showToast({ title: `已暂存（草稿 #${saved.id}），可稍后从「我的草稿」继续填写`, icon: 'success' })
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '暂存失败')
+    uni.showToast({ title: error instanceof Error ? error.message : '暂存失败', icon: 'none' })
   } finally {
     savingDraft.value = false
   }
@@ -1004,7 +1053,7 @@ const restoreDraft = async (id: number) => {
     try {
       data = JSON.parse(remote.draftData) as CpsIssueDraftData
     } catch {
-      message.error('草稿数据损坏，无法恢复')
+      uni.showToast({ title: '草稿数据损坏，无法恢复', icon: 'none' })
       return
     }
     draft.location = data.location ?? { factory: '', area: '', line: '', process: '' }
@@ -1035,9 +1084,9 @@ const restoreDraft = async (id: number) => {
         draft.processes = await getProcesses(draft.location.factory, draft.location.area)
       }
     }
-    message.success(`已恢复草稿 #${remote.id}，继续填写`)
+    uni.showToast({ title: `已恢复草稿 #${remote.id}，继续填写`, icon: 'success' })
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '恢复草稿失败')
+    uni.showToast({ title: error instanceof Error ? error.message : '恢复草稿失败', icon: 'none' })
   }
 }
 
@@ -1071,7 +1120,7 @@ const submit = async () => {
     draft.reset()
     uni.redirectTo({ url: `/views/cps/IssueDetailView?id=${result.issueId}` })
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '提交失败')
+    uni.showToast({ title: error instanceof Error ? error.message : '提交失败', icon: 'none' })
   } finally {
     submitting.value = false
   }
@@ -1135,7 +1184,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   letter-spacing: 0.18em;
 }
 
-.cps-hero h1 {
+.cps-hero__title {
   margin: 0;
   font-size: 24px;
   font-weight: 800;
@@ -1206,15 +1255,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   border-radius: var(--cps-radius-lg);
   border: 1px solid var(--cps-border);
   box-shadow: var(--cps-shadow-card);
-}
-
-.cps-card :deep(.ant-card-head) {
-  min-height: 54px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--cps-border);
-}
-
-.cps-card-title {
+}.cps-card-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1259,23 +1300,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   width: 100%;
   height: 100%;
   color: #0f766e;
-}
-
-.cps-create-page :deep(.ant-upload.ant-upload-select) {
-  width: 100%;
-  height: auto;
-  margin-bottom: 12px;
-}
-
-.cps-create-page :deep(.ant-upload.ant-upload-select .ant-upload) {
-  width: 100%;
-  padding: 18px;
-  border-radius: var(--cps-radius-lg);
-  background: var(--cps-mist);
-  border: 1px dashed #99f6e4;
-}
-
-.cps-uploader__plus {
+}.cps-uploader__plus {
   font-size: 28px;
   line-height: 1;
 }
@@ -1301,7 +1326,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   cursor: pointer;
 }
 
-.cps-uploader__item img {
+.cps-uploader__img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -1366,21 +1391,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
-}
-
-.cps-selector-group :deep(.ant-radio-button-wrapper) {
-  border-radius: 999px;
-  border: 1px solid #cbd5e1;
-  height: 36px;
-  line-height: 34px;
-  padding: 0 16px;
-}
-
-.cps-selector-group :deep(.ant-radio-button-wrapper:not(:first-child))::before {
-  display: none;
-}
-
-.cps-muted {
+}.cps-muted {
   flex: 1 1 auto;
   padding-top: 6px;
   color: #64748b;
@@ -1439,7 +1450,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   min-width: 0;
 }
 
-.cps-area-pick__main strong {
+.cps-area-pick__name {
   color: #0f172a;
   font-size: 14px;
   font-weight: 700;
@@ -1602,7 +1613,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   gap: 8px;
 }
 
-.cps-check-entry__head strong {
+.cps-check-entry__title {
   color: #0f172a;
   font-size: 14px;
   line-height: 20px;
@@ -1647,7 +1658,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   background: #e2e8f0;
 }
 
-.cps-check-photo img {
+.cps-check-photo__img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -1806,28 +1817,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   padding: 8px 12px;
   border-radius: var(--cps-radius-md);
   background: var(--cps-cloud);
-}
-
-.cps-person-picker__option :deep(.ant-radio + span) {
-  display: grid;
-  gap: 2px;
-  padding-right: 8px;
-}
-
-.cps-person-picker__option :deep(strong) {
-  color: #0f172a;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 22px;
-}
-
-.cps-person-picker__option :deep(span:not(.ant-radio)) {
-  color: #64748b;
-  font-size: 13px;
-  line-height: 18px;
-}
-
-.cps-submit-bar {
+}.cps-submit-bar {
   position: fixed;
   left: 0;
   right: 0;
@@ -1902,48 +1892,238 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   .cps-page {
     padding: 20px 28px 120px;
   }
-  .cps-hero h1 {
+  .cps-hero__title {
     font-size: 26px;
   }
 }
-/* ===== antd 组件品牌色（只在本页作用域内生效） ===== */
-.cps-create-page :deep(.ant-btn-primary:not(:disabled)) {
-  background: var(--cps-teal-deep);
-  border-color: var(--cps-teal-deep);
+/* ===== uni-app 内置控件改造补充 ===== */
+.cps-create-page .cps-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.cps-create-page .cps-card--pad-lg {
+  padding: 20px;
+}
+
+.cps-create-page .cps-card--pad-x {
+  padding: 14px 16px;
+}
+
+.cps-create-page .cps-card--pad-sm {
+  padding: 12px 16px;
+}
+
+.cps-create-layout {
+  display: grid;
+  gap: 16px;
+}
+
+.cps-create-layout__col {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+@media (min-width: 992px) {
+  .cps-create-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+.cps-form {
+  display: grid;
+  gap: 14px;
+}
+
+.cps-hero__title {
+  color: #ffffff;
+}
+
+.cps-uploader__img,
+.cps-check-photo__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cps-uploader__add {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 2px;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1.5px dashed #99f6e4;
+  border-radius: 12px;
+  background: var(--cps-mist);
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cps-uploader__add[disabled] {
+  opacity: 0.6;
+}
+
+.cps-desc-count {
+  display: block;
+  margin-top: -4px;
+  text-align: right;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.cps-person-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.cps-person-field__placeholder {
+  color: #94a3b8;
+}
+
+.cps-person-picker__option--active {
+  outline: 1.5px solid var(--cps-teal);
+  background: #f0fdfa;
+}
+
+.cps-person-picker__radio {
+  color: var(--cps-teal-deep);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.cps-person-picker__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cps-person-picker__name {
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 22px;
+}
+
+.cps-person-picker__no {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.cps-person-picker__option {
+  cursor: pointer;
+}
+
+.cps-check-entry__title {
+  color: #0f172a;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.cps-area-pick__name {
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.cps-area-pick__meta-text {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.cps-type-select__name {
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.cps-type-content-banner__label {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.cps-selector-group {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.cps-selector-group .u-seg__item {
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  height: 36px;
+  line-height: 34px;
+  padding: 0 16px;
+}
+
+.cps-selector-group .u-seg__item--active {
+  border-color: var(--cps-teal);
+  background: var(--cps-teal);
+  color: #ffffff;
   box-shadow: none;
 }
 
-.cps-create-page :deep(.ant-btn-primary:not(:disabled):hover) {
-  background: #115e59;
-  border-color: #115e59;
+.cps-progress-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.cps-create-page :deep(.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled)) {
-  background: var(--cps-teal-deep);
-  border-color: var(--cps-teal-deep);
-  color: #fff;
+.cps-draft-hint {
+  display: block;
 }
 
-.cps-create-page :deep(.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled)::before) {
-  background-color: var(--cps-teal-deep);
+/* 弹层标题栏 */
+.u-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.cps-create-page :deep(.ant-radio-checked .ant-radio-inner) {
-  border-color: var(--cps-teal-deep);
+.u-modal__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--cps-ink);
 }
 
-.cps-create-page :deep(.ant-radio-checked .ant-radio-inner::after) {
-  background-color: var(--cps-teal-deep);
+.u-modal__close {
+  padding: 2px 8px;
+  color: #94a3b8;
+  font-size: 20px;
+  line-height: 1;
 }
 
-.cps-create-page :deep(.ant-input:focus),
-.cps-create-page :deep(.ant-input-focused),
-.cps-create-page :deep(.ant-input-affix-wrapper-focused) {
-  border-color: var(--cps-teal);
-  box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.16);
+/* 搜索框清除按钮 */
+.u-search {
+  position: relative;
 }
 
-.cps-create-page :deep(.ant-spin-dot-item) {
-  background-color: var(--cps-teal-deep);
+.u-search__clear {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.cps-type-search .u-search__input,
+.cps-area-search .u-search__input {
+  padding-right: 36px;
 }
 </style>
