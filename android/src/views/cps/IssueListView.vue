@@ -19,7 +19,7 @@
           :key="item.value"
           class="u-tabs__item cps-tab"
           :class="{ 'u-tabs__item--active': tab === item.value }"
-          @click="selectTab(item.value)"
+          @click="tab = item.value"
         >
           <text class="cps-tab__label">{{ item.label }}</text>
           <text v-if="item.count > 0" class="u-badge cps-tab__badge">{{ item.count > 99 ? '99+' : item.count }}</text>
@@ -187,10 +187,6 @@ const load = async (force = false) => {
   }
 }
 
-const onTabChange = () => {
-  if (isIssueTab(tab.value)) void load()
-}
-
 // onShow：从详情页/新建页返回时，当前 tab 列表可能已变化，强制刷新一次
 const onShowHandler = () => {
   if (isIssueTab(tab.value)) void load(true)
@@ -228,13 +224,6 @@ const currentLoading = computed(() => {
   if (tab.value === 'running') return recordsLoading.value
   return loading.value
 })
-
-// 页签切换：值不变时不重复触发（保持原 antd @change 语义）
-const selectTab = (value: TabKey) => {
-  if (tab.value === value) return
-  tab.value = value
-  onTabChange()
-}
 
 const loadCounts = async () => {
   try {
@@ -561,6 +550,9 @@ checkbox .wx-checkbox-input {
 
 .u-tabs {
   display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 4px;
   padding: 6px;
   border-bottom: 1px solid #e2e8f0;
@@ -569,6 +561,10 @@ checkbox .wx-checkbox-input {
 }
 
 .u-tabs__item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
   flex: none;
   padding: 8px 14px;
   border-radius: 10px 10px 0 0;

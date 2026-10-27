@@ -1145,7 +1145,10 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   if (raw !== undefined && Number.isFinite(draftIdParam) && draftIdParam > 0) {
     pendingDraftId.value = draftIdParam
     void restoreDraft(draftIdParam)
+    return
   }
+  // 新建问题：不沿用任何本地缓存，进入即清空上一次遗留的表单内容
+  draft.reset()
 })
 </script>
 
