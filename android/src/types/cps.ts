@@ -378,7 +378,7 @@ export interface CpsSpeechTranscriptionResult {
 
 // ===== Phase B2：服务端草稿（防止一次填不完）=====
 
-/** 草稿表单快照：由 formDraft store 序列化 / 反序列化。 */
+/** 草稿表单快照：保存到服务端草稿接口（saveCpsIssueDraft / getCpsIssueDraft）的序列化格式。 */
 export interface CpsIssueDraftData {
   location: { factory: string; area: string; line: string; process: string }
   description: string

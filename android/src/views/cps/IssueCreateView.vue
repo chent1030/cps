@@ -456,7 +456,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { inspectCpsImage, startVoiceRecording, stopVoiceRecording } from '@/api/cps/ai'
 import { createCpsIssue } from '@/api/cps/issue'
@@ -473,11 +473,55 @@ import {
   type CpsEmployeeOption,
 } from '@/api/cps/master'
 import { uploadCpsAttachment, type CpsAttachmentUploadSource } from '@/api/cps/attachment'
-import type { CpsCheckItemInfo, CpsInspectionArea, CpsInspectionType, CpsIssueCheckResult, CpsIssueDraftData, CpsUploadedImage } from '@/types/cps'
-import { useFormDraftStore } from '@/store/formDraft'
+import type { CpsAiSuggestionPayload, CpsCheckItemInfo, CpsInspectionArea, CpsInspectionType, CpsIssueCheckResult, CpsIssueDraftData, CpsOption, CpsUploadedImage } from '@/types/cps'
 import { resolveUploadSources, toImageUrl } from '@/utils/image'
 
-const draft = useFormDraftStore()
+// 新建问题表单状态：只存在于当前页面实例，**不写任何本地缓存**（不做草稿暂存/回填）。
+// 从「我的草稿」进入时，由 restoreDraft 通过接口 getCpsIssueDraft 拉取后回填。
+interface CreateDraftState {
+  location: { factory: string; area: string; line: string; process: string }
+  images: CpsUploadedImage[]
+  imagePreviewSources: Record<number, string>
+  description: string
+  resourceNo: string
+  inspectionTypeCode: string | null
+  extraData: Record<string, unknown>
+  draftId: number | null
+  feedbackEmpNo: string
+  feedbackPerson: CpsEmployeeOption | null
+  aiSuggestion: CpsAiSuggestionPayload | null
+  factories: CpsOption[]
+  areas: CpsOption[]
+  lines: CpsOption[]
+  processes: CpsOption[]
+  inspectionTypes: CpsInspectionType[]
+}
+
+const createInitialDraft = (): CreateDraftState => ({
+  location: { factory: '', area: '', line: '', process: '' },
+  images: [],
+  imagePreviewSources: {},
+  description: '',
+  resourceNo: '',
+  inspectionTypeCode: null,
+  extraData: {},
+  draftId: null,
+  feedbackEmpNo: '',
+  feedbackPerson: null,
+  aiSuggestion: null,
+  factories: [],
+  areas: [],
+  lines: [],
+  processes: [],
+  inspectionTypes: [],
+})
+
+const draft = reactive<CreateDraftState & { reset: () => void }>({
+  ...createInitialDraft(),
+  reset: () => {
+    Object.assign(draft, createInitialDraft())
+  },
+})
 
 const submitting = ref(false)
 const inspecting = ref(false)
@@ -1145,10 +1189,7 @@ onLoad((query?: Record<string, string | string[] | undefined>) => {
   if (raw !== undefined && Number.isFinite(draftIdParam) && draftIdParam > 0) {
     pendingDraftId.value = draftIdParam
     void restoreDraft(draftIdParam)
-    return
   }
-  // 新建问题：不沿用任何本地缓存，进入即清空上一次遗留的表单内容
-  draft.reset()
 })
 </script>
 
