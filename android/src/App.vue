@@ -17,5 +17,8 @@ onHide(() => {
 </script>
 
 <style>
-/* 全局样式统一在 src/styles.css（含 src/styles/uni-controls.css）中维护 */
+/* App.vue 的 style 是 uni-app 在 App 平台（app-plus）的全局样式入口。
+   main.ts 里 import 的 css 只保证 H5 生效；App 端若不在这里引入，
+   .u-* 控件样式与 --cps-* 变量会整体丢失，页面看起来"没有样式"。 */
+@import './styles.css';
 </style>

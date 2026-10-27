@@ -5,22 +5,34 @@
  */
 
 /* ---------- 基础 reset ---------- */
+/* App 平台（app-plus）会把 uni 组件渲染成 uni-view / uni-button 等自定义标签，
+   元素选择器必须同时匹配 uni-* 别名，否则这些 reset 只在 H5 生效。 */
 view,
+uni-view,
 text,
+uni-text,
 image,
+uni-image,
 button,
+uni-button,
 input,
+uni-input,
 textarea,
+uni-textarea,
 scroll-view,
-picker {
+uni-scroll-view,
+picker,
+uni-picker {
   box-sizing: border-box;
 }
 
-image {
+image,
+uni-image {
   display: block;
 }
 
-button {
+button,
+uni-button {
   margin: 0;
   padding: 0;
   background: transparent;
@@ -32,12 +44,15 @@ button {
   text-align: center;
 }
 
-button::after {
+button::after,
+uni-button::after {
   border: none;
 }
 
 input,
-textarea {
+uni-input,
+textarea,
+uni-textarea {
   margin: 0;
   padding: 0;
   background: transparent;
