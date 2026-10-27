@@ -210,7 +210,7 @@
                   <image class="cps-check-photo__img" :src="checkPhotoUrl(p)" mode="aspectFill" />
                   <text class="cps-check-photo__del" @click.stop="removeCheckPhoto(ci.itemCode, pi)">×</text>
                 </view>
-                <button class="cps-check-photo__add" @click="onCheckPhotoPick(ci.itemCode)">
+                <button class="cps-check-photo__add" @click="onCheckPhotoPick" :data-code="ci.itemCode">
                   <text>＋ {{ (checkEntries[ci.itemCode]?.photos?.length ?? 0) }}/{{ ci.photoMinCount ?? 1 }}</text>
                 </button>
               </view>
@@ -645,20 +645,36 @@ const loadTypeCheckItems = async (code: string) => {
 
 /** 调起 uni 图片选择（拍照 / 相册），返回可上传的源 */
 const chooseUploadSources = (count: number) =>
-  new Promise<CpsAttachmentUploadSource[]>((resolve) => {
+  new Promise<CpsAttachmentUploadSource[]>((resolve, reject) => {
+    if (typeof uni === 'undefined' || typeof uni.chooseImage !== 'function') {
+      reject(new Error('当前环境不支持拍照/选图'))
+      return
+    }
     uni.chooseImage({
       count,
       sizeType: ['compressed'],
       sourceType: ['camera', 'album'],
       success: (result) => resolve(resolveUploadSources(result)),
-      fail: () => resolve([]),
+      fail: (err) => {
+        const message = String((err as { errMsg?: string } | undefined)?.errMsg ?? '')
+        // 用户主动取消不算失败
+        if (/cancel/i.test(message)) {
+          resolve([])
+          return
+        }
+        reject(new Error(message || '拍照/选图失败'))
+      },
     })
   })
 
 /** 点检项照片的显示地址：后端存的是站内相对路径，显示前补成绝对地址 */
 const checkPhotoUrl = (entry: { url: string }) => resolveAssetUrl(entry.url)
 
-const onCheckPhotoPick = async (itemCode: string) => {
+const onCheckPhotoPick = async (event: unknown) => {
+  const dataset = ((event as { currentTarget?: { dataset?: Record<string, unknown> } } | undefined)?.currentTarget
+    ?.dataset ?? {}) as { code?: string }
+  const itemCode = String(dataset.code ?? '')
+  if (!itemCode) return
   const sources = await chooseUploadSources(9)
   if (!sources.length) return
   try {
@@ -954,7 +970,10 @@ watch(feedbackPickerOpen, (v) => {
 // 图片上传：uni.chooseImage 逐张串行上传，保持选择顺序（首张仍触发 AI 识别）
 const pickImages = async () => {
   const remaining = Math.max(5 - draft.images.length, 0)
-  if (!remaining) return
+  if (!remaining) {
+    uni.showToast({ title: '最多上传 5 张照片', icon: 'none' })
+    return
+  }
   const sources = await chooseUploadSources(remaining)
   if (!sources.length) return
   uploading.value = true

@@ -113,7 +113,13 @@
               <image class="cps-photo__img" :src="photoUrl(p)" mode="aspectFill" />
               <text v-if="!readonly" class="cps-photo-del" @click.stop="removePhoto(item, pi)">×</text>
             </view>
-            <view v-if="!readonly" class="cps-photo-add" hover-class="u-tap" @click="onPhotoPick(item)">
+            <view
+              v-if="!readonly"
+              class="cps-photo-add"
+              hover-class="u-tap"
+              @click="onPhotoPick"
+              :data-item-id="item.id"
+            >
               <text class="cps-photo-add__plus">＋</text>
               <text class="cps-photo-add__text">{{ uploadingItem === item.id ? '上传中' : '拍照/选择' }}</text>
             </view>
@@ -297,7 +303,10 @@ const pickPhotoSources = (count: number) =>
     })
   })
 
-const onPhotoPick = async (item: CpsInspectionRecordItem) => {
+const onPhotoPick = async (event: unknown) => {
+  const dataset = readDataset(event)
+  const item = items.value.find((record) => record.id === Number(dataset.itemId ?? 0))
+  if (!item) return
   try {
     const sources = await pickPhotoSources(9)
     if (!sources.length) return

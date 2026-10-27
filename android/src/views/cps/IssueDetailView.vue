@@ -1050,12 +1050,21 @@ const uploadProofImages = async (sources: CpsAttachmentUploadSource[]) => {
 
 const chooseProofImages = () => {
   const remaining = Math.max(5 - proofImages.value.length, 0)
-  if (!remaining || proofUploading.value) return
+  if (proofUploading.value) return
+  if (!remaining) {
+    uni.showToast({ title: '最多上传 5 张照片', icon: 'none' })
+    return
+  }
   uni.chooseImage({
     count: remaining,
     sourceType: ['camera', 'album'],
     success: (result) => {
       void uploadProofImages(resolveUploadSources(result))
+    },
+    fail: (err) => {
+      const message = String((err as { errMsg?: string } | undefined)?.errMsg ?? '')
+      if (/cancel/i.test(message)) return
+      uni.showToast({ title: message || '拍照/选图失败', icon: 'none' })
     },
   })
 }

@@ -16,6 +16,8 @@
       "delay": 0
     },
     "modules": {
+      "Camera": {},
+      "Gallery": {},
       "Recorder": {}
     },
     "distribute": {
@@ -25,7 +27,8 @@
           "<uses-permission android:name=\"android.permission.FLASHLIGHT\"/>",
           "<uses-permission android:name=\"android.permission.RECORD_AUDIO\"/>",
           "<uses-permission android:name=\"android.permission.MODIFY_AUDIO_SETTINGS\"/>",
-          "<uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\"/>",
+          "<uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\"/>"
+          "<uses-permission android:name=\"android.permission.READ_MEDIA_IMAGES\"/>",
           "<uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\"/>",
           "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\"/>",
           "<uses-permission android:name=\"android.permission.ACCESS_WIFI_STATE\"/>",
