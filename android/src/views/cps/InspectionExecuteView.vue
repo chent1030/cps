@@ -106,9 +106,11 @@
               :key="pi"
               class="cps-photo-tile"
               hover-class="u-tap"
-              @click="previewPhoto(item, pi)"
+              @click="previewPhoto"
+              :data-item-id="item.id"
+              :data-index="pi"
             >
-              <image class="cps-photo__img" :src="p.url" mode="aspectFill" />
+              <image class="cps-photo__img" :src="photoUrl(p)" mode="aspectFill" />
               <text v-if="!readonly" class="cps-photo-del" @click.stop="removePhoto(item, pi)">×</text>
             </view>
             <view v-if="!readonly" class="cps-photo-add" hover-class="u-tap" @click="onPhotoPick(item)">
@@ -160,7 +162,7 @@ import {
   submitInspection,
 } from '@/api/cps/inspectionTask'
 import type { CpsInspectionRecord, CpsInspectionRecordItem } from '@/types/cps'
-import { resolveUploadSources } from '@/utils/image'
+import { resolveAssetUrl, resolveUploadSources } from '@/utils/image'
 
 interface PhotoEntry {
   url: string
@@ -234,6 +236,9 @@ const photoList = (item: CpsInspectionRecordItem): PhotoEntry[] => {
   const names = (item.photoFileName ?? '').split(',').filter(Boolean)
   return keys.map((k, i) => ({ url: k, name: names[i] ?? `照片${i + 1}` }))
 }
+
+/** 图片 src：后端存的是站内相对路径，显示前补成绝对地址 */
+const photoUrl = (entry: PhotoEntry) => resolveAssetUrl(entry.url)
 
 const photoCount = (item: CpsInspectionRecordItem) => photoList(item).length
 
@@ -317,11 +322,39 @@ const removePhoto = async (item: CpsInspectionRecordItem, index: number) => {
   await persistItem(item)
 }
 
-const previewPhoto = (item: CpsInspectionRecordItem, index: number) => {
-  const urls = photoList(item).map((p) => p.url)
-  if (typeof uni !== 'undefined' && typeof uni.previewImage === 'function') {
-    uni.previewImage({ urls, current: urls[index] })
+
+type PhotoTapDataset = { list?: string; index?: number | string; itemId?: number | string }
+
+const readDataset = (event: unknown): PhotoTapDataset =>
+  ((event as { currentTarget?: { dataset?: Record<string, unknown> } } | undefined)?.currentTarget?.dataset ??
+    {}) as PhotoTapDataset
+
+// uni 原生图片预览：urls 必须是绝对地址，current 用下标（避免 filter 后错位）
+const previewImages = (sources: string[], index: number) => {
+  const urls = sources.map((item) => resolveAssetUrl(item)).filter(Boolean)
+  if (!urls.length) {
+    uni.showToast({ title: '图片还没加载出来', icon: 'none' })
+    return
   }
+  const current = Math.min(Math.max(index, 0), urls.length - 1)
+  uni.previewImage({
+    urls,
+    current,
+    indicator: 'number',
+    loop: true,
+    fail: () => uni.showToast({ title: '图片打不开，检查图片地址配置', icon: 'none' }),
+  })
+}
+
+// 点开巡检项照片：uni 原生预览
+const previewPhoto = (event: unknown) => {
+  const dataset = readDataset(event)
+  const item = items.value.find((record) => record.id === Number(dataset.itemId ?? 0))
+  if (!item) return
+  previewImages(
+    photoList(item).map((photo) => photo.url),
+    Number(dataset.index ?? 0),
+  )
 }
 
 /** 保存单项到服务端（合格/文本/照片一起提交） */

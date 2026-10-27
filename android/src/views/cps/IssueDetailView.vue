@@ -102,7 +102,9 @@
                   class="cps-photo-tile"
                   :class="{ 'cps-photo-tile--lead': detail.issueAttachments.length > 1 && index === 0 }"
                   hover-class="u-tap"
-                  @click="previewAttachments(detail.issueAttachments, index)"
+                  @click="onPhotoTap"
+                  :data-list="'issue'"
+                  :data-index="index"
                 >
                   <image class="cps-photo-tile__img" mode="aspectFill" :src="attachmentImageSources[image.id] || ''" />
                   <text class="cps-photo-tile__index">{{ index + 1 }}/{{ detail.issueAttachments.length }}</text>
@@ -129,7 +131,9 @@
                   :key="image.id"
                   class="cps-photo-tile"
                   hover-class="u-tap"
-                  @click="previewAttachments(detail.proofAttachments, index)"
+                  @click="onPhotoTap"
+                  :data-list="'proof'"
+                  :data-index="index"
                 >
                   <image class="cps-photo-tile__img" mode="aspectFill" :src="attachmentImageSources[image.id] || ''" />
                   <text class="cps-photo-tile__index">{{ index + 1 }}/{{ detail.proofAttachments.length }}</text>
@@ -333,7 +337,7 @@
                               :key="image.id"
                               class="cps-uploader__item"
                               hover-class="u-tap"
-                              @click="previewProofImage(index)"
+                              @click="onUploadPhotoTap" :data-index="index"
                             >
                               <image class="cps-uploader__img" mode="aspectFill" :src="attachmentImageSources[image.id] || ''" />
                               <text v-if="!proofUploading" class="cps-uploader__delete" @click.stop="removeProofImage(index)">×</text>
@@ -390,7 +394,7 @@
                               :key="image.id"
                               class="cps-uploader__item"
                               hover-class="u-tap"
-                              @click="previewProofImage(index)"
+                              @click="onUploadPhotoTap" :data-index="index"
                             >
                               <image class="cps-uploader__img" mode="aspectFill" :src="attachmentImageSources[image.id] || ''" />
                               <text v-if="!proofUploading" class="cps-uploader__delete" @click.stop="removeProofImage(index)">×</text>
@@ -550,7 +554,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import { executeCpsIssueAction, getCpsIssueDetail } from '@/api/cps/issue'
 import { getCategories, searchCpsEmployees, type CpsEmployeeOption, type CpsOption } from '@/api/cps/master'
 import { uploadCpsAttachment, type CpsAttachmentUploadSource } from '@/api/cps/attachment'
-import { loadAttachmentImageSources, resolveUploadSources } from '@/utils/image'
+import { loadAttachmentImageSources, resolveAssetUrl, resolveUploadSources, toImageUrl } from '@/utils/image'
 import { statusMeta, issueLocation as formatLocation, issueCategory as formatCategory, personLabel as formatPersonLabel } from '@/utils/format'
 import { resolveDefaultPersons, type ActionPersonField } from '@/utils/personDefault'
 import type {
@@ -986,22 +990,43 @@ const cancelTransfer = () => {
   transferMode.value = false
 }
 
-const previewAttachments = (attachments: CpsAttachment[], startPosition: number) => {
-  const target = attachments[startPosition]
-  if (!target) return
-  const urls = attachments.map((image) => attachmentImageSources.value[image.id]).filter(Boolean)
-  if (typeof uni !== 'undefined' && typeof uni.previewImage === 'function') {
-    uni.previewImage({ urls, current: attachmentImageSources.value[target.id] })
+
+type PhotoTapDataset = { list?: string; index?: number | string; itemId?: number | string }
+
+const readDataset = (event: unknown): PhotoTapDataset =>
+  ((event as { currentTarget?: { dataset?: Record<string, unknown> } } | undefined)?.currentTarget?.dataset ??
+    {}) as PhotoTapDataset
+
+// uni 原生图片预览：urls 必须是绝对地址，current 用下标（避免 filter 后错位）
+const previewImages = (sources: string[], index: number) => {
+  const urls = sources.map((item) => resolveAssetUrl(item)).filter(Boolean)
+  if (!urls.length) {
+    uni.showToast({ title: '图片还没加载出来', icon: 'none' })
+    return
   }
+  const current = Math.min(Math.max(index, 0), urls.length - 1)
+  uni.previewImage({
+    urls,
+    current,
+    indicator: 'number',
+    loop: true,
+    fail: () => uni.showToast({ title: '图片打不开，检查图片地址配置', icon: 'none' }),
+  })
 }
 
-const previewProofImage = (index: number) => {
-  const target = proofImages.value[index]
-  if (!target) return
-  const urls = proofImages.value.map((i) => attachmentImageSources.value[i.id]).filter(Boolean)
-  if (typeof uni !== 'undefined' && typeof uni.previewImage === 'function') {
-    uni.previewImage({ urls, current: attachmentImageSources.value[target.id] })
-  }
+// 现场照片 / 复核照片：统一走 data-list + data-index，回调里再由原始数组取图
+const onPhotoTap = (event: unknown) => {
+  const dataset = readDataset(event)
+  const current = detail.value
+  if (!current) return
+  const attachments = dataset.list === 'proof' ? current.proofAttachments : current.issueAttachments
+  previewImages(attachments.map((item) => toImageUrl(item)), Number(dataset.index ?? 0))
+}
+
+// 整改阶段刚上传、还没刷新详情的照片
+const onUploadPhotoTap = (event: unknown) => {
+  const dataset = readDataset(event)
+  previewImages(proofImages.value.map((item) => item.url), Number(dataset.index ?? 0))
 }
 
 // 整改照片上传（内联）

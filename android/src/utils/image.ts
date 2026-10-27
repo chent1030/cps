@@ -35,11 +35,29 @@ export const toImageUrl = (attachment: { id: number; url: string } | { id: numbe
   return ''
 }
 
-// 批量加载附件的图片预览源（直接用后端 url，失败的附件会被忽略）
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
+
+/**
+ * 把后端返回的站内相对路径（/api/...）补成绝对地址。
+ * App 端（app-plus）没有同源页面，相对路径既不能显示也不能预览，必须先补 host。
+ * 本身已是绝对地址或本地临时文件（/storage/...）的原样返回，可重复调用。
+ */
+export const resolveAssetUrl = (path: string): string => {
+  const value = (path ?? '').trim()
+  if (!value) return ''
+  if (/^(https?:)?\/\//i.test(value)) return value
+  if (/^(data|blob|file|content):/i.test(value)) return value
+  if (value.startsWith('/storage/')) return value
+  if (!value.startsWith('/')) return value
+  if (!API_BASE) return value
+  return `${API_BASE.replace(/\/+$/, '')}${value}`
+}
+
+// 批量加载附件的图片预览源（把后端相对地址补成绝对地址，失败的附件会被忽略）
 export const loadAttachmentImageSources = async (attachments: CpsAttachment[]) => {
   const resolved = attachments
     .map((attachment) => {
-      const url = toImageUrl(attachment)
+      const url = resolveAssetUrl(toImageUrl(attachment))
       if (!url) return null
       return [attachment.id, url] as const
     })

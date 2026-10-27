@@ -90,7 +90,7 @@
               v-for="(image, index) in draft.images"
               :key="image.id"
               class="cps-uploader__item"
-              @click="onPreviewImage(index)"
+              @click="onPreviewImage" :data-index="index"
             >
               <image class="cps-uploader__img" :src="draft.imagePreviewSources[image.id] || ''" mode="aspectFill" />
               <text v-if="!uploading" class="cps-uploader__delete" @click.stop="onRemoveImage(index)">×</text>
@@ -207,7 +207,7 @@
             <view v-if="hasCheckType(ci, 'PHOTO')" class="cps-check-entry__row">
               <view class="cps-check-photos">
                 <view v-for="(p, pi) in checkEntries[ci.itemCode]?.photos ?? []" :key="pi" class="cps-check-photo">
-                  <image class="cps-check-photo__img" :src="p.url" mode="aspectFill" />
+                  <image class="cps-check-photo__img" :src="checkPhotoUrl(p)" mode="aspectFill" />
                   <text class="cps-check-photo__del" @click.stop="removeCheckPhoto(ci.itemCode, pi)">×</text>
                 </view>
                 <button class="cps-check-photo__add" @click="onCheckPhotoPick(ci.itemCode)">
@@ -474,7 +474,7 @@ import {
 } from '@/api/cps/master'
 import { uploadCpsAttachment, type CpsAttachmentUploadSource } from '@/api/cps/attachment'
 import type { CpsAiSuggestionPayload, CpsCheckItemInfo, CpsInspectionArea, CpsInspectionType, CpsIssueCheckResult, CpsIssueDraftData, CpsOption, CpsUploadedImage } from '@/types/cps'
-import { resolveUploadSources, toImageUrl } from '@/utils/image'
+import { resolveAssetUrl, resolveUploadSources, toImageUrl } from '@/utils/image'
 
 // 新建问题表单状态：只存在于当前页面实例，**不写任何本地缓存**（不做草稿暂存/回填）。
 // 从「我的草稿」进入时，由 restoreDraft 通过接口 getCpsIssueDraft 拉取后回填。
@@ -654,6 +654,9 @@ const chooseUploadSources = (count: number) =>
       fail: () => resolve([]),
     })
   })
+
+/** 点检项照片的显示地址：后端存的是站内相对路径，显示前补成绝对地址 */
+const checkPhotoUrl = (entry: { url: string }) => resolveAssetUrl(entry.url)
 
 const onCheckPhotoPick = async (itemCode: string) => {
   const sources = await chooseUploadSources(9)
@@ -962,7 +965,7 @@ const pickImages = async () => {
       draft.images = [...draft.images, uploaded]
       // 直接使用后端返回的 /api/cps/attachments/{id}/content 路径作为预览地址，
       // 免掉 base64 转换与 /api/cps/attachments/base64 接口（已下线）。
-      draft.imagePreviewSources = { ...draft.imagePreviewSources, [uploaded.id]: uploaded.url }
+      draft.imagePreviewSources = { ...draft.imagePreviewSources, [uploaded.id]: resolveAssetUrl(uploaded.url) }
       if (shouldInspectFirst) {
         await onFirstImageReady(uploaded.id)
       }
@@ -978,15 +981,35 @@ const onRemoveImage = (index: number) => {
   draft.images = draft.images.filter((_, i) => i !== index)
 }
 
-const onPreviewImage = (index: number) => {
-  const target = draft.images[index]
-  if (!target) return
-  const urls = draft.images
-    .map((i) => draft.imagePreviewSources[i.id] || i.url)
-    .filter(Boolean)
-  if (typeof uni !== 'undefined' && typeof uni.previewImage === 'function') {
-    uni.previewImage({ urls, current: draft.imagePreviewSources[target.id] || target.url })
+
+type PhotoTapDataset = { list?: string; index?: number | string; itemId?: number | string }
+
+const readDataset = (event: unknown): PhotoTapDataset =>
+  ((event as { currentTarget?: { dataset?: Record<string, unknown> } } | undefined)?.currentTarget?.dataset ??
+    {}) as PhotoTapDataset
+
+// uni 原生图片预览：urls 必须是绝对地址，current 用下标（避免 filter 后错位）
+const previewImages = (sources: string[], index: number) => {
+  const urls = sources.map((item) => resolveAssetUrl(item)).filter(Boolean)
+  if (!urls.length) {
+    uni.showToast({ title: '图片还没加载出来', icon: 'none' })
+    return
   }
+  const current = Math.min(Math.max(index, 0), urls.length - 1)
+  uni.previewImage({
+    urls,
+    current,
+    indicator: 'number',
+    loop: true,
+    fail: () => uni.showToast({ title: '图片打不开，检查图片地址配置', icon: 'none' }),
+  })
+}
+
+// 点开已选图片：uni 原生预览
+const onPreviewImage = (event: unknown) => {
+  const dataset = readDataset(event)
+  const sources = draft.images.map((item) => draft.imagePreviewSources[item.id] || item.url)
+  previewImages(sources, Number(dataset.index ?? 0))
 }
 
 const onFirstImageReady = async (fileId: number) => {
@@ -1024,7 +1047,7 @@ const onVoiceClick = async () => {
   }
   // 未录音 → 开始
   if (transcribing.value) return
-  const started = await startVoiceRecording()
+  const started = startVoiceRecording()
   if (!started) {
     uni.showToast({ title: '当前环境不支持语音录入', icon: 'none' })
     return
@@ -1108,7 +1131,9 @@ const restoreDraft = async (id: number) => {
     draft.feedbackEmpNo = data.feedbackEmpNo ?? ''
     draft.feedbackPerson = (data.feedbackPerson as never) ?? null
     draft.images = data.images ?? []
-    draft.imagePreviewSources = data.imagePreviewSources ?? {}
+    draft.imagePreviewSources = Object.fromEntries(
+      Object.entries(data.imagePreviewSources ?? {}).map(([key, url]) => [key, resolveAssetUrl(url)]),
+    )
     draft.aiSuggestion = data.aiSuggestion ?? null
     draft.draftId = remote.id
     // 恢复的类型非空 → 直接进入第二步表单

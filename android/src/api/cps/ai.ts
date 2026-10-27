@@ -39,184 +39,122 @@ export const inspectCpsImage = async (sourceAttachmentId: number): Promise<CpsAi
   return normalizeMatchResponse(resp)
 }
 
-interface TranscribeResponse {
-  text: string
-}
+// ============================================================
+// 语音输入（uni 原生录音器 uni.getRecorderManager）
+// 交互：点一次 = 开始录音；再点一次 = 停止录音，停止后把录音文件送去转写，返回文字。
+// 转写接口暂未接入（先留空），接入时只需要实现文件末尾的 transcribeAudio()。
+// ============================================================
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
+/** 后端契约（待接入）：POST /api/cps/ai/transcribe，multipart 字段名 audio，返回 { text: string }。 */
 const TRANSCRIBE_PATH = '/api/cps/ai/transcribe'
 
-/**
- * 语音转文字录音器：点击开始、再点击结束的两段式控制。
- *
- * - start()：开始录音，返回一个可调用的 stop 函数。
- * - stop()：结束录音并上传后端转写，返回识别文本。
- *
- * 后端契约：POST /api/cps/ai/transcribe，multipart 字段名 audio，返回 { text: string }。
- */
-
-// ---- app-plus 录音器（uni.getRecorderManager）----
-interface UniRecorderController {
-  stop: () => Promise<string>
+interface RecorderStopResult {
+  tempFilePath?: string
+  duration?: number
+  fileSize?: number
 }
 
-const startUniRecorder = (): UniRecorderController => {
-  const recorder = uni.getRecorderManager()
-  let resolveStop: ((text: string) => void) | null = null
-  let rejectStop: ((error: Error) => void) | null = null
-  let finished = false
+/** 只声明用得到的几个方法，避免依赖平台类型定义缺失。 */
+interface RecorderManagerLike {
+  start: (options: Record<string, unknown>) => void
+  stop: () => void
+  onStop: (handler: (result: RecorderStopResult) => void) => void
+  onError: (handler: (error: { errMsg?: string }) => void) => void
+}
 
-  recorder.onStop((res) => {
-    if (finished) return
-    finished = true
-    uploadAudio(res.tempFilePath).then(
-      (text) => resolveStop?.(text),
-      (error) => rejectStop?.(error),
-    )
+let recorder: RecorderManagerLike | null = null
+let recording = false
+let handleStop: ((result: RecorderStopResult) => void) | null = null
+let handleError: ((error: Error) => void) | null = null
+
+/** 录音器是全局单例，onStop/onError 只注册一次。 */
+const ensureRecorder = (): RecorderManagerLike => {
+  if (recorder) return recorder
+  const manager = uni.getRecorderManager() as unknown as RecorderManagerLike
+  manager.onStop((result) => {
+    recording = false
+    const done = handleStop
+    handleStop = null
+    handleError = null
+    done?.(result)
   })
-
-  recorder.onError((error) => {
-    if (finished) return
-    finished = true
-    rejectStop?.(new Error(error.errMsg || '录音失败'))
+  manager.onError((error) => {
+    recording = false
+    const fail = handleError
+    handleStop = null
+    handleError = null
+    fail?.(new Error(error?.errMsg || '录音失败'))
   })
-
-  recorder.start({
-    duration: 60000,
-    format: 'aac',
-    sampleRate: 16000,
-    numberOfChannels: 1,
-  })
-
-  return {
-    stop: () =>
-      new Promise<string>((resolve, reject) => {
-        resolveStop = resolve
-        rejectStop = reject
-        try {
-          recorder.stop()
-        } catch (error) {
-          reject(error instanceof Error ? error : new Error('停止录音失败'))
-        }
-      }),
-  }
+  recorder = manager
+  return recorder
 }
 
-// ---- H5 / 浏览器录音器（MediaRecorder）----
-interface MediaRecorderController {
-  stop: () => Promise<string>
-}
-
-const startMediaRecorder = async (): Promise<MediaRecorderController> => {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-  const mime = pickMime()
-  const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
-  const chunks: BlobPart[] = []
-
-  recorder.ondataavailable = (event) => {
-    if (event.data.size > 0) chunks.push(event.data)
-  }
-
-  recorder.start()
-
-  return {
-    stop: () =>
-      new Promise<string>((resolve, reject) => {
-        recorder.onstop = async () => {
-          stream.getTracks().forEach((track) => track.stop())
-          const blob = new Blob(chunks, { type: mime || 'audio/webm' })
-          try {
-            resolve(await uploadAudioBlob(blob))
-          } catch (error) {
-            reject(error instanceof Error ? error : new Error('语音转写失败'))
-          }
-        }
-        recorder.onerror = () => reject(new Error('录音失败'))
-        if (recorder.state !== 'inactive') recorder.stop()
-      }),
-  }
-}
-
-const pickMime = () => {
-  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4']
-  if (typeof MediaRecorder === 'undefined') return ''
-  return candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? ''
-}
-
-type RecorderController = UniRecorderController | MediaRecorderController
-
-let activeController: RecorderController | null = null
-
-/** 开始录音。返回 true 表示成功开始；当前环境不支持或已在录音中时返回 false。 */
-export const startVoiceRecording = async (): Promise<boolean> => {
-  if (activeController) return false
+/** 开始录音：true=已在录音；当前环境不支持或重复点击返回 false。 */
+export const startVoiceRecording = (): boolean => {
+  if (recording) return false
+  if (typeof uni === 'undefined' || typeof uni.getRecorderManager !== 'function') return false
   try {
-    if (typeof uni !== 'undefined' && typeof uni.getRecorderManager === 'function') {
-      activeController = startUniRecorder()
-    } else if (typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getUserMedia === 'function') {
-      activeController = await startMediaRecorder()
-    } else {
-      return false
-    }
+    ensureRecorder().start({
+      duration: 120000,
+      format: 'aac',
+      sampleRate: 16000,
+      numberOfChannels: 1,
+      encodeBitRate: 48000,
+    })
+    recording = true
     return true
   } catch {
-    activeController = null
     return false
   }
 }
 
-/** 结束录音并转写。返回识别文本。 */
-export const stopVoiceRecording = async (): Promise<string> => {
-  const controller = activeController
-  activeController = null
-  if (!controller) {
-    throw new Error('未在录音中')
-  }
-  return controller.stop()
-}
-
 /** 是否正在录音。 */
-export const isVoiceRecording = () => activeController !== null
+export const isVoiceRecording = () => recording
 
-const uploadAudio = (filePath: string): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    if (typeof uni === 'undefined' || typeof uni.uploadFile !== 'function') {
-      reject(new Error('当前环境不支持文件上传'))
+/** 停止录音 → 上传录音文件转写 → 返回识别文字。 */
+export const stopVoiceRecording = (): Promise<string> =>
+  new Promise<string>((resolve, reject) => {
+    if (!recorder || !recording) {
+      reject(new Error('当前没有在录音'))
       return
     }
-    uni.uploadFile({
-      url: buildUrl(TRANSCRIBE_PATH),
-      filePath,
-      name: 'audio',
-      success(response) {
-        const statusCode = response.statusCode ?? 0
-        if (statusCode < 200 || statusCode >= 300) {
-          reject(new Error(`语音转写失败：${statusCode}`))
-          return
-        }
-        try {
-          const data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data
-          resolve((data as TranscribeResponse).text ?? '')
-        } catch {
-          reject(new Error('语音转写响应解析失败'))
-        }
-      },
-      fail(error) {
-        reject(new Error(error.errMsg || '语音转写上传失败'))
-      },
-    })
+    handleStop = (result) => {
+      const filePath = result?.tempFilePath
+      if (!filePath) {
+        reject(new Error('没有取到录音文件'))
+        return
+      }
+      transcribeAudio(filePath).then(resolve, reject)
+    }
+    handleError = reject
+    try {
+      recorder.stop()
+    } catch (error) {
+      recording = false
+      handleStop = null
+      handleError = null
+      reject(error instanceof Error ? error : new Error('停止录音失败'))
+    }
   })
-}
 
-const uploadAudioBlob = async (blob: Blob): Promise<string> => {
-  const formData = new FormData()
-  formData.append('audio', blob, `voice.${(blob.type.split('/')[1] || 'webm').split(';')[0]}`)
-  const response = await request.post<TranscribeResponse>(TRANSCRIBE_PATH, formData)
-  return response.text ?? ''
-}
-
-const buildUrl = (path: string) => {
-  const origin = typeof window !== 'undefined' && window.location ? window.location.origin : ''
-  const base = API_BASE || origin
-  return new URL(`${base}${path}`, origin || 'http://localhost').toString()
+/**
+ * 语音转写：把录音文件上传到后端，返回识别出的文字。
+ *
+ * TODO 待接入（按后端最终约定实现即可，页面逻辑无需改动）：
+ *   const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
+ *   uni.uploadFile({
+ *     url: `${API_BASE}${TRANSCRIBE_PATH}`,
+ *     filePath,
+ *     name: 'audio',
+ *     success: (res) => resolve((JSON.parse(res.data) as { text?: string }).text ?? ''),
+ *     fail: (err) => reject(new Error(err?.errMsg || '语音转写失败')),
+ *   })
+ *
+ * 现在先返回空字符串：录音链路（开始/停止/拿到临时文件）可以正常验证，
+ * 页面会提示「未识别到语音内容」。
+ */
+const transcribeAudio = async (filePath: string): Promise<string> => {
+  void TRANSCRIBE_PATH
+  void filePath
+  return ''
 }
