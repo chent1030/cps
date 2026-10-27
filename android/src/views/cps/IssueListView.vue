@@ -318,6 +318,376 @@ const formatRecordTime = (t?: string | null) => {
 </script>
 
 <style scoped>
+/* @inline-uni-controls: 由脚本按页面用到的类内联生成，勿手改 */
+
+/* 该页自包含的 uni 内置控件样式（原全局样式已按页面内联到这里） */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+view,
+uni-view,
+text,
+uni-text,
+image,
+uni-image,
+button,
+uni-button,
+input,
+uni-input,
+textarea,
+uni-textarea,
+scroll-view,
+uni-scroll-view,
+picker,
+uni-picker {
+  box-sizing: border-box;
+}
+
+image,
+uni-image {
+  display: block;
+}
+
+button,
+uni-button {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  line-height: normal;
+  font: inherit;
+  color: inherit;
+  text-align: center;
+}
+
+button::after,
+uni-button::after {
+  border: none;
+}
+
+input,
+uni-input,
+textarea,
+uni-textarea {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  outline: none;
+}
+
+@keyframes u-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+switch {
+  transform: scale(0.9);
+  transform-origin: right center;
+}
+
+radio .wx-radio-input,
+checkbox .wx-checkbox-input {
+  border-radius: 4px;
+}
+
+.cps-page {
+  --cps-teal: #14b8a6;
+  --cps-teal-deep: #0f766e;
+  --cps-blue: #2563eb;
+  --cps-orange: #f97316;
+  --cps-green: #22c55e;
+  --cps-red: #ef4444;
+  --cps-ink: #0f172a;
+  --cps-muted: #64748b;
+  --cps-mist: #f0fdfa;
+  --cps-cloud: #f8fafc;
+  --cps-line: #ccfbf1;
+  --cps-ink-2: #334155;
+  --cps-faint: #94a3b8;
+  --cps-border: #e2e8f0;
+  --cps-border-strong: #cbd5e1;
+  --cps-info-deep: #1d4ed8;
+  --cps-warn-deep: #b45309;
+  --cps-success-deep: #15803d;
+  --cps-danger-deep: #b91c1c;
+  --cps-radius-sm: 8px;
+  --cps-radius-md: 10px;
+  --cps-radius-lg: 12px;
+  --cps-radius-xl: 16px;
+  --cps-radius-pill: 999px;
+  --cps-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.04);
+  --cps-shadow-hero: 0 12px 32px rgba(15, 23, 42, 0.12);
+  --cps-hero-bg: linear-gradient(160deg, #0f766e 0%, #115e59 100%);
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(20, 184, 166, 0.18), transparent 512px),
+    linear-gradient(180deg, #f0fdfa 0%, #f8fafc 42%, #eef2ff 100%);
+  color: var(--cps-ink);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 16px;
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.u-tap {
+  opacity: 0.72;
+}
+
+.u-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.u-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: var(--cps-ink);
+  transition: opacity 0.15s ease;
+}
+
+.u-btn--primary {
+  border-color: transparent;
+  background: linear-gradient(135deg, #14b8a6 0%, #0e7490 100%);
+  color: #ffffff;
+}
+
+.u-btn--danger {
+  border-color: transparent;
+  background: var(--cps-red);
+  color: #ffffff;
+}
+
+.u-btn--ghost {
+  border-color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.u-btn--plain {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: var(--cps-muted);
+}
+
+.u-btn--block {
+  display: flex;
+  width: 100%;
+}
+
+.u-btn--sm {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+  border-radius: 9px;
+}
+
+.u-btn[disabled],
+.u-btn--disabled {
+  opacity: 0.5;
+}
+
+.u-card {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  padding: 16px;
+  box-shadow: 0 4px 16px rgba(15, 118, 110, 0.06);
+}
+
+.u-card--flat {
+  box-shadow: none;
+}
+
+.u-card--pad-none {
+  padding: 0;
+}
+
+.u-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 48px 16px;
+}
+
+.u-empty__icon {
+  font-size: 34px;
+  line-height: 1;
+}
+
+.u-empty__text {
+  font-size: 14px;
+  color: var(--cps-muted);
+}
+
+.u-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 18px;
+}
+
+.u-loading__text {
+  font-size: 14px;
+  color: var(--cps-muted);
+}
+
+.u-loading__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cps-teal);
+  animation: u-pulse 1s ease-in-out infinite;
+}
+
+.u-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  border-bottom: 1px solid #e2e8f0;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.u-tabs__item {
+  flex: none;
+  padding: 8px 14px;
+  border-radius: 10px 10px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cps-muted);
+}
+
+.u-tabs__item--active {
+  color: var(--cps-teal-deep);
+  background: var(--cps-mist);
+  box-shadow: inset 0 -2px 0 var(--cps-teal);
+}
+
+.u-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--cps-red, #ef4444);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.u-badge--dot {
+  width: 8px;
+  height: 8px;
+  min-width: 0;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.cps-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.cps-pill--blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.cps-pill--orange {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.cps-pill--green {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.cps-pill--teal {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.cps-pill--gray {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.cps-pill--red {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.cps-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: var(--cps-radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.cps-status-pill--blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.cps-status-pill--orange {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.cps-status-pill--green {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.cps-status-pill--teal {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.cps-status-pill--gray {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.cps-status-pill--red {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+/* @end-inline-uni-controls */
+
 .cps-page {
   width: 100%;
   max-width: 1280px;
