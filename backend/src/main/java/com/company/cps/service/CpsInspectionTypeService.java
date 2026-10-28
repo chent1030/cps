@@ -12,9 +12,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.company.cps.util.CpsStrings;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -83,7 +86,7 @@ public class CpsInspectionTypeService {
                 "分区域类型的点检项挂在区域上，请按区域查询: code=" + code);
         List<CpsCheckItem> items = new ArrayList<>();
         String ids = type.getCheckItemIds();
-        if (ids == null || ids.trim().isEmpty()) return items;
+        if (ids == null || CpsStrings.isBlank(ids)) return items;
         for (String part : ids.split(",")) {
             String itemCode = part.trim();
             if (itemCode.isEmpty()) continue;
@@ -114,7 +117,7 @@ public class CpsInspectionTypeService {
         t.setEnabled(req.getEnabled() == null ? 1 : req.getEnabled());
         t.setSortOrder(req.getSortOrder() == null ? 0 : req.getSortOrder());
         // form_schema 已废弃：传了才校验保存，否则留空
-        if (req.getFormSchemaJson() != null && !req.getFormSchemaJson().trim().isEmpty()) {
+        if (req.getFormSchemaJson() != null && !CpsStrings.isBlank(req.getFormSchemaJson())) {
             validateFormSchema(req.getFormSchemaJson());
             t.setFormSchemaJson(req.getFormSchemaJson().trim());
         }
@@ -133,7 +136,7 @@ public class CpsInspectionTypeService {
         CpsInspectionType t = mapper.findById(id);
         require(t != null, "巡检类型不存在: id=" + id);
         boolean builtin = t.getBuiltin() != null && t.getBuiltin() == 1;
-        if (req.getCode() != null && !req.getCode().trim().isEmpty() && !req.getCode().equals(t.getCode())) {
+        if (req.getCode() != null && !CpsStrings.isBlank(req.getCode()) && !req.getCode().equals(t.getCode())) {
             require(!builtin, "内置类型（" + t.getName() + "）不可修改编码");
             CpsInspectionType dup = mapper.findByCode(req.getCode().trim());
             require(dup == null || dup.getId().equals(id), "巡检类型编码已被占用: " + req.getCode());
@@ -142,7 +145,7 @@ public class CpsInspectionTypeService {
             require(areaRefs == 0, "该类型下已有 " + areaRefs + " 个巡检区域，不能改编码；请先迁移区域");
             t.setCode(req.getCode().trim());
         }
-        if (req.getName() != null && !req.getName().trim().isEmpty()) t.setName(req.getName().trim());
+        if (req.getName() != null && !CpsStrings.isBlank(req.getName())) t.setName(req.getName().trim());
         if (req.getContent() != null) t.setContent(blankToNull(req.getContent()));
         if (req.getZoneFlag() != null) {
             // 内置 CPS巡检 固定为不分区域的标准上报流程
@@ -160,7 +163,7 @@ public class CpsInspectionTypeService {
             t.setEnabled(req.getEnabled());
         }
         if (req.getSortOrder() != null) t.setSortOrder(req.getSortOrder());
-        if (req.getFormSchemaJson() != null && !req.getFormSchemaJson().trim().isEmpty()) {
+        if (req.getFormSchemaJson() != null && !CpsStrings.isBlank(req.getFormSchemaJson())) {
             validateFormSchema(req.getFormSchemaJson());
             t.setFormSchemaJson(req.getFormSchemaJson().trim());
         }
@@ -191,7 +194,7 @@ public class CpsInspectionTypeService {
      */
     private String normalizeCheckItemIds(String raw, int zoneFlag) {
         if (zoneFlag == 1) return null;
-        if (raw == null || raw.trim().isEmpty()) return null;
+        if (raw == null || CpsStrings.isBlank(raw)) return null;
         List<String> codes = new ArrayList<>();
         for (String part : raw.split(",")) {
             String code = part.trim();
@@ -213,7 +216,7 @@ public class CpsInspectionTypeService {
             require(fields instanceof List, "formSchemaJson.fields 必须是数组");
             List<?> list = (List<?>) fields;
             java.util.Set<String> keys = new java.util.HashSet<>();
-            java.util.Set<String> allowed = java.util.Set.of("input", "number", "textarea", "select", "date", "switch");
+            java.util.Set<String> allowed = new java.util.LinkedHashSet<>(java.util.Arrays.asList("input", "number", "textarea", "select", "date", "switch"));
             for (Object f : list) {
                 require(f instanceof Map, "formSchemaJson.fields 元素必须是对象");
                 Map<?, ?> fm = (Map<?, ?>) f;
@@ -244,6 +247,6 @@ public class CpsInspectionTypeService {
     }
 
     private static void requireNotBlank(String s, String field) {
-        require(s != null && !s.trim().isEmpty(), field + " is required");
+        require(s != null && !CpsStrings.isBlank(s), field + " is required");
     }
 }

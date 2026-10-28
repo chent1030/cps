@@ -2,18 +2,21 @@ package com.company.cps.service;
 
 import com.company.cps.domain.CpsAreaPersonConfig;
 import com.company.cps.domain.CpsProblemCategory;
-import com.company.cps.dto.CpsAreaPersonConfigRequest;
 import com.company.cps.dto.CpsAdminLoginRequest;
 import com.company.cps.dto.CpsAdminLoginResponse;
-import com.company.cps.dto.CpsOptionResponse;
 import com.company.cps.dto.CpsAdminPageResponse;
+import com.company.cps.dto.CpsAreaPersonConfigRequest;
+import com.company.cps.dto.CpsOptionResponse;
 import com.company.cps.dto.CpsProblemCategoryRequest;
-import com.company.cps.mapper.CpsAreaPersonConfigMapper;
 import com.company.cps.mapper.CpsAdminUserMapper;
+import com.company.cps.mapper.CpsAreaPersonConfigMapper;
 import com.company.cps.mapper.CpsProblemCategoryMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.company.cps.util.CpsStrings;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -110,7 +113,7 @@ public class CpsMasterDataService {
 
     /** 退出登录时记录审计日志（前端主动调用） */
     public void recordLogout(String empNo, String empName) {
-        if (empNo == null || empNo.isBlank()) return;
+        if (empNo == null || CpsStrings.isBlank(empNo)) return;
         auditLogService.record(empNo, empName, "LOGOUT", "AUTH", empNo, null, null, null, "SUCCESS", null);
     }
 
@@ -295,27 +298,24 @@ public class CpsMasterDataService {
     }
 
     private static void requireText(String value, String message) {
-        if (isBlank(value)) {
+        if (CpsStrings.isBlank(value)) {
             throw new IllegalArgumentException(message);
         }
     }
 
     private static String blankToEmpty(String value) {
-        return isBlank(value) ? "" : value.trim();
+        return CpsStrings.isBlank(value) ? "" : value.trim();
     }
 
     private static String trimToNull(String value) {
-        return isBlank(value) ? null : value.trim();
+        return CpsStrings.isBlank(value) ? null : value.trim();
     }
 
     private static String firstNonBlank(String first, String second) {
-        if (!isBlank(first)) {
+        if (!CpsStrings.isBlank(first)) {
             return first.trim();
         }
         return trimToNull(second);
     }
 
-    private static boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

@@ -21,6 +21,7 @@ import org.mockito.quality.Strictness;
 
 import java.util.Optional;
 
+import java.util.Collections;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -274,13 +275,13 @@ class CpsInventoryTxnServiceTest {
     @Test
     void pageTxnsAndAlertsNormalizePaging() {
         when(txnMapper.count(null, null)).thenReturn(3L);
-        when(txnMapper.page(isNull(), isNull(), eq(20), eq(20))).thenReturn(java.util.List.of());
+        when(txnMapper.page(isNull(), isNull(), eq(20), eq(20))).thenReturn(java.util.Collections.emptyList());
         CpsPageResponse<CpsInventoryTxn> txns = service.pageTxns(null, null, 2, 20);
         assertEquals(3L, txns.getTotal());
 
         when(alertMapper.count("OPEN", ITEM_ID)).thenReturn(1L);
         when(alertMapper.page(eq("OPEN"), eq(ITEM_ID), anyInt(), anyInt()))
-                .thenReturn(java.util.List.of());
+                .thenReturn(java.util.Collections.emptyList());
         CpsPageResponse<CpsInventoryAlertEvent> alerts =
                 service.pageAlerts("OPEN", ITEM_ID, 0, 9999); // size 上限 200
         assertEquals(1L, alerts.getTotal());

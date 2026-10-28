@@ -6,7 +6,10 @@ import com.company.cps.mapper.CpsPushConfigMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.company.cps.util.CpsStrings;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -19,12 +22,12 @@ import java.util.Set;
 @Service
 public class CpsPushConfigService {
 
-    private static final Set<String> ALLOWED_CHANNELS = Set.of(
+    private static final Set<String> ALLOWED_CHANNELS = new LinkedHashSet<>(Arrays.asList(
             CpsPushConfig.CHANNEL_INTERFACE,
             CpsPushConfig.CHANNEL_EMAIL,
             CpsPushConfig.CHANNEL_SMS,
             CpsPushConfig.CHANNEL_WEBHOOK
-    );
+    ));
 
     private final CpsPushConfigMapper mapper;
 
@@ -84,7 +87,7 @@ public class CpsPushConfigService {
     }
 
     private static String trimToNull(String value) {
-        if (value == null || value.trim().isEmpty()) return null;
+        if (value == null || CpsStrings.isBlank(value)) return null;
         return value.trim();
     }
 

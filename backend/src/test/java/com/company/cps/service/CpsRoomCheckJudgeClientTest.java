@@ -13,6 +13,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.Arrays;
 import java.util.List;
 
+import java.util.Collections;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -101,7 +102,7 @@ class CpsRoomCheckJudgeClientTest {
                         "{\"status\":\"JUDGED\",\"verdict\":\"PASS\",\"reason\":\"ok\"}",
                         MediaType.APPLICATION_JSON));
         List<CpsRoomCheckJudgeClient.ItemJudge> judged =
-                client.judge(record(), List.of(absolute), 1);
+                client.judge(record(), Arrays.asList(absolute), 1);
         assertEquals("PASS", judged.get(0).outcome);
         server.verify();
     }
@@ -180,6 +181,6 @@ class CpsRoomCheckJudgeClientTest {
 
     @Test
     void emptyItemsReturnsNull() {
-        assertNull(client.judge(record(), List.of(), 1));
+        assertNull(client.judge(record(), Collections.emptyList(), 1));
     }
 }

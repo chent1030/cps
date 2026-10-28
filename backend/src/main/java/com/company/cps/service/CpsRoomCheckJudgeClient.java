@@ -13,7 +13,10 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import com.company.cps.util.CpsStrings;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -98,9 +101,9 @@ public class CpsRoomCheckJudgeClient {
         // C-04 照片二选一：绝对 URL 走 photo_urls，历史裸对象键走 photo_object_keys（恰有一个非空）。
         String photo = item.getPhotoObjectKey() == null ? null : item.getPhotoObjectKey().trim();
         boolean photoIsUrl = photo != null && MinioStorageService.isAbsoluteUrl(photo);
-        payload.put("photo_urls", photoIsUrl ? List.of(photo) : List.of());
+        payload.put("photo_urls", photoIsUrl ? Arrays.asList(photo) : Collections.emptyList());
         payload.put("photo_object_keys", photo == null || photo.isEmpty() || photoIsUrl
-                ? List.of() : List.of(photo));
+                ? Collections.emptyList() : Arrays.asList(photo));
         payload.put("deduction", item.getDeductScore());
         payload.put("config_version", item.getConfigVersion() == null ? null : String.valueOf(item.getConfigVersion()));
         payload.put("room_name", record.getRoomCode() + "-" + record.getRoomName());
@@ -121,7 +124,7 @@ public class CpsRoomCheckJudgeClient {
 
     /** 200 响应解析：status=JUDGED 按 verdict 取 PASS/FAIL；SKIPPED / 不可解析 ⇒ PENDING（不伪造）。 */
     private ItemJudge parse(String body, CpsRoomCheckRecordItem item) {
-        if (body == null || body.trim().isEmpty()) {
+        if (body == null || CpsStrings.isBlank(body)) {
             return pending(item, "judge service returned empty body");
         }
         JsonNode root;

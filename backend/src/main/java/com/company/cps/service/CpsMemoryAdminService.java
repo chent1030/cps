@@ -12,7 +12,9 @@ import com.company.cps.mapper.CpsIssueMapper;
 import com.company.cps.mapper.CpsReviewAdjudicationMapper;
 import org.springframework.stereotype.Service;
 
+import com.company.cps.util.CpsStrings;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -56,7 +58,7 @@ public class CpsMemoryAdminService {
                 trim(factory), trim(area),
                 categoryL1Id, categoryL2Id,
                 trim(startTime), trim(endTime));
-        List<CpsReviewAdjudication> rows = total == 0 ? List.of() : adjudicationMapper.findMemoryPage(
+        List<CpsReviewAdjudication> rows = total == 0 ? Collections.emptyList() : adjudicationMapper.findMemoryPage(
                 issueId, trim(decision), trim(aiRelation), trim(reviewerEmpNo),
                 trim(factory), trim(area),
                 categoryL1Id, categoryL2Id,
@@ -99,7 +101,7 @@ public class CpsMemoryAdminService {
                 trim(factory), trim(area),
                 categoryL1Id, categoryL2Id,
                 trim(startTime), trim(endTime));
-        List<CpsInitialReviewEvent> rows = total == 0 ? List.of() : eventMapper.findMemoryPage(
+        List<CpsInitialReviewEvent> rows = total == 0 ? Collections.emptyList() : eventMapper.findMemoryPage(
                 issueId, trim(eventType), taskId,
                 trim(factory), trim(area),
                 categoryL1Id, categoryL2Id,
@@ -132,7 +134,7 @@ public class CpsMemoryAdminService {
         long total = issueMapper.countMemory(
                 trim(factory), categoryL1Id, categoryL2Id,
                 status, trim(startTime), trim(endTime));
-        List<CpsIssueListItemResponse> rows = total == 0 ? List.of() : issueMapper.findMemoryPage(
+        List<CpsIssueListItemResponse> rows = total == 0 ? Collections.emptyList() : issueMapper.findMemoryPage(
                 trim(factory), categoryL1Id, categoryL2Id,
                 status, trim(startTime), trim(endTime),
                 norm[1], norm[0]);
@@ -148,7 +150,7 @@ public class CpsMemoryAdminService {
     }
 
     private static String trim(String value) {
-        if (value == null || value.trim().isEmpty()) return null;
+        if (value == null || CpsStrings.isBlank(value)) return null;
         return value.trim();
     }
 }

@@ -13,7 +13,9 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import com.company.cps.util.CpsStrings;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,7 +82,7 @@ public class CpsVisionClient {
         payload.put("roomType", roomType);
         payload.put("checkItemId", checkItemId);
         payload.put("photoUrl", photoUrl);
-        payload.put("expectedEvidence", expectedEvidence == null ? List.of() : expectedEvidence);
+        payload.put("expectedEvidence", expectedEvidence == null ? Collections.emptyList() : expectedEvidence);
 
         String body;
         try {
@@ -98,7 +100,7 @@ public class CpsVisionClient {
 
     /** 解析响应：overall=PASS|PARTIAL|PROBLEM；score=0-100；reasons=[…]。 */
     private VisionJudgeResult parse(String body) {
-        if (body == null || body.trim().isEmpty()) {
+        if (body == null || CpsStrings.isBlank(body)) {
             return null;
         }
         JsonNode root;

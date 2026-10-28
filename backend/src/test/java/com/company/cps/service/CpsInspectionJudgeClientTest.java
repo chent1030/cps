@@ -102,7 +102,7 @@ class CpsInspectionJudgeClientTest {
                         MediaType.APPLICATION_JSON));
 
         List<CpsInspectionJudgeClient.ItemJudge> results = client.judge(record(),
-                List.of(photoItem(6L, url)), 1);
+                Arrays.asList(photoItem(6L, url)), 1);
 
         assertEquals("PASS", results.get(0).outcome);
         server.verify();
@@ -114,7 +114,7 @@ class CpsInspectionJudgeClientTest {
                 .andRespond(withSuccess("{\"status\":\"PENDING\"}", MediaType.APPLICATION_JSON));
 
         List<CpsInspectionJudgeClient.ItemJudge> results = client.judge(record(),
-                List.of(photoItem(3L, "cps/pending.jpg")), 1);
+                Arrays.asList(photoItem(3L, "cps/pending.jpg")), 1);
 
         assertEquals(1, results.size());
         assertEquals("PENDING", results.get(0).outcome);
@@ -126,7 +126,7 @@ class CpsInspectionJudgeClientTest {
         server.expect(requestTo(URL)).andRespond(withServerError());
 
         List<CpsInspectionJudgeClient.ItemJudge> results = client.judge(record(),
-                List.of(photoItem(4L, "cps/err.jpg")), 2);
+                Arrays.asList(photoItem(4L, "cps/err.jpg")), 2);
 
         assertEquals("PENDING", results.get(0).outcome);
         assertTrue(results.get(0).reason.contains("judge call failed"));
@@ -135,7 +135,7 @@ class CpsInspectionJudgeClientTest {
     @Test
     void itemWithoutPhotoIsNotSentToAi() {
         List<CpsInspectionJudgeClient.ItemJudge> results = client.judge(record(),
-                List.of(photoItem(5L, null)), 1);
+                Arrays.asList(photoItem(5L, null)), 1);
 
         assertEquals("PENDING", results.get(0).outcome);
         assertTrue(results.get(0).reason.contains("no photo"));
@@ -147,7 +147,7 @@ class CpsInspectionJudgeClientTest {
         properties.setEnabled(false);
 
         List<CpsInspectionJudgeClient.ItemJudge> results = client.judge(record(),
-                List.of(photoItem(6L, "cps/any.jpg")), 1);
+                Arrays.asList(photoItem(6L, "cps/any.jpg")), 1);
 
         assertEquals("PENDING", results.get(0).outcome);
         assertTrue(results.get(0).reason.contains("disabled"));

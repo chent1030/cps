@@ -11,6 +11,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import com.company.cps.util.CpsStrings;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -95,7 +96,7 @@ public class CpsSpeechTranscribeClient {
         payload.put("field", field);
         payload.put("attempt", attempt);
         payload.put("audio_object_key", audioObjectKey);
-        if (audioFormat != null && !audioFormat.isBlank()) {
+        if (audioFormat != null && !CpsStrings.isBlank(audioFormat)) {
             payload.put("audio_format", audioFormat);
         }
         payload.put("idempotency_key", "speech-" + submissionId + "-" + field + "-" + attempt);
@@ -114,7 +115,7 @@ public class CpsSpeechTranscribeClient {
 
     /** 契约解析：status=TRANSCRIBED 取 text；SKIPPED 取 metadata.skip_reason；其余一律降级（不伪造文本）。 */
     Transcription parse(String body) {
-        if (body == null || body.isBlank()) {
+        if (body == null || CpsStrings.isBlank(body)) {
             return Transcription.unavailable();
         }
         try {

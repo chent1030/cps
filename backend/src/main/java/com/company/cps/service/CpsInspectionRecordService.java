@@ -26,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.company.cps.util.CpsStrings;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -273,8 +274,8 @@ public class CpsInspectionRecordService {
         String aiReason = summary.isEmpty() ? "AI 初审无结论（人工复核）" : String.join("；", summary);
         // 整改责任人 = 区域责任人（cps_inspection_area.keeper_emp_no）；未配置区域的类型回退检查人自己
         CpsInspectionArea area = record.getAreaId() == null ? null : areaMapper.findById(record.getAreaId());
-        String keeperEmpNo = area == null || isBlank(area.getKeeperEmpNo()) ? record.getCheckEmpNo() : area.getKeeperEmpNo();
-        String keeperEmpName = area == null || isBlank(area.getKeeperEmpNo()) ? record.getCheckEmpName() : area.getKeeperEmpName();
+        String keeperEmpNo = area == null || CpsStrings.isBlank(area.getKeeperEmpNo()) ? record.getCheckEmpNo() : area.getKeeperEmpNo();
+        String keeperEmpName = area == null || CpsStrings.isBlank(area.getKeeperEmpNo()) ? record.getCheckEmpName() : area.getKeeperEmpName();
 
         // 3) 进入 web 人工复核（Android 不再承载复核动作）
         int rows = recordMapper.updateToReview(recordId, "PENDING_REVIEW", aiOverall, score, aiReason,
@@ -483,9 +484,9 @@ public class CpsInspectionRecordService {
     }
 
     private String typeName(String typeCode) {
-        if (isBlank(typeCode)) return "";
+        if (CpsStrings.isBlank(typeCode)) return "";
         CpsInspectionType type = typeMapper.findByCode(typeCode.trim());
-        return type == null || isBlank(type.getName()) ? typeCode.trim() : type.getName();
+        return type == null || CpsStrings.isBlank(type.getName()) ? typeCode.trim() : type.getName();
     }
 
     private String rectifyPhotoUrls(CpsInspectionRecord record) {
@@ -672,10 +673,6 @@ public class CpsInspectionRecordService {
 
     private static void requireText(String value, String field) {
         require(value != null && !value.trim().isEmpty(), field + " is required");
-    }
-
-    private static boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
     }
 
     /** 文本字数（去首尾空白后的字符数），与 C-01 text_validity 的口径对齐。 */

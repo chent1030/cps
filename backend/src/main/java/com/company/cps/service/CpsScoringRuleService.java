@@ -6,9 +6,12 @@ import com.company.cps.mapper.CpsScoringRuleMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.company.cps.util.CpsStrings;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -26,12 +29,12 @@ import java.util.Set;
 @Service
 public class CpsScoringRuleService {
 
-    public static final Set<String> KNOWN_RULE_KEYS = Set.of(
+    public static final Set<String> KNOWN_RULE_KEYS = new LinkedHashSet<>(Arrays.asList(
             CpsScoringRule.RULE_KEY_BASE,
             CpsScoringRule.RULE_KEY_CONTENT_MISMATCH_DEDUCT,
             CpsScoringRule.RULE_KEY_EVIDENCE_VAGUE_DEDUCT,
             CpsScoringRule.RULE_KEY_KEYWORDS_MISSING_DEDUCT,
-            CpsScoringRule.RULE_KEY_OTHER_DEDUCT);
+            CpsScoringRule.RULE_KEY_OTHER_DEDUCT));
 
     /** 内置默认（DB 未初始化时的兜底；正常路径读 DB）。 */
     private static final int DEFAULT_BASE = 100;
@@ -163,7 +166,7 @@ public class CpsScoringRuleService {
     }
 
     private static String trimToNull(String value) {
-        if (value == null || value.trim().isEmpty()) return null;
+        if (value == null || CpsStrings.isBlank(value)) return null;
         return value.trim();
     }
 

@@ -1,17 +1,16 @@
 package com.company.cps.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.company.cps.domain.CpsInitialReviewTask;
 import com.company.cps.domain.CpsIssue;
 import com.company.cps.domain.CpsIssueAction;
 import com.company.cps.domain.CpsIssueAiSuggestion;
 import com.company.cps.domain.CpsIssueFlowLog;
 import com.company.cps.domain.CpsIssueStatus;
-import com.company.cps.domain.CpsInitialReviewTask;
 import com.company.cps.domain.CpsRectificationSubmission;
 import com.company.cps.domain.CpsRectificationSubmissionStatus;
 import com.company.cps.domain.CpsRectificationTransfer;
 import com.company.cps.domain.CpsReviewAdjudication;
+import com.company.cps.dto.CpsInspectionTypeDto;
 import com.company.cps.dto.CpsIssueActionRequest;
 import com.company.cps.dto.CpsIssueActionResponse;
 import com.company.cps.dto.CpsIssueAiSuggestionRequest;
@@ -19,7 +18,6 @@ import com.company.cps.dto.CpsIssueCreateRequest;
 import com.company.cps.dto.CpsIssueDetailResponse;
 import com.company.cps.dto.CpsIssueListItemResponse;
 import com.company.cps.dto.CpsIssueTypeSummaryResponse;
-import com.company.cps.dto.CpsInspectionTypeDto;
 import com.company.cps.dto.CpsReviewAdjudicationResponse;
 import com.company.cps.mapper.CpsIssueAiSuggestionMapper;
 import com.company.cps.mapper.CpsIssueAttachmentMapper;
@@ -27,12 +25,15 @@ import com.company.cps.mapper.CpsIssueFlowLogMapper;
 import com.company.cps.mapper.CpsIssueMapper;
 import com.company.cps.mapper.CpsRectificationSubmissionMapper;
 import com.company.cps.mapper.CpsRectificationTransferMapper;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import com.company.cps.util.CpsStrings;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -300,7 +301,7 @@ public class CpsIssueService {
 
     /** file_url 归一：绝对 URL/相对路径原样，历史裸对象键拼 MinIO 公开地址；storage 缺失时回退原值。 */
     private String resolveAccessibleFileUrl(String fileUrl) {
-        if (fileUrl == null || fileUrl.trim().isEmpty()) {
+        if (fileUrl == null || CpsStrings.isBlank(fileUrl)) {
             return fileUrl;
         }
         String value = fileUrl.trim();
@@ -322,7 +323,7 @@ public class CpsIssueService {
                                                String inspectionTypeCode) {
         int safePage = Math.max(page, 1);
         int safePageSize = Math.min(Math.max(pageSize, 1), 100);
-        String typeCode = isBlank(inspectionTypeCode) ? null : inspectionTypeCode.trim();
+        String typeCode = CpsStrings.isBlank(inspectionTypeCode) ? null : inspectionTypeCode.trim();
         return issueMapper.listByTab(tab, currentEmpNo, typeCode, safePageSize, (safePage - 1) * safePageSize);
     }
 
@@ -331,7 +332,7 @@ public class CpsIssueService {
      * 与 list(tab, ..., inspectionTypeCode) 使用同一套过滤口径，客户端拿总数与各类型数量一次到位。
      */
     public CpsIssueTypeSummaryResponse typeSummary(String tab, String currentEmpNo) {
-        String safeTab = isBlank(tab) ? "todo" : tab;
+        String safeTab = CpsStrings.isBlank(tab) ? "todo" : tab;
         CpsIssueTypeSummaryResponse response = new CpsIssueTypeSummaryResponse();
         List<Map<String, Object>> rows = issueMapper.countByTypeForTab(safeTab, currentEmpNo);
         if (rows == null) {
@@ -381,7 +382,7 @@ public class CpsIssueService {
      * extraData 留作后续按 form_schema 逐字段强校验的 hook，V1 暂只校验 JSON 合法。
      */
     private void validateInspectionTypeIfPresent(CpsIssueCreateRequest request) {
-        if (isBlank(request.getInspectionTypeCode())) {
+        if (CpsStrings.isBlank(request.getInspectionTypeCode())) {
             return;
         }
         if (inspectionTypeService == null) {
@@ -389,7 +390,7 @@ public class CpsIssueService {
             return;
         }
         CpsInspectionTypeDto type = inspectionTypeService.findByCodeOrThrow(request.getInspectionTypeCode().trim());
-        if (!isBlank(request.getExtraData())) {
+        if (!CpsStrings.isBlank(request.getExtraData())) {
             try {
                 OBJECT_MAPPER.readTree(request.getExtraData());
             } catch (Exception e) {
@@ -399,7 +400,7 @@ public class CpsIssueService {
     }
 
     private static String blankToNull(String s) {
-        return isBlank(s) ? null : s.trim();
+        return CpsStrings.isBlank(s) ? null : s.trim();
     }
 
     private void validateActionRequest(CpsIssue issue, CpsIssueActionRequest request) {
@@ -682,7 +683,7 @@ public class CpsIssueService {
 
     /** 裁决与 AI 意见的关系矩阵：无结果=NO_AI_RESULT；同向=WITH_AI；反向=AGAINST_AI（AI 只供意见，PRD §29）。 */
     private static String aiRelation(String decision, String aiOverall) {
-        if (aiOverall == null || aiOverall.isBlank()) {
+        if (aiOverall == null || CpsStrings.isBlank(aiOverall)) {
             return "NO_AI_RESULT";
         }
         String opinion = aiOverall.trim().toUpperCase();
@@ -792,7 +793,7 @@ public class CpsIssueService {
             issue.setShortTermMeasure(trimToNull(request.getShortTermMeasure()));
             issue.setLongTermMeasure(trimToNull(request.getLongTermMeasure()));
             issue.setRectifyRemark(trimToNull(request.getRectifyRemark()));
-            if (!isBlank(request.getResponsibleEmpNo())) {
+            if (!CpsStrings.isBlank(request.getResponsibleEmpNo())) {
                 issue.setResponsibleEmpNo(request.getResponsibleEmpNo().trim());
                 issue.setResponsibleEmpName(empName(issue.getResponsibleEmpNo()));
             }
@@ -974,7 +975,7 @@ public class CpsIssueService {
     }
 
     private static void requireText(String value, String message) {
-        if (isBlank(value)) {
+        if (CpsStrings.isBlank(value)) {
             throw new IllegalArgumentException(message);
         }
     }
@@ -992,7 +993,7 @@ public class CpsIssueService {
 
     private static String firstNonBlank(String... values) {
         for (String value : values) {
-            if (!isBlank(value)) {
+            if (!CpsStrings.isBlank(value)) {
                 return value.trim();
             }
         }
@@ -1000,7 +1001,7 @@ public class CpsIssueService {
     }
 
     private static String trimToNull(String value) {
-        if (isBlank(value)) {
+        if (CpsStrings.isBlank(value)) {
             return null;
         }
         return value.trim();
@@ -1010,9 +1011,6 @@ public class CpsIssueService {
         return empNo;
     }
 
-    private static boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 
     private static Boolean isCategoryModified(CpsIssueCreateRequest request) {
         return !Objects.equals(request.getAiCategoryL1Id(), request.getCategoryL1Id())

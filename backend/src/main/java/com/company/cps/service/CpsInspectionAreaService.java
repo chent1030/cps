@@ -11,8 +11,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.company.cps.util.CpsStrings;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -24,7 +27,7 @@ import java.util.Set;
 @Service
 public class CpsInspectionAreaService {
 
-    private static final Set<String> RISK_LEVELS = Set.of("HIGH", "MEDIUM", "LOW");
+    private static final Set<String> RISK_LEVELS = new LinkedHashSet<>(Arrays.asList("HIGH", "MEDIUM", "LOW"));
 
     @Autowired
     private CpsInspectionAreaMapper areaMapper;
@@ -69,7 +72,7 @@ public class CpsInspectionAreaService {
         requireText(req.getTypeCode(), "typeCode");
         requireText(req.getAreaName(), "areaName");
         requireText(req.getKeeperEmpNo(), "keeperEmpNo");
-        String risk = req.getRiskLevel() == null || req.getRiskLevel().trim().isEmpty()
+        String risk = req.getRiskLevel() == null || CpsStrings.isBlank(req.getRiskLevel())
                 ? "LOW" : req.getRiskLevel().trim().toUpperCase();
         require(RISK_LEVELS.contains(risk), "riskLevel 必须是 HIGH/MEDIUM/LOW: " + risk);
 
@@ -130,7 +133,7 @@ public class CpsInspectionAreaService {
 
     /** 点检项编码规范化：trim/去重/存在且启用校验 */
     private String normalizeCheckItemIds(String raw) {
-        if (raw == null || raw.trim().isEmpty()) return null;
+        if (raw == null || CpsStrings.isBlank(raw)) return null;
         List<String> codes = new ArrayList<>();
         for (String part : raw.split(",")) {
             String code = part.trim();
@@ -150,7 +153,7 @@ public class CpsInspectionAreaService {
     }
 
     private static String firstNonBlank(String a, String b) {
-        if (a != null && !a.trim().isEmpty()) return a.trim();
+        if (a != null && !CpsStrings.isBlank(a)) return a.trim();
         return b == null ? null : b.trim();
     }
 
@@ -159,6 +162,6 @@ public class CpsInspectionAreaService {
     }
 
     private static void requireText(String value, String field) {
-        require(value != null && !value.trim().isEmpty(), field + " is required");
+        require(value != null && !CpsStrings.isBlank(value), field + " is required");
     }
 }

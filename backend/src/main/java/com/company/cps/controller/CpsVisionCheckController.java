@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.company.cps.util.CpsStrings;
 import java.time.LocalDateTime;
 
 /**
@@ -74,7 +75,7 @@ public class CpsVisionCheckController {
     @PostMapping("/{id}/override")
     public CpsVisionCheckRecord override(@PathVariable Long id,
                                           @RequestBody CpsVisionCheckOverrideRequest request) {
-        if (request != null && (request.getOperatorEmpNo() == null || request.getOperatorEmpNo().isBlank())) {
+        if (request != null && (request.getOperatorEmpNo() == null || CpsStrings.isBlank(request.getOperatorEmpNo()))) {
             request.setOperatorEmpNo("admin");
         }
         return visionCheckService.humanOverride(id, request);

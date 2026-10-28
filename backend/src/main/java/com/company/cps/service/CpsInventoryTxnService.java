@@ -13,7 +13,9 @@ import com.company.cps.mapper.CpsInventoryTxnMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.company.cps.util.CpsStrings;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -168,7 +170,7 @@ public class CpsInventoryTxnService {
         if (!ignore && !close) {
             throw new IllegalArgumentException("action must be IGNORE or CLOSE: " + request.getAction());
         }
-        if (close && (request.getReason() == null || request.getReason().trim().isEmpty())) {
+        if (close && (request.getReason() == null || CpsStrings.isBlank(request.getReason()))) {
             throw new IllegalArgumentException("reason is required when closing an alert");
         }
         CpsInventoryAlertEvent event = alertMapper.findById(eventId)
@@ -191,14 +193,14 @@ public class CpsInventoryTxnService {
         int pageSize = normalizeSize(size);
         long total = txnMapper.count(itemId, txnType);
         List<CpsInventoryTxn> rows = total == 0
-                ? List.of()
+                ? Collections.emptyList()
                 : txnMapper.page(itemId, txnType, pageSize, normalizeOffset(page, pageSize));
         return new CpsPageResponse<>(total, rows);
     }
 
     /** E3：预警分页列表。 */
     public CpsPageResponse<CpsInventoryAlertEvent> pageAlerts(String status, Long itemId, Integer page, Integer size) {
-        if (status != null && !status.trim().isEmpty()) {
+        if (status != null && !CpsStrings.isBlank(status)) {
             String s = status.trim().toUpperCase();
             if (!CpsInventoryAlertEvent.STATUS_OPEN.equals(s)
                     && !CpsInventoryAlertEvent.STATUS_RESOLVED_AUTO.equals(s)
@@ -213,7 +215,7 @@ public class CpsInventoryTxnService {
         int pageSize = normalizeSize(size);
         long total = alertMapper.count(status, itemId);
         List<CpsInventoryAlertEvent> rows = total == 0
-                ? List.of()
+                ? Collections.emptyList()
                 : alertMapper.page(status, itemId, pageSize, normalizeOffset(page, pageSize));
         return new CpsPageResponse<>(total, rows);
     }
@@ -229,7 +231,7 @@ public class CpsInventoryTxnService {
     }
 
     private static void requireText(String value, String field) {
-        if (value == null || value.trim().isEmpty()) {
+        if (value == null || CpsStrings.isBlank(value)) {
             throw new IllegalArgumentException("Inventory txn " + field + " is required");
         }
     }

@@ -2,19 +2,21 @@ package com.company.cps.service;
 
 import com.company.cps.domain.CpsKnowledgeCase;
 import com.company.cps.domain.CpsKnowledgeCaseImage;
+import com.company.cps.dto.CpsAdminPageResponse;
 import com.company.cps.dto.CpsKnowledgeCaseImageRequest;
 import com.company.cps.dto.CpsKnowledgeCaseRequest;
-import com.company.cps.dto.CpsKnowledgeVectorSyncResponse;
 import com.company.cps.dto.CpsKnowledgeMaterialRequest;
-import com.company.cps.dto.CpsAdminPageResponse;
+import com.company.cps.dto.CpsKnowledgeVectorSyncResponse;
 import com.company.cps.mapper.CpsKnowledgeCaseImageMapper;
 import com.company.cps.mapper.CpsKnowledgeCaseMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.company.cps.util.CpsStrings;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -190,7 +192,7 @@ public class CpsKnowledgeAdminService {
             throw new IllegalArgumentException("material file must not exceed 20 MB");
         }
         String contentType = trimToNull(file.getContentType());
-        if (contentType == null || !Set.of("image/jpeg", "image/png", "image/webp").contains(contentType.toLowerCase())) {
+        if (contentType == null || !new LinkedHashSet<>(Arrays.asList("image/jpeg", "image/png", "image/webp")).contains(contentType.toLowerCase())) {
             throw new IllegalArgumentException("only JPEG, PNG and WebP material images are supported");
         }
     }
@@ -202,16 +204,13 @@ public class CpsKnowledgeAdminService {
     }
 
     private static void requireText(String value, String message) {
-        if (isBlank(value)) {
+        if (CpsStrings.isBlank(value)) {
             throw new IllegalArgumentException(message);
         }
     }
 
     private static String trimToNull(String value) {
-        return isBlank(value) ? null : value.trim();
+        return CpsStrings.isBlank(value) ? null : value.trim();
     }
 
-    private static boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
 }

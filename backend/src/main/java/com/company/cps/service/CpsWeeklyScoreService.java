@@ -15,12 +15,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.company.cps.util.CpsStrings;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -48,8 +51,8 @@ public class CpsWeeklyScoreService {
     /** 一周最多取多少 issue 行参与 SUM（防止爆炸）。 */
     private static final int MAX_ISSUES_PER_WEEK = 1000;
 
-    private static final Set<String> SUPPORTED_RECOMPUTE_OPERATORS = Set.of(
-            "ADMIN", "SYSTEM", "SCHEDULER");
+    private static final Set<String> SUPPORTED_RECOMPUTE_OPERATORS = new LinkedHashSet<>(Arrays.asList(
+            "ADMIN", "SYSTEM", "SCHEDULER"));
 
     private final CpsWeeklyScoreMapper scoreMapper;
     private final CpsIssueMapper issueMapper;
@@ -123,7 +126,7 @@ public class CpsWeeklyScoreService {
                 ? naturalWeekStart(request.getWeekStartDate())
                 : naturalWeekStart(LocalDate.now(SHANGHAI_ZONE).minusDays(7));
         String operatorRaw = request.getOperatorEmpNo();
-        if (operatorRaw == null || operatorRaw.trim().isEmpty()) {
+        if (operatorRaw == null || CpsStrings.isBlank(operatorRaw)) {
             throw new IllegalArgumentException("operatorEmpNo is required");
         }
         String operator = operatorRaw.trim().toUpperCase();

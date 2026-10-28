@@ -4,8 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import com.company.cps.util.CpsStrings;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -69,7 +69,7 @@ public class CpsAdminUser {
     /** 解析 page_permissions JSON 字符串为列表。 */
     @JsonIgnore
     public List<String> parsePagePermissions() {
-        if (pagePermissions == null || pagePermissions.isBlank()) {
+        if (pagePermissions == null || CpsStrings.isBlank(pagePermissions)) {
             return null;
         }
         try {

@@ -64,6 +64,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import java.util.Collections;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -214,11 +215,11 @@ class CpsWave13IntegrationTest {
 
         when(issueMapper.findById(issueId)).thenReturn(Optional.of(issue));
         when(submissionMapper.findById(submissionId)).thenReturn(submission);
-        when(attachmentMapper.findByIssueAndStage(issueId, "ISSUE")).thenReturn(List.of());
-        when(attachmentMapper.findByIssueAndStage(issueId, "PROOF")).thenReturn(List.of());
+        when(attachmentMapper.findByIssueAndStage(issueId, "ISSUE")).thenReturn(Collections.emptyList());
+        when(attachmentMapper.findByIssueAndStage(issueId, "PROOF")).thenReturn(Collections.emptyList());
         when(taskMapper.findById(taskId)).thenReturn(runningTask);
         when(taskMapper.findByIssueAndVersion(issueId, versionNo)).thenReturn(runningTask);
-        when(taskMapper.findExpiredRunning(any())).thenReturn(List.of());
+        when(taskMapper.findExpiredRunning(any())).thenReturn(Collections.emptyList());
         when(adjudicationMapper.findByIssueAndVersion(issueId, versionNo)).thenReturn(null);
         // handleCallback 路径：resultMapper.findByTaskId null + 任务 RUNNING
         when(resultMapper.findByTaskId(taskId)).thenReturn(null);
@@ -246,7 +247,7 @@ class CpsWave13IntegrationTest {
 
         // ---- act 1: Python /api/v1/agent/rectifications 投递 mock 返回 review_task_ref ----
         String reviewTaskRef = agentClient.triggerInitialReview(
-                submission, issue, List.<CpsIssueAttachment>of(), List.<CpsIssueAttachment>of());
+                submission, issue, Collections.<CpsIssueAttachment>emptyList(), Collections.<CpsIssueAttachment>emptyList());
         assertEquals("PY-RECT-777", reviewTaskRef,
                 "Chain 1.1: C-01 投递返回 review_task_ref 必须 = PY-RECT-777");
 
@@ -265,7 +266,7 @@ class CpsWave13IntegrationTest {
         item.setVerdict("PASS");
         item.setConfidence(new BigDecimal("0.92"));
         item.setReason("前后照对比一致");
-        callback.setItems(List.of(item));
+        callback.setItems(Arrays.asList(item));
 
         when(taskMapper.markCompleted(eq(taskId), any())).thenReturn(1);
 
@@ -471,7 +472,7 @@ class CpsWave13IntegrationTest {
         // vision client 返回 PASS（fingerprint 由 service 自动 sha256 计算 → 任意匹配即可）
         when(visionClient.judge(anyString(), anyString(), anyLong(), anyString(), any()))
                 .thenReturn(new CpsVisionClient.VisionJudgeResult(
-                        CpsVisionCheckRecord.AI_OVERALL_PASS, 95, List.of("前后对比一致")));
+                        CpsVisionCheckRecord.AI_OVERALL_PASS, 95, Arrays.asList("前后对比一致")));
         when(recordMapper.updateAiJudgeResult(any(CpsVisionCheckRecord.class))).thenAnswer(inv -> {
             CpsVisionCheckRecord r = inv.getArgument(0);
             // mutate live
@@ -592,25 +593,25 @@ class CpsWave13IntegrationTest {
         // ---- arrange mock responses ----
         when(coverageMapper.countFrequencyGroupBy(any(), any(), any(), any(), any())).thenReturn(1L);
         when(coverageMapper.frequencyGroupBy(any(), any(), any(), any(), any(), anyInt(), anyInt()))
-                .thenReturn(List.of(rowOf(
+                .thenReturn(Arrays.asList(rowOf(
                         "factory", "工厂A", "area", "1区",
                         "categoryL1Id", 100L, "issueCount", 12,
                         "closedCount", 8, "closeRate", 0.67)));
 
         when(coverageMapper.countRegionSupervisorGroupBy(any(), any(), any(), any())).thenReturn(1L);
         when(coverageMapper.regionSupervisorGroupBy(any(), any(), any(), any(), any(), anyInt(), anyInt()))
-                .thenReturn(List.of(rowOf(
+                .thenReturn(Arrays.asList(rowOf(
                         "area", "1区", "currentHandlerEmpNo", "E30001",
                         "openCount", 5, "overdueCount", 1)));
 
         when(coverageMapper.countRecurrenceGroupBy(any(), any(), any(), any())).thenReturn(1L);
         when(coverageMapper.recurrenceGroupBy(any(), any(), any(), any(), anyInt(), anyInt()))
-                .thenReturn(List.of(rowOf(
+                .thenReturn(Arrays.asList(rowOf(
                         "issueId", 8001L, "reopenCount", 3, "rejectCount", 1)));
 
         when(coverageMapper.countCoverageGaps(any(), any(), any(), any())).thenReturn(1L);
         when(coverageMapper.coverageGaps(any(), any(), any(), any(), anyInt(), anyInt()))
-                .thenReturn(List.of(rowOf(
+                .thenReturn(Arrays.asList(rowOf(
                         "factory", "工厂A", "area", "2区",
                         "storageRoomType", "PRIMARY", "lastRecordDaysAgo", 12)));
 

@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -131,7 +132,7 @@ class CpsVisionCheckServiceTest {
                 ArgumentCaptor.forClass(CpsVisionCheckJudgeEvent.class);
         verify(eventMapper, times(3)).insert(eventCaptor.capture());
         List<String> types = eventCaptor.getAllValues().stream()
-                .map(CpsVisionCheckJudgeEvent::getEventType).toList();
+                .map(CpsVisionCheckJudgeEvent::getEventType).collect(Collectors.toList());
         assertTrue(types.contains(CpsVisionCheckJudgeEvent.EVENT_SUBMITTED));
         assertTrue(types.contains(CpsVisionCheckJudgeEvent.EVENT_AI_STARTED));
         assertTrue(types.contains(CpsVisionCheckJudgeEvent.EVENT_AI_COMPLETED));
@@ -203,7 +204,7 @@ class CpsVisionCheckServiceTest {
                 ArgumentCaptor.forClass(CpsVisionCheckJudgeEvent.class);
         verify(eventMapper, times(4)).insert(eventCaptor.capture());
         List<String> types = eventCaptor.getAllValues().stream()
-                .map(CpsVisionCheckJudgeEvent::getEventType).toList();
+                .map(CpsVisionCheckJudgeEvent::getEventType).collect(Collectors.toList());
         assertTrue(types.contains(CpsVisionCheckJudgeEvent.EVENT_AI_FAILED));
         assertTrue(types.contains(CpsVisionCheckJudgeEvent.EVENT_TIMEOUT_OPENED));
     }

@@ -6,8 +6,11 @@ import com.company.cps.service.CpsSpeechTranscribeClient.Transcription;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.company.cps.util.CpsStrings;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -25,7 +28,7 @@ import java.util.UUID;
 public class CpsSpeechService {
 
     /** D-03 语音覆盖三字段白名单。 */
-    static final Set<String> ALLOWED_FIELDS = Set.of("reason", "short_term", "long_term");
+    static final Set<String> ALLOWED_FIELDS = new LinkedHashSet<>(Arrays.asList("reason", "short_term", "long_term"));
 
     static final String FALLBACK_UNAVAILABLE = "语音转写暂不可用，可点击重试或手动输入";
     static final String FALLBACK_SKIPPED = "语音转写已跳过";
@@ -52,7 +55,7 @@ public class CpsSpeechService {
         if (file.getSize() > properties.getMaxAudioBytes()) {
             throw new IllegalArgumentException("audio file exceeds size limit: " + properties.getMaxAudioBytes());
         }
-        String resolvedSubmissionId = (submissionId == null || submissionId.isBlank())
+        String resolvedSubmissionId = (submissionId == null || CpsStrings.isBlank(submissionId))
                 ? "speech-" + UUID.randomUUID().toString().substring(0, 8)
                 : submissionId.trim();
         int resolvedAttempt = attempt == null ? 1 : attempt;
@@ -116,6 +119,6 @@ public class CpsSpeechService {
     }
 
     private static String firstNonBlank(String value, String fallback) {
-        return value == null || value.isBlank() ? fallback : value;
+        return value == null || CpsStrings.isBlank(value) ? fallback : value;
     }
 }

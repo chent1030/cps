@@ -15,11 +15,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.company.cps.util.CpsStrings;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -43,14 +45,14 @@ public class CpsVisionCheckService {
 
     private static final Logger log = LoggerFactory.getLogger(CpsVisionCheckService.class);
 
-    private static final Set<String> ALLOWED_ROOM_TYPES = Set.of(
+    private static final Set<String> ALLOWED_ROOM_TYPES = new LinkedHashSet<>(Arrays.asList(
             CpsVisionCheckRecord.ROOM_TYPE_PRIMARY,
             CpsVisionCheckRecord.ROOM_TYPE_STANDARD,
             CpsVisionCheckRecord.ROOM_TYPE_SPECIAL,
             CpsVisionCheckRecord.ROOM_TYPE_TOOL,
-            CpsVisionCheckRecord.ROOM_TYPE_OTHER);
+            CpsVisionCheckRecord.ROOM_TYPE_OTHER));
 
-    private static final Set<String> ALLOWED_OVERRIDE_DECISIONS = Set.of("PASS", "FAIL");
+    private static final Set<String> ALLOWED_OVERRIDE_DECISIONS = new LinkedHashSet<>(Arrays.asList("PASS", "FAIL"));
 
     private final CpsVisionCheckRecordMapper recordMapper;
     private final CpsVisionCheckJudgeEventMapper eventMapper;
@@ -110,7 +112,7 @@ public class CpsVisionCheckService {
      */
     @Transactional
     public CpsVisionCheckRecord judge(Long recordId, String fingerprint) {
-        if (recordId == null || fingerprint == null || fingerprint.isBlank()) {
+        if (recordId == null || fingerprint == null || CpsStrings.isBlank(fingerprint)) {
             throw new IllegalArgumentException("recordId/fingerprint is required for judge");
         }
         // 内部幂等
@@ -197,10 +199,10 @@ public class CpsVisionCheckService {
             throw new IllegalArgumentException("decision must be PASS or FAIL (got: "
                     + request.getDecision() + ")");
         }
-        if (request.getReason() == null || request.getReason().trim().isEmpty()) {
+        if (request.getReason() == null || CpsStrings.isBlank(request.getReason())) {
             throw new IllegalArgumentException("reason is required for human override");
         }
-        if (request.getOperatorEmpNo() == null || request.getOperatorEmpNo().trim().isEmpty()) {
+        if (request.getOperatorEmpNo() == null || CpsStrings.isBlank(request.getOperatorEmpNo())) {
             throw new IllegalArgumentException("operatorEmpNo is required");
         }
 
@@ -235,7 +237,7 @@ public class CpsVisionCheckService {
         if (recordId == null) {
             throw new IllegalArgumentException("recordId is required");
         }
-        if (operatorEmpNo == null || operatorEmpNo.trim().isEmpty()) {
+        if (operatorEmpNo == null || CpsStrings.isBlank(operatorEmpNo)) {
             throw new IllegalArgumentException("operatorEmpNo is required");
         }
         CpsVisionCheckRecord record = recordMapper.findById(recordId);
@@ -265,7 +267,7 @@ public class CpsVisionCheckService {
         int offset = (page - 1) * size;
 
         String status = filter.getStatus();
-        if (status != null && !status.isBlank() && !CpsVisionCheckStatus.isValid(status)) {
+        if (status != null && !CpsStrings.isBlank(status) && !CpsVisionCheckStatus.isValid(status)) {
             throw new IllegalArgumentException("invalid status: " + status);
         }
         long total = recordMapper.countByFilters(
@@ -301,24 +303,24 @@ public class CpsVisionCheckService {
         if (request.getCheckItemId() == null) {
             throw new IllegalArgumentException("checkItemId is required");
         }
-        if (request.getRoomType() == null || request.getRoomType().isBlank()) {
+        if (request.getRoomType() == null || CpsStrings.isBlank(request.getRoomType())) {
             throw new IllegalArgumentException("roomType is required");
         }
         if (!ALLOWED_ROOM_TYPES.contains(request.getRoomType())) {
             throw new IllegalArgumentException("Unsupported roomType: " + request.getRoomType()
                     + " (allowed: PRIMARY/STANDARD/SPECIAL/TOOL/OTHER)");
         }
-        if ((request.getPhotoObjectKey() == null || request.getPhotoObjectKey().isBlank())
-                && (request.getPhotoUrl() == null || request.getPhotoUrl().isBlank())) {
+        if ((request.getPhotoObjectKey() == null || CpsStrings.isBlank(request.getPhotoObjectKey()))
+                && (request.getPhotoUrl() == null || CpsStrings.isBlank(request.getPhotoUrl()))) {
             throw new IllegalArgumentException("photoObjectKey or photoUrl is required (image evidence)");
         }
-        if (request.getCreatedBy() == null || request.getCreatedBy().isBlank()) {
+        if (request.getCreatedBy() == null || CpsStrings.isBlank(request.getCreatedBy())) {
             throw new IllegalArgumentException("createdBy is required");
         }
     }
 
     private void appendEvent(String fingerprint, String eventType, String detail, String operatorEmpNo) {
-        if (fingerprint == null || fingerprint.isBlank()) return;
+        if (fingerprint == null || CpsStrings.isBlank(fingerprint)) return;
         CpsVisionCheckJudgeEvent event = new CpsVisionCheckJudgeEvent();
         event.setJudgeFingerprint(fingerprint);
         event.setEventType(eventType);
@@ -332,15 +334,25 @@ public class CpsVisionCheckService {
      * photoUrl 为空时退化为 sha256(roomId|checkItemId|"no-photo") 仍能按业务上下文去重。
      */
     static String buildFingerprint(Long roomId, Long checkItemId, String photoUrl) {
-        String salt = (photoUrl == null || photoUrl.isBlank()) ? "no-photo" : photoUrl;
+        String salt = (photoUrl == null || CpsStrings.isBlank(photoUrl)) ? "no-photo" : photoUrl;
         String raw = roomId + "|" + checkItemId + "|" + salt;
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(raw.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
+            return toHex(hash);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 not available", e);
         }
+    }
+
+    /** JDK 8 兼容的十六进制转换（替代 HexFormat.of().formatHex）。 */
+    private static String toHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder(bytes.length * 2);
+        for (byte b : bytes) {
+            sb.append(Character.forDigit((b >> 4) & 0xF, 16));
+            sb.append(Character.forDigit(b & 0xF, 16));
+        }
+        return sb.toString();
     }
 
     private static String joinReasons(List<String> reasons) {

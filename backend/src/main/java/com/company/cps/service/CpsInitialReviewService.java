@@ -35,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronizationAdapter;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import com.company.cps.util.CpsStrings;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -570,7 +571,7 @@ public class CpsInitialReviewService {
                     summary.append("，");
                 }
                 summary.append(checkTypeLabel(item.getCheckType()))
-                        .append(item.getFieldName() == null || item.getFieldName().isBlank()
+                        .append(item.getFieldName() == null || CpsStrings.isBlank(item.getFieldName())
                                 ? "" : "(" + item.getFieldName() + ")")
                         .append('=')
                         .append(verdictLabel(item.getVerdict()));
@@ -580,7 +581,7 @@ public class CpsInitialReviewService {
     }
 
     private String overallLabel(String overall) {
-        if (overall == null || overall.isBlank()) {
+        if (overall == null || CpsStrings.isBlank(overall)) {
             return "AI 初审已出结果";
         }
         switch (overall) {
@@ -915,7 +916,7 @@ public class CpsInitialReviewService {
     }
 
     private static boolean notBlank(String value) {
-        return value != null && !value.trim().isEmpty();
+        return value != null && !CpsStrings.isBlank(value);
     }
 
     private static String firstNonBlank(String... values) {

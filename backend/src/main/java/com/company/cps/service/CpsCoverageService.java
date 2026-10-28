@@ -5,8 +5,10 @@ import com.company.cps.mapper.CpsCoverageMapper;
 import com.company.cps.mapper.CpsEffectMetricMapper;
 import org.springframework.stereotype.Service;
 
+import com.company.cps.util.CpsStrings;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,7 +74,7 @@ public class CpsCoverageService {
         String endArg = trim(endTime);
         long total = coverageMapper.countFrequencyGroupBy(
                 factoryArg, areaArg, categoryL1Id, startArg, endArg);
-        List<Map<String, Object>> rows = total == 0 ? List.of()
+        List<Map<String, Object>> rows = total == 0 ? Collections.emptyList()
                 : coverageMapper.frequencyGroupBy(
                         factoryArg, areaArg, categoryL1Id, startArg, endArg,
                         norm[1], norm[0]);
@@ -94,7 +96,7 @@ public class CpsCoverageService {
         int overdue = overdueDays == null || overdueDays < 0 ? DEFAULT_OVERDUE_DAYS : overdueDays;
         long total = coverageMapper.countRegionSupervisorGroupBy(
                 factoryArg, areaArg, categoryL1Id, statusArg);
-        List<Map<String, Object>> rows = total == 0 ? List.of()
+        List<Map<String, Object>> rows = total == 0 ? Collections.emptyList()
                 : coverageMapper.regionSupervisorGroupBy(
                         factoryArg, areaArg, categoryL1Id, statusArg, overdue,
                         norm[1], norm[0]);
@@ -119,7 +121,7 @@ public class CpsCoverageService {
         }
         long total = coverageMapper.countRecurrenceGroupBy(
                 startArg, endArg, categoryL1Id, thr);
-        List<Map<String, Object>> rows = total == 0 ? List.of()
+        List<Map<String, Object>> rows = total == 0 ? Collections.emptyList()
                 : coverageMapper.recurrenceGroupBy(
                         startArg, endArg, categoryL1Id, thr,
                         norm[1], norm[0]);
@@ -138,7 +140,7 @@ public class CpsCoverageService {
         int gap = gapDays == null || gapDays < 1 ? DEFAULT_GAP_DAYS : gapDays;
         long total = coverageMapper.countCoverageGaps(
                 factoryArg, trim(area), storageArg, gap);
-        List<Map<String, Object>> rows = total == 0 ? List.of()
+        List<Map<String, Object>> rows = total == 0 ? Collections.emptyList()
                 : coverageMapper.coverageGaps(
                         factoryArg, trim(area), storageArg, gap,
                         norm[1], norm[0]);
@@ -167,7 +169,7 @@ public class CpsCoverageService {
         String et = trim(endTime);
         long total = coverageMapper.countDispatcherMemoryGroupBy(
                 c1, c2, f, a, d, ar, st, et);
-        List<Map<String, Object>> rows = total == 0 ? List.of()
+        List<Map<String, Object>> rows = total == 0 ? Collections.emptyList()
                 : coverageMapper.dispatcherMemoryGroupBy(
                         c1, c2, f, a, d, ar, st, et,
                         norm[1], norm[0]);
@@ -229,9 +231,9 @@ public class CpsCoverageService {
 
     /** 解析 mapper 输出 '||' 字段 + ';;' 多样的拼接串为样例列表。 */
     static List<Map<String, Object>> parseSampleReasons(Object raw) {
-        if (raw == null) return List.of();
+        if (raw == null) return Collections.emptyList();
         String s = raw.toString();
-        if (s.isEmpty()) return List.of();
+        if (s.isEmpty()) return Collections.emptyList();
         String[] items = s.split(";;");
         List<Map<String, Object>> out = new ArrayList<>(items.length);
         for (String item : items) {
@@ -263,7 +265,7 @@ public class CpsCoverageService {
     }
 
     private static String trim(String value) {
-        if (value == null || value.trim().isEmpty()) return null;
+        if (value == null || CpsStrings.isBlank(value)) return null;
         return value.trim();
     }
 }

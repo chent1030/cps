@@ -6,8 +6,10 @@ import com.company.cps.mapper.CpsCheckItemMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.company.cps.util.CpsStrings;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -57,7 +59,7 @@ public class CpsCheckItemService {
                             + "（请在字典管理中启用或新增）");
         }
         String applicableRoomTypes = request.getApplicableRoomTypes();
-        if (applicableRoomTypes != null && !applicableRoomTypes.trim().isEmpty()) {
+        if (applicableRoomTypes != null && !CpsStrings.isBlank(applicableRoomTypes)) {
             for (String part : applicableRoomTypes.split(",")) {
                 String roomType = part.trim();
                 if (!roomType.isEmpty() && !dictService.valueExists(CpsDictService.DICT_ROOM_TYPE, roomType)) {
@@ -118,17 +120,17 @@ public class CpsCheckItemService {
     }
 
     private static void requireText(String value, String field) {
-        if (value == null || value.trim().isEmpty()) {
+        if (value == null || CpsStrings.isBlank(value)) {
             throw new IllegalArgumentException("Check item " + field + " is required");
         }
     }
 
     /** Phase C1：点检类型多选规范化。空 → 默认 PASS_FAIL；非法值报错；去重保序。 */
     private static String normalizeCheckTypes(String raw) {
-        if (raw == null || raw.trim().isEmpty()) {
+        if (raw == null || CpsStrings.isBlank(raw)) {
             return "PASS_FAIL";
         }
-        java.util.Set<String> allowed = java.util.Set.of("PASS_FAIL", "TEXT", "PHOTO");
+        java.util.Set<String> allowed = new java.util.LinkedHashSet<>(java.util.Arrays.asList("PASS_FAIL", "TEXT", "PHOTO"));
         java.util.List<String> parts = new java.util.ArrayList<>();
         for (String part : raw.split(",")) {
             String v = part.trim().toUpperCase();

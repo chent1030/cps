@@ -3,7 +3,6 @@ package com.company.cps.service;
 import com.company.cps.domain.CpsInspectionPlan;
 import com.company.cps.domain.CpsInspectionPlanStatus;
 import com.company.cps.domain.CpsInspectionPlanTask;
-import com.company.cps.domain.CpsInspectionPlanTaskType;
 import com.company.cps.dto.CpsInspectionPlanApproveRequest;
 import com.company.cps.dto.CpsInspectionPlanRejectRequest;
 import com.company.cps.dto.CpsInspectionPlanRequest;
@@ -316,7 +315,7 @@ class CpsInspectionPlanServiceTest {
         CpsInspectionPlanService.ApproveResult result = service.approve(planId, req);
         CpsInspectionPlanTask patrolTask = result.getCreatedTasks().stream()
                 .filter(t -> "INSPECT_PATROL".equals(t.getTaskType()))
-                .findFirst().orElseThrow();
+                .findFirst().orElseThrow(IllegalStateException::new);
         assertEquals("夜间巡检", patrolTask.getTitle());
         assertEquals("E2001", patrolTask.getTargetEmpNo());
     }

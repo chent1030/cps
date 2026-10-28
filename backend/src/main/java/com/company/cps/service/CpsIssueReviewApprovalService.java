@@ -5,6 +5,7 @@ import com.company.cps.domain.CpsIssueStatus;
 import com.company.cps.domain.CpsRectificationSubmission;
 import com.company.cps.mapper.CpsIssueMapper;
 import com.company.cps.mapper.CpsRectificationSubmissionMapper;
+import com.company.cps.util.CpsStrings;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
@@ -199,7 +200,7 @@ public class CpsIssueReviewApprovalService {
             log.info("Review handler switched to approver: issueId={} from={} to={}",
                     issue.getId(), issue.getCurrentHandlerEmpNo(), operator);
         }
-        String reason = comment == null || comment.isBlank()
+        String reason = comment == null || CpsStrings.isBlank(comment)
                 ? (approved ? "审批中心批准：整改有效，关闭问题" : "审批中心驳回：整改不通过，退回整改人")
                 : comment.trim();
         issueService.adjudicate(issue.getId(), approved ? "APPROVE" : "REJECT", reason, operator);
@@ -210,7 +211,7 @@ public class CpsIssueReviewApprovalService {
 
     private String titleOf(CpsIssue issue) {
         String text = issue.getDescription();
-        if (text == null || text.isBlank()) {
+        if (text == null || CpsStrings.isBlank(text)) {
             return "问题整改审核 #" + issue.getId();
         }
         String flat = text.replace('\n', ' ').trim();
@@ -239,7 +240,7 @@ public class CpsIssueReviewApprovalService {
     private String locationOf(CpsIssue issue) {
         StringBuilder sb = new StringBuilder();
         for (String part : new String[]{issue.getFactory(), issue.getArea(), issue.getLine(), issue.getProcess()}) {
-            if (part != null && !part.isBlank()) {
+            if (part != null && !CpsStrings.isBlank(part)) {
                 if (sb.length() > 0) {
                     sb.append(" / ");
                 }
@@ -262,7 +263,7 @@ public class CpsIssueReviewApprovalService {
     }
 
     private String attachmentCountOf(String attachmentIds) {
-        if (attachmentIds == null || attachmentIds.isBlank()) {
+        if (attachmentIds == null || CpsStrings.isBlank(attachmentIds)) {
             return "0 张";
         }
         long count = java.util.Arrays.stream(attachmentIds.split(","))
@@ -273,6 +274,6 @@ public class CpsIssueReviewApprovalService {
     }
 
     private String valueOrDash(String value) {
-        return value == null || value.isBlank() ? "-" : value;
+        return value == null || CpsStrings.isBlank(value) ? "-" : value;
     }
 }

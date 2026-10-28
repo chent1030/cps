@@ -15,7 +15,9 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import com.company.cps.util.CpsStrings;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -93,7 +95,7 @@ public class CpsInspectionJudgeClient {
     }
 
     private ItemJudge judgeItem(CpsInspectionRecord record, CpsInspectionRecordItem item, int attempt) {
-        if (item.getPhotoObjectKey() == null || item.getPhotoObjectKey().trim().isEmpty()) {
+        if (item.getPhotoObjectKey() == null || CpsStrings.isBlank(item.getPhotoObjectKey())) {
             // 无回传照片的项 C-04 无从判定，交人工
             return new ItemJudge(item.getCheckItemId(), "PENDING", "no photo for AI judge");
         }
@@ -106,7 +108,7 @@ public class CpsInspectionJudgeClient {
         payload.put("item_content", item.getContent());
         payload.put("item_type", item.getCheckTypes() == null ? "PHOTO" : item.getCheckTypes());
         // 落库即完整图片地址（MinIO 绝对 URL），直接作为 photo_urls 下发。
-        payload.put("photo_urls", List.of(item.getPhotoObjectKey().trim()));
+        payload.put("photo_urls", Arrays.asList(item.getPhotoObjectKey().trim()));
         payload.put("deduction", item.getDeductScore());
         payload.put("config_version", item.getConfigVersion() == null ? null : String.valueOf(item.getConfigVersion()));
         payload.put("room_name", nameOf(record));
@@ -127,7 +129,7 @@ public class CpsInspectionJudgeClient {
     }
 
     private ItemJudge parse(String body, CpsInspectionRecordItem item) {
-        if (body == null || body.trim().isEmpty()) {
+        if (body == null || CpsStrings.isBlank(body)) {
             return new ItemJudge(item.getCheckItemId(), "PENDING", "empty judge response");
         }
         try {
