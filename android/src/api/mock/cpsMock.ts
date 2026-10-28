@@ -1,5 +1,6 @@
 import type {
   CpsAiSuggestionPayload,
+  CpsInspectionRecord,
   CpsIssueDetail,
   CpsIssueListItem,
   CpsIssueStatus,
@@ -160,6 +161,33 @@ const detail: CpsIssueDetail = {
   ],
 }
 
+const mockRectifyRecord: CpsInspectionRecord = {
+  id: 301,
+  typeCode: 'CPS_ROUTINE',
+  areaName: 'Mock Injection Area',
+  areaCode: 'AREA-MOCK-01',
+  checkEmpNo: '61016968',
+  checkEmpName: '陈涛',
+  recordStatus: 'PENDING_RECTIFY',
+  score: 86,
+  aiOverall: 'PARTIAL',
+  aiScore: 86,
+  aiReason: '1 项点检不合格，建议现场整改后复核。',
+  reviewRound: 1,
+  reviewEmpNo: 'E90001',
+  reviewEmpName: '王复核',
+  reviewOpinion: '复核通过，请针对不合格项补充整改照片与长期措施。',
+  reviewedAt: '2026-10-20 10:00:00',
+  rectifyEmpNo: '61016968',
+  rectifyEmpName: '陈涛',
+  currentHandlerEmpNo: '61016968',
+  currentHandlerEmpName: '陈涛',
+  startedAt: '2026-10-19 09:00:00',
+  submittedAt: '2026-10-19 17:30:00',
+}
+
+const inspectionRectifyRecords: CpsInspectionRecord[] = [mockRectifyRecord]
+
 const num = (value: QueryValue) => {
   return Number(value ?? 0)
 }
@@ -221,6 +249,28 @@ export const getCpsMockResponse = <T>({ method, path, params, body }: MockReques
   if (method === 'POST' && path === '/api/cps/issues') return { issueId: 999 } as T
   if (method === 'POST' && /^\/api\/cps\/issues\/\d+\/actions$/.test(path)) {
     return { issueId: Number(path.split('/')[4]), status: 'PENDING_RECTIFY' as CpsIssueStatus, currentHandlerEmpNo: 'E10023' } as T
+  }
+  if (method === 'GET' && path === '/api/cps/inspection-tasks/my-rectify') return inspectionRectifyRecords as T
+  if (method === 'GET' && /^\/api\/cps\/inspection-tasks\/\d+$/.test(path)) {
+    const id = Number(path.split('/').pop())
+    const record = inspectionRectifyRecords.find((item) => item.id === id) ?? { ...inspectionRectifyRecords[0], id }
+    return { record, items: [], logs: [], rectifyAttachments: [] } as T
+  }
+  if (method === 'POST' && /^\/api\/cps\/inspection-tasks\/\d+\/rectify$/.test(path)) {
+    const id = Number(path.split('/')[4])
+    const payload = jsonBody(body)
+    const base = inspectionRectifyRecords[0]
+    return {
+      ...base,
+      id,
+      recordStatus: 'JUDGED',
+      rectifyReason: String(payload.reason ?? ''),
+      rectifyShortTerm: String(payload.shortTermMeasure ?? ''),
+      rectifyLongTerm: String(payload.longTermMeasure ?? ''),
+      rectifySubmittedAt: '2026-10-21 10:00:00',
+      currentHandlerEmpNo: null,
+      currentHandlerEmpName: null,
+    } as T
   }
   if (method === 'POST' && path === '/api/cps/attachments') {
     const file = isFormDataBody(body) ? ((body as FormData).get('file') as File | null) : null

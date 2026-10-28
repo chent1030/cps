@@ -4,6 +4,7 @@ import type {
   CpsInspectionRecord,
   CpsInspectionRecordDetail,
   CpsInspectionRecordItem,
+  CpsInspectionRectifyPayload,
 } from '@/types/cps'
 
 /**
@@ -59,5 +60,27 @@ export const submitInspection = (recordId: number) => {
 export const listMyInProgressInspections = () => {
   return request.get<CpsInspectionRecord[]>('/api/cps/inspection-tasks/my-in-progress', {
     params: { empNo: EMP_NO },
+  })
+}
+
+/**
+ * 我的待整改记录（PENDING_REVIEW 复核通过后转入，整改责任人为当前用户）。
+ * web 端复核通过后，记录状态变 PENDING_RECTIFY 并出现在这里。
+ */
+export const myRectify = (empNo: string = EMP_NO) => {
+  return request.get<CpsInspectionRecord[]>('/api/cps/inspection-tasks/my-rectify', {
+    params: { empNo },
+  })
+}
+
+/**
+ * 提交整改：原因分析 / 短期措施 / 长期措施各 ≥15 字 + 1~5 张照片。
+ * 成功后记录变 JUDGED，流程结束。
+ */
+export const submitRectify = (recordId: number, payload: CpsInspectionRectifyPayload) => {
+  return request.post<CpsInspectionRecord>(`/api/cps/inspection-tasks/${recordId}/rectify`, {
+    ...payload,
+    empNo: payload.empNo ?? EMP_NO,
+    empName: payload.empName ?? EMP_NAME,
   })
 }

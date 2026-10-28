@@ -19,8 +19,8 @@
           </view>
         </view>
         <view class="cps-hero__side">
-          <text class="u-tag cps-hero__badge" :class="readonly ? 'u-tag--green' : 'u-tag--blue'">
-            {{ readonly ? '已锁定' : '执行中' }}
+          <text class="u-tag cps-hero__badge" :class="statusBadgeClass(record.recordStatus)">
+            {{ statusLabel(record.recordStatus) }}
           </text>
           <button v-if="!readonly" class="u-btn u-btn--sm cps-hero__switch" @click="switchType">
             切换巡检类型
@@ -144,11 +144,22 @@
         </button>
       </view>
 
-      <!-- 已判定：得分横幅 -->
+      <!-- 非执行中：只读状态说明（待复核 / 待整改 / 已结束） -->
       <view v-else class="u-result cps-done-result">
-        <text class="u-result__icon">✅</text>
-        <text class="u-result__title">巡检已完成，得分 {{ record.score ?? '-' }}</text>
-        <text class="u-result__desc">提交时间：{{ formatTime(record.submittedAt) }}</text>
+        <text class="u-result__icon">{{ record.recordStatus === 'JUDGED' ? '✅' : '🕒' }}</text>
+        <text class="u-result__title">{{ statusLabel(record.recordStatus) }}</text>
+        <text class="u-result__desc">{{ statusDesc(record.recordStatus) }}</text>
+        <text v-if="record.reviewOpinion" class="u-result__desc">复核意见：{{ record.reviewOpinion }}</text>
+        <text v-if="record.recordStatus === 'JUDGED'" class="u-result__desc">
+          得分：{{ record.score ?? '-' }} · 提交时间：{{ formatTime(record.submittedAt) }}
+        </text>
+        <button
+          v-if="record.recordStatus === 'PENDING_RECTIFY'"
+          class="u-btn u-btn--primary cps-rectify-btn"
+          @click="goRectify"
+        >
+          去整改
+        </button>
       </view>
     </template>
     <view v-else-if="!loading" class="u-empty">
@@ -162,9 +173,6 @@
 import { cpsApi } from '@/api/index'
 import { computed, reactive, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-
-
-
 import type { CpsInspectionRecord, CpsInspectionRecordItem } from '@/types/cps'
 import { resolveAssetUrl, resolveUploadSources } from '@/utils/image'
 
@@ -186,7 +194,8 @@ const items = ref<CpsInspectionRecordItem[]>([])
 const local = reactive<Record<number, { passResult?: string | null; textValue?: string | null; photos?: PhotoEntry[] }>>({})
 const savedTip = reactive<Record<number, boolean>>({})
 
-const readonly = computed(() => record.value?.recordStatus === 'JUDGED' || record.value?.recordStatus === 'AWAIT_CONFIRM')
+/** 只有 IN_PROGRESS 可编辑/可提交；待复核、待整改、已结束均为只读 */
+const readonly = computed(() => record.value?.recordStatus !== 'IN_PROGRESS')
 
 const splitTypes = (types?: string) => (types ?? '').split(',').filter(Boolean)
 const hasType = (item: CpsInspectionRecordItem, t: string) => splitTypes(item.checkTypes).includes(t)
@@ -195,7 +204,32 @@ const typeColor = (t: string) => (t === 'PHOTO' ? 'orange' : t === 'TEXT' ? 'blu
 const textHint = (item: CpsInspectionRecordItem) => `请描述现场情况（${item.itemCode}）`
 
 const statusLabel = (s: string) =>
-  ({ PENDING: '待执行', IN_PROGRESS: '执行中', AWAIT_CONFIRM: '待确认', JUDGED: '已判定' }[s] ?? s)
+  ({
+    PENDING: '待执行',
+    IN_PROGRESS: '执行中',
+    PENDING_REVIEW: '待复核',
+    PENDING_RECTIFY: '待整改',
+    AWAIT_CONFIRM: '待确认',
+    JUDGED: '已结束',
+  }[s] ?? s)
+
+const statusBadgeClass = (s: string) => {
+  if (s === 'IN_PROGRESS') return 'u-tag--blue'
+  if (s === 'JUDGED') return 'u-tag--green'
+  if (s === 'PENDING_REVIEW' || s === 'PENDING_RECTIFY') return 'u-tag--orange'
+  return 'u-tag--blue'
+}
+
+/** 只读状态说明：待复核等待 web 端，待整改去整改页，已结束流程完成 */
+const statusDesc = (s: string) =>
+  ({
+    PENDING: '等待开始执行。',
+    IN_PROGRESS: '巡检执行中，可继续填写。',
+    PENDING_REVIEW: '巡检已提交，等待 web 端复核；复核通过后转入「待整改」，退回可继续修改后重提。',
+    PENDING_RECTIFY: 'web 端复核已通过，请到「待整改」页签填写整改内容并上传照片。',
+    JUDGED: '流程已结束，记录已归档。',
+    AWAIT_CONFIRM: '记录已锁定。',
+  }[s] ?? '当前状态不可编辑。')
 
 const formatTime = (t?: string | null) => (t ? t.replace('T', ' ').slice(0, 16) : '-')
 
@@ -229,6 +263,12 @@ const backToList = () => {
   } else {
     uni.redirectTo({ url: '/views/cps/IssueListView' })
   }
+}
+
+/** 待整改记录跳转整改页（用 redirectTo，提交后返回即列表） */
+const goRectify = () => {
+  if (!record.value) return
+  uni.redirectTo({ url: `/views/cps/InspectionRectifyView?recordId=${record.value.id}` })
 }
 
 /** 照片列表：本地缓冲优先，其次远端快照（photoObjectKey 逗号分隔） */
@@ -992,4 +1032,5 @@ checkbox .wx-checkbox-input {
 }
 
 .cps-done-result { margin-top: 16px; }
+.cps-rectify-btn { margin-top: 12px; }
 </style>

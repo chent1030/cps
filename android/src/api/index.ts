@@ -43,6 +43,8 @@ export const cpsApi = {
   saveInspectionItemResult: inspectionTask.saveInspectionItemResult,
   submitInspection: inspectionTask.submitInspection,
   listMyInProgressInspections: inspectionTask.listMyInProgressInspections,
+  myRectify: inspectionTask.myRectify,
+  submitRectify: inspectionTask.submitRectify,
 
   // ---------- 基础字典 ----------
   getFactories: master.getFactories,

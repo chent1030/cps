@@ -23,6 +23,12 @@
       "style": {
         "navigationBarTitleText": "巡检执行"
       }
+    },
+    {
+      "path": "views/cps/InspectionRectifyView",
+      "style": {
+        "navigationBarTitleText": "巡检整改"
+      }
     }
   ],
   "globalStyle": {

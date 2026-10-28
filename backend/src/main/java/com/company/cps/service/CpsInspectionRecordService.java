@@ -334,6 +334,10 @@ public class CpsInspectionRecordService {
         requireText(request.getReason(), "reason");
         requireText(request.getShortTermMeasure(), "shortTermMeasure");
         requireText(request.getLongTermMeasure(), "longTermMeasure");
+        // 与 C-01 文本有效性规则一致：原因与长短期措施各不少于 15 字（去空白后计数）
+        require(textLength(request.getReason()) >= 15, "整改原因不少于 15 字");
+        require(textLength(request.getShortTermMeasure()) >= 15, "短期措施不少于 15 字");
+        require(textLength(request.getLongTermMeasure()) >= 15, "长期措施不少于 15 字");
         List<Long> attachmentIds = request.getAttachmentIds();
         require(attachmentIds != null && !attachmentIds.isEmpty(), "attachmentIds 至少 1 张整改照片");
         require(attachmentIds.size() <= 5, "整改照片最多 5 张");
@@ -556,6 +560,11 @@ public class CpsInspectionRecordService {
 
     private static boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
+    }
+
+    /** 文本字数（去首尾空白后的字符数），与 C-01 text_validity 的口径对齐。 */
+    private static int textLength(String value) {
+        return value == null ? 0 : value.trim().length();
     }
 
     /** 流转日志（提交/复核/整改各写一条，供详情时间线与审计追溯） */

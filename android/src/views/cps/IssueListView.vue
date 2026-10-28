@@ -89,6 +89,30 @@
       </view>
     </view>
 
+    <!-- 待整改：web 端复核通过后转入 PENDING_RECTIFY，进入整改页提交 -->
+    <view v-else-if="tab === 'rectify'" class="cps-inline-list">
+      <view v-if="!rectifyRecords.length && !rectifyLoading" class="u-empty">
+        <text class="u-empty__icon">📝</text>
+        <text class="u-empty__text">暂无待整改的巡检——web 端复核通过后会出现在这里</text>
+      </view>
+      <view v-for="r in rectifyRecords" :key="r.id" class="cps-inline-list__item">
+        <view class="cps-inline-list__info">
+          <text class="cps-inline-list__title">
+            {{ typeLabel(r.typeCode) }}<text v-if="r.areaName"> · {{ r.areaName }}</text>
+          </text>
+          <text class="cps-inline-list__time">
+            复核通过 {{ formatRecordTime(r.reviewedAt) }}<text v-if="r.score != null"> · 得分 {{ r.score }}</text>
+          </text>
+          <text v-if="r.reviewOpinion" class="cps-inline-list__time cps-inline-list__opinion">
+            复核意见：{{ r.reviewOpinion }}
+          </text>
+        </view>
+        <view class="cps-inline-list__actions">
+          <button class="u-btn u-btn--primary u-btn--sm" @click="openRectify(r.id)">去整改</button>
+        </view>
+      </view>
+    </view>
+
     <view v-else class="cps-list-grid">
       <view v-if="!items.length && !loading" class="u-empty cps-list-empty">
         <text class="u-empty__icon">📭</text>
@@ -159,7 +183,7 @@ import type {
 import { statusMeta, issueLocation, issueCategory } from '@/utils/format'
 import { useListCacheStore } from '@/store/listCache'
 
-type TabKey = CpsIssueTab | 'drafts' | 'running'
+type TabKey = CpsIssueTab | 'drafts' | 'running' | 'rectify'
 
 interface TabItem {
   value: TabKey
@@ -242,6 +266,13 @@ const records = ref<CpsInspectionRecord[]>([])
 const recordCount = computed(() => records.value.length)
 const typeOptions = ref<CpsInspectionType[]>([])
 
+// ============================================================
+// 待整改分组：web 端复核通过后转入 PENDING_RECTIFY 的巡检记录
+// ============================================================
+const rectifyLoading = ref(false)
+const rectifyRecords = ref<CpsInspectionRecord[]>([])
+const rectifyCount = computed(() => rectifyRecords.value.length)
+
 const typeLabel = (code: string) => typeOptions.value.find((t) => t.code === code)?.name ?? code
 
 const tabs = computed<TabItem[]>(() => [
@@ -251,12 +282,14 @@ const tabs = computed<TabItem[]>(() => [
   { value: 'closed', label: '已关闭', count: counts.value.closed },
   { value: 'drafts', label: '我的草稿', count: draftCount.value },
   { value: 'running', label: '执行中', count: recordCount.value },
+  { value: 'rectify', label: '待整改', count: rectifyCount.value },
 ])
 
 // 当前页签对应的加载态（替代 a-spin 的 spinning 计算）
 const currentLoading = computed(() => {
   if (tab.value === 'drafts') return draftsLoading.value
   if (tab.value === 'running') return recordsLoading.value
+  if (tab.value === 'rectify') return rectifyLoading.value
   return loading.value
 })
 
@@ -350,12 +383,34 @@ const loadRecords = async () => {
   }
 }
 
+const loadRectify = async () => {
+  rectifyLoading.value = true
+  try {
+    rectifyRecords.value = await cpsApi.myRectify()
+    if (rectifyRecords.value.length && !typeOptions.value.length) {
+      try {
+        typeOptions.value = await cpsApi.listCpsInspectionTypes()
+      } catch {
+        // 类型名拿不到时回退显示编码
+      }
+    }
+  } catch {
+    // 待整改记录拉取失败不打扰主列表，静默忽略
+  } finally {
+    rectifyLoading.value = false
+  }
+}
+
 const restoreDraft = (id: number) => {
   uni.navigateTo({ url: `/views/cps/IssueCreateView?draftId=${id}` })
 }
 
 const resumeRecord = (id: number) => {
   uni.navigateTo({ url: `/views/cps/InspectionExecuteView?recordId=${id}` })
+}
+
+const openRectify = (id: number) => {
+  uni.navigateTo({ url: `/views/cps/InspectionRectifyView?recordId=${id}` })
 }
 
 // App 端（app-vue）里 uni-view 的默认布局与 scoped 样式的命中都不稳定，
@@ -393,6 +448,8 @@ watch([tab, selectedTypeCode], () => {
     void loadTypeSummary()
   } else if (tab.value === 'drafts') {
     void loadDrafts()
+  } else if (tab.value === 'rectify') {
+    void loadRectify()
   } else {
     void loadRecords()
   }
@@ -408,6 +465,7 @@ onShow(() => {
   void loadTypeOptions()
   void loadDrafts()
   void loadRecords()
+  void loadRectify()
   void loadCounts()
 })
 
@@ -928,6 +986,12 @@ checkbox .wx-checkbox-input {
 .cps-inline-list__time {
   color: #94a3b8;
   font-size: 12px;
+}
+
+.cps-inline-list__opinion {
+  color: #64748b;
+  line-height: 1.5;
+  white-space: normal;
 }
 
 .cps-inline-list__actions {

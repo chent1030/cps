@@ -167,7 +167,19 @@ export interface CpsInspectionArea {
   enabled?: boolean
 }
 
-export type CpsInspectionRecordStatus = 'PENDING' | 'IN_PROGRESS' | 'AWAIT_CONFIRM' | 'JUDGED'
+/**
+ * 巡检记录状态。
+ * 非 CPS 闭环：IN_PROGRESS（执行中）→ PENDING_REVIEW（待复核）
+ *   → PENDING_RECTIFY（待整改）→ JUDGED（已结束）；复核退回则回到 IN_PROGRESS。
+ * PENDING/AWAIT_CONFIRM 为历史数据兼容值。
+ */
+export type CpsInspectionRecordStatus =
+  | 'PENDING'
+  | 'IN_PROGRESS'
+  | 'PENDING_REVIEW'
+  | 'PENDING_RECTIFY'
+  | 'AWAIT_CONFIRM'
+  | 'JUDGED'
 
 export interface CpsInspectionRecord {
   id: number
@@ -182,8 +194,49 @@ export interface CpsInspectionRecord {
   recordStatus: CpsInspectionRecordStatus | string
   judgeStatus?: string | null
   score?: number | null
+  /** AI 初审结论：PASS/PARTIAL/PROBLEM/NONE（提交时写入） */
+  aiOverall?: string | null
+  aiScore?: number | null
+  aiReason?: string | null
+  aiJudgedAt?: string | null
+  /** 提交-复核轮数（复核退回后 +1） */
+  reviewRound?: number | null
+  reviewEmpNo?: string | null
+  reviewEmpName?: string | null
+  /** web 端人工复核意见 */
+  reviewOpinion?: string | null
+  reviewedAt?: string | null
+  /** 整改责任人（分区域取区域责任人） */
+  rectifyEmpNo?: string | null
+  rectifyEmpName?: string | null
+  rectifyReason?: string | null
+  rectifyShortTerm?: string | null
+  rectifyLongTerm?: string | null
+  /** 整改照片附件 id，逗号分隔 */
+  rectifyAttachmentIds?: string | null
+  rectifySubmittedAt?: string | null
+  rectifyAiOverall?: string | null
+  rectifyAiReason?: string | null
+  currentHandlerEmpNo?: string | null
+  currentHandlerEmpName?: string | null
+  sourceRecordId?: number | null
   startedAt?: string | null
   submittedAt?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
+/** 巡检记录流转日志（START/SUBMIT/REVIEW_PASS/REVIEW_RETURN/RECTIFY_SUBMIT）。 */
+export interface CpsInspectionRecordLog {
+  id: number
+  recordId: number
+  action: string
+  fromStatus?: string | null
+  toStatus?: string | null
+  operatorEmpNo?: string | null
+  operatorEmpName?: string | null
+  comment?: string | null
+  createdAt?: string | null
 }
 
 export interface CpsInspectionRecordItem {
@@ -210,6 +263,19 @@ export interface CpsInspectionRecordItem {
 export interface CpsInspectionRecordDetail {
   record: CpsInspectionRecord
   items: CpsInspectionRecordItem[]
+  logs?: CpsInspectionRecordLog[]
+  /** 整改照片附件（后端按 rectifyAttachmentIds 回查） */
+  rectifyAttachments?: CpsAttachment[]
+}
+
+/** 非 CPS 巡检整改提交（三要素各 ≥15 字 + 1~5 张照片）。 */
+export interface CpsInspectionRectifyPayload {
+  reason: string
+  shortTermMeasure: string
+  longTermMeasure: string
+  attachmentIds: number[]
+  empNo?: string
+  empName?: string
 }
 
 export interface CpsIssueActionRequest {
