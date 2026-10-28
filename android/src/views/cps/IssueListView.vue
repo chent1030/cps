@@ -28,6 +28,23 @@
       </view>
     </view>
 
+    <!-- 检查项目（巡检类型）筛选：只在问题页签下出现 -->
+    <view v-if="isIssueTab(tab) && typeChips.length" class="cps-type-chips" :style="typeChipBarStyle">
+      <view class="cps-type-chips__scroll" :style="typeChipBarStyle">
+        <view
+          v-for="chip in typeChips"
+          :key="chip.code"
+          class="cps-type-chip"
+          :class="{ 'cps-type-chip--active': selectedTypeCode === chip.code }"
+          :style="typeChipStyle"
+          @click="selectType(chip.code)"
+        >
+          <text class="cps-type-chip__label">{{ chip.name }}</text>
+          <text class="cps-type-chip__count">{{ chip.count }}</text>
+        </view>
+      </view>
+    </view>
+
     <view v-if="currentLoading" class="u-loading">
       <view class="u-loading__dot" />
       <text class="u-loading__text">加载中…</text>
@@ -93,7 +110,10 @@
             </view>
             <view class="cps-issue-card__badges">
               <text class="cps-pill" :class="statusMeta[issue.status].tone">{{ statusMeta[issue.status].label }}</text>
-              <text v-if="issue.inspectionTypeCode" class="cps-pill cps-pill--blue">{{ issue.inspectionTypeCode }}</text>
+              <text
+                v-if="issue.inspectionTypeName || issue.inspectionTypeCode"
+                class="cps-pill cps-pill--blue"
+              >{{ issueTypeName(issue) }}</text>
               <text v-if="issue.overdue" class="cps-pill cps-pill--red">超时</text>
             </view>
           </view>
@@ -150,6 +170,10 @@ interface TabItem {
 const listCache = useListCacheStore()
 
 const tab = ref<TabKey>('todo')
+// 检查项目（巡检类型）筛选：'' 表示「全部类型」
+const selectedTypeCode = ref<string>('')
+const typeCounts = ref<Record<string, number>>({})
+const typeTotal = ref<number>(0)
 const items = ref<CpsIssueListItem[]>([])
 const loading = ref<boolean>(false)
 // 4 个问题页签的角标条数（后端一次聚合）
@@ -171,17 +195,26 @@ const isIssueTab = (key: TabKey): key is CpsIssueTab =>
 
 const load = async (force = false) => {
   if (!isIssueTab(tab.value)) return
-  // 命中缓存（且非强制刷新）时直接回显，再后台静默更新
-  const cached = listCache.get(tab.value)
-  const fresh = force ? false : listCache.age(tab.value) > 0 && listCache.age(tab.value) < 30_000
-  if (cached.length || fresh) {
-    items.value = cached
+  // 类型过滤下不进缓存（缓存按页签存放，混用会串类型）
+  const cacheable = !selectedTypeCode.value
+  if (cacheable) {
+    // 命中缓存（且非强制刷新）时直接回显，再后台静默更新
+    const cached = listCache.get(tab.value)
+    const fresh = force ? false : listCache.age(tab.value) > 0 && listCache.age(tab.value) < 30_000
+    if (cached.length || fresh) {
+      items.value = cached
+    }
   }
   loading.value = true
   try {
-    const result = await cpsApi.listCpsIssues({ tab: tab.value, page: 1, pageSize: 50 })
+    const result = await cpsApi.listCpsIssues({
+      tab: tab.value,
+      page: 1,
+      pageSize: 50,
+      inspectionTypeCode: selectedTypeCode.value || undefined,
+    })
     items.value = result
-    listCache.set(tab.value, result)
+    if (cacheable) listCache.set(tab.value, result)
   } catch (error) {
     uni.showToast({ title: error instanceof Error ? error.message : '加载失败', icon: 'none' })
   } finally {
@@ -235,6 +268,59 @@ const loadCounts = async () => {
   }
 }
 
+// ============================================================
+// 检查项目（巡检类型）筛选：类型字典 + 当前页签各类型条数
+// ============================================================
+interface TypeChip {
+  code: string
+  name: string
+  count: number
+}
+
+const typeChips = computed<TypeChip[]>(() => {
+  const chips: TypeChip[] = [{ code: '', name: '全部', count: typeTotal.value }]
+  const known = new Set<string>()
+  for (const option of typeOptions.value) {
+    known.add(option.code)
+    chips.push({ code: option.code, name: option.name || option.code, count: typeCounts.value[option.code] ?? 0 })
+  }
+  // 兜底：后端统计到、但类型字典里没有的编码（例如已停用类型）也给出入口
+  for (const [code, count] of Object.entries(typeCounts.value)) {
+    if (!known.has(code)) chips.push({ code, name: code, count })
+  }
+  return chips
+})
+
+const issueTypeName = (issue: CpsIssueListItem) =>
+  issue.inspectionTypeName || issue.inspectionTypeCode || ''
+
+const selectType = (code: string) => {
+  if (selectedTypeCode.value === code) return
+  selectedTypeCode.value = code
+}
+
+const loadTypeOptions = async () => {
+  if (typeOptions.value.length) return
+  try {
+    typeOptions.value = await cpsApi.listCpsInspectionTypes()
+  } catch {
+    // 类型字典拉不到时只显示「全部」，不影响主列表
+  }
+}
+
+const loadTypeSummary = async () => {
+  if (!isIssueTab(tab.value)) return
+  try {
+    const summary = await cpsApi.getCpsIssueTypeSummary(tab.value)
+    typeTotal.value = summary.total
+    const map: Record<string, number> = {}
+    for (const item of summary.types) map[item.code] = item.count
+    typeCounts.value = map
+  } catch {
+    // 聚合失败时 chips 仍显示类型名、数量保持 0
+  }
+}
+
 const loadDrafts = async () => {
   draftsLoading.value = true
   try {
@@ -280,6 +366,20 @@ const tabBarStyle = {
   flexWrap: 'nowrap' as const,
   alignItems: 'center' as const,
 }
+const typeChipBarStyle = {
+  display: 'flex',
+  flexDirection: 'row' as const,
+  flexWrap: 'nowrap' as const,
+  alignItems: 'center' as const,
+  overflowX: 'auto' as const,
+}
+const typeChipStyle = {
+  display: 'inline-flex',
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+  flex: 'none' as const,
+  marginRight: '8px',
+}
 const tabItemStyle = {
   display: 'inline-flex',
   flexDirection: 'row' as const,
@@ -287,16 +387,25 @@ const tabItemStyle = {
   flex: 'none' as const,
 }
 
-watch(tab, () => {
-  if (isIssueTab(tab.value)) void load()
-  else if (tab.value === 'drafts') void loadDrafts()
-  else void loadRecords()
+watch([tab, selectedTypeCode], () => {
+  if (isIssueTab(tab.value)) {
+    void load()
+    void loadTypeSummary()
+  } else if (tab.value === 'drafts') {
+    void loadDrafts()
+  } else {
+    void loadRecords()
+  }
 }, { immediate: true })
 
 // uni-app 页面生命周期：每次显示页面触发
 import { onShow } from '@dcloudio/uni-app'
 onShow(() => {
-  if (isIssueTab(tab.value)) onShowHandler()
+  if (isIssueTab(tab.value)) {
+    onShowHandler()
+    void loadTypeSummary()
+  }
+  void loadTypeOptions()
   void loadDrafts()
   void loadRecords()
   void loadCounts()
@@ -975,4 +1084,63 @@ checkbox .wx-checkbox-input {
     font-size: 26px;
   }
 }
+/* ---------- 检查项目（巡检类型）筛选 ---------- */
+.cps-type-chips {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  overflow-x: auto;
+  padding: 2px 2px 12px;
+}
+
+.cps-type-chips__scroll {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.cps-type-chip {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  flex: none;
+  margin-right: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  font-size: 13px;
+  line-height: 18px;
+  color: #475569;
+}
+
+.cps-type-chip--active {
+  background: rgba(20, 184, 166, 0.14);
+  border-color: #14b8a6;
+  color: #0f766e;
+  font-weight: 600;
+}
+
+.cps-type-chip__label {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.cps-type-chip__count {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+  font-size: 12px;
+  line-height: 16px;
+  color: #64748b;
+}
+
+.cps-type-chip--active .cps-type-chip__count {
+  background: rgba(20, 184, 166, 0.2);
+  color: #0f766e;
+}
+
 </style>

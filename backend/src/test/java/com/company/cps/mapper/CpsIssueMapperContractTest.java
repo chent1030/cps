@@ -39,6 +39,31 @@ class CpsIssueMapperContractTest {
     }
 
     @Test
+    void listByTabSupportsInspectionTypeFilterAndReturnsTypeName() throws IOException {
+        String sql = readXml("CpsIssueMapper.xml");
+
+        assertTrue(sql.contains("AS inspection_type_name"));
+        assertTrue(sql.contains("(SELECT t.name FROM cps_inspection_type t"));
+        assertTrue(sql.contains("#{typeCode} IS NULL"));
+        assertTrue(sql.contains("COLLATE utf8mb4_unicode_ci = #{typeCode}"));
+    }
+
+    @Test
+    void countByTypeForTabGroupsByInspectionType() throws IOException {
+        String sql = readXml("CpsIssueMapper.xml");
+
+        assertTrue(sql.contains("<select id=\"countByTypeForTab\""));
+        assertTrue(sql.contains("GROUP BY x.type_code"));
+        assertTrue(sql.contains("AS type_name"));
+        assertTrue(sql.contains("#{tab} != 'closed' OR (status = 'CLOSED'"));
+    }
+
+    @Test
+    void listItemResponseExposesInspectionTypeName() throws NoSuchMethodException {
+        assertEquals(String.class, CpsIssueListItemResponse.class.getMethod("getInspectionTypeName").getReturnType());
+    }
+
+    @Test
     void listItemResponseExposesRequiredFields() throws NoSuchMethodException {
         assertEquals(String.class, CpsIssueListItemResponse.class.getMethod("getFactory").getReturnType());
         assertEquals(String.class, CpsIssueListItemResponse.class.getMethod("getArea").getReturnType());

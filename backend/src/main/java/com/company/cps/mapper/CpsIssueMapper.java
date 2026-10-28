@@ -66,8 +66,18 @@ public interface CpsIssueMapper {
     List<CpsIssueListItemResponse> listByTab(
             @Param("tab") String tab,
             @Param("empNo") String empNo,
+            @Param("typeCode") String typeCode,
             @Param("limit") int limit,
             @Param("offset") int offset
+    );
+
+    /**
+     * 巡检类型聚合：当前页签下按 inspection_type_code 分组计数（同 listByTab 的过滤口径）。
+     * 返回列：type_code / type_name / cnt。
+     */
+    java.util.List<java.util.Map<String, Object>> countByTypeForTab(
+            @Param("tab") String tab,
+            @Param("empNo") String empNo
     );
 
     /**

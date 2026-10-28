@@ -24,6 +24,7 @@ export const cpsApi = {
   listCpsIssues: issue.listCpsIssues,
   getCpsIssueDetail: issue.getCpsIssueDetail,
   getCpsIssueCounts: issue.getCpsIssueCounts,
+  getCpsIssueTypeSummary: issue.getCpsIssueTypeSummary,
   executeCpsIssueAction: issue.executeCpsIssueAction,
 
   // ---------- 暂存草稿 ----------

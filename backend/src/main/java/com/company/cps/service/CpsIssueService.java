@@ -18,6 +18,7 @@ import com.company.cps.dto.CpsIssueAiSuggestionRequest;
 import com.company.cps.dto.CpsIssueCreateRequest;
 import com.company.cps.dto.CpsIssueDetailResponse;
 import com.company.cps.dto.CpsIssueListItemResponse;
+import com.company.cps.dto.CpsIssueTypeSummaryResponse;
 import com.company.cps.dto.CpsInspectionTypeDto;
 import com.company.cps.dto.CpsReviewAdjudicationResponse;
 import com.company.cps.mapper.CpsIssueAiSuggestionMapper;
@@ -290,9 +291,43 @@ public class CpsIssueService {
     }
 
     public List<CpsIssueListItemResponse> list(String tab, int page, int pageSize, String currentEmpNo) {
+        return list(tab, page, pageSize, currentEmpNo, null);
+    }
+
+    /**
+     * 按巡检类型过滤的问题列表。inspectionTypeCode 为空时行为与不带过滤完全一致（向后兼容）。
+     * 未标类型的存量问题（inspection_type_code 为 NULL）归入内置类型 CPS_INSPECTION。
+     */
+    public List<CpsIssueListItemResponse> list(String tab, int page, int pageSize, String currentEmpNo,
+                                               String inspectionTypeCode) {
         int safePage = Math.max(page, 1);
         int safePageSize = Math.min(Math.max(pageSize, 1), 100);
-        return issueMapper.listByTab(tab, currentEmpNo, safePageSize, (safePage - 1) * safePageSize);
+        String typeCode = isBlank(inspectionTypeCode) ? null : inspectionTypeCode.trim();
+        return issueMapper.listByTab(tab, currentEmpNo, typeCode, safePageSize, (safePage - 1) * safePageSize);
+    }
+
+    /**
+     * 当前页签下按巡检类型聚合的条数（首页筛选器 / 检查项目入口用）。
+     * 与 list(tab, ..., inspectionTypeCode) 使用同一套过滤口径，客户端拿总数与各类型数量一次到位。
+     */
+    public CpsIssueTypeSummaryResponse typeSummary(String tab, String currentEmpNo) {
+        String safeTab = isBlank(tab) ? "todo" : tab;
+        CpsIssueTypeSummaryResponse response = new CpsIssueTypeSummaryResponse();
+        List<Map<String, Object>> rows = issueMapper.countByTypeForTab(safeTab, currentEmpNo);
+        if (rows == null) {
+            return response;
+        }
+        for (Map<String, Object> row : rows) {
+            Object code = row.get("type_code");
+            Object name = row.get("type_name");
+            Object count = row.get("cnt");
+            if (code == null) {
+                continue;
+            }
+            long value = count instanceof Number ? ((Number) count).longValue() : 0L;
+            response.addType(String.valueOf(code), name == null ? null : String.valueOf(name), value);
+        }
+        return response;
     }
 
     /**

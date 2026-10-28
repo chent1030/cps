@@ -13,6 +13,7 @@ public class CpsIssueListItemResponse {
     private String process;
     private String resourceNo;
     private String inspectionTypeCode;
+    private String inspectionTypeName;
     private String extraData;
     private Long categoryL1Id;
     private Long categoryL2Id;
@@ -54,6 +55,8 @@ public class CpsIssueListItemResponse {
     public void setResourceNo(String resourceNo) { this.resourceNo = resourceNo; }
     public String getInspectionTypeCode() { return inspectionTypeCode; }
     public void setInspectionTypeCode(String v) { this.inspectionTypeCode = v; }
+    public String getInspectionTypeName() { return inspectionTypeName; }
+    public void setInspectionTypeName(String v) { this.inspectionTypeName = v; }
     public String getExtraData() { return extraData; }
     public void setExtraData(String v) { this.extraData = v; }
     public Long getCategoryL1Id() { return categoryL1Id; }

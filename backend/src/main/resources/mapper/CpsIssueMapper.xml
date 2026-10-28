@@ -117,6 +117,9 @@
                process,
                resource_no,
                inspection_type_code,
+               (SELECT t.name FROM cps_inspection_type t
+                 WHERE t.code COLLATE utf8mb4_unicode_ci
+                       = IFNULL(cps_issue.inspection_type_code, 'CPS_INSPECTION')) AS inspection_type_name,
                extra_data,
                category_l1_id,
                category_l2_id,
@@ -130,6 +133,8 @@
                END AS overdue
         FROM cps_issue
         WHERE (#{tab} != 'todo' OR (current_handler_emp_no = #{empNo} AND status &lt;&gt; 'CLOSED'))
+          AND (#{typeCode} IS NULL
+               OR IFNULL(cps_issue.inspection_type_code, 'CPS_INSPECTION') COLLATE utf8mb4_unicode_ci = #{typeCode})
           AND (#{tab} != 'created' OR creator_emp_no = #{empNo})
           AND (#{tab} != 'related' OR (
                 creator_emp_no = #{empNo}
@@ -197,6 +202,51 @@
                     )
                   ) THEN 1 ELSE 0 END) AS SIGNED), 0) AS closed
         FROM cps_issue
+    </select>
+
+    <!-- 巡检类型聚合：当前页签下按类型分组的条数（过滤口径与 listByTab 一致，含「未标类型」归入内置 CPS巡检） -->
+    <select id="countByTypeForTab" resultType="java.util.LinkedHashMap">
+        SELECT
+            x.type_code AS type_code,
+            (SELECT t.name FROM cps_inspection_type t
+              WHERE t.code COLLATE utf8mb4_unicode_ci = x.type_code) AS type_name,
+            COUNT(*) AS cnt
+        FROM (
+            SELECT IFNULL(cps_issue.inspection_type_code, 'CPS_INSPECTION') AS type_code
+            FROM cps_issue
+            WHERE (#{tab} != 'todo' OR (current_handler_emp_no = #{empNo} AND status &lt;&gt; 'CLOSED'))
+              AND (#{tab} != 'created' OR creator_emp_no = #{empNo})
+              AND (#{tab} != 'related' OR (
+                    creator_emp_no = #{empNo}
+                    OR current_handler_emp_no = #{empNo}
+                    OR feedback_emp_no = #{empNo}
+                    OR responsible_emp_no = #{empNo}
+                    OR proof_emp_no = #{empNo}
+                    OR reviewer_emp_no = #{empNo}
+                    OR EXISTS (
+                      SELECT 1
+                      FROM cps_issue_flow_log
+                      WHERE cps_issue_flow_log.issue_id = cps_issue.id
+                        AND cps_issue_flow_log.operator_emp_no = #{empNo}
+                    )
+                  ))
+              AND (#{tab} != 'closed' OR (status = 'CLOSED' AND (
+                    creator_emp_no = #{empNo}
+                    OR current_handler_emp_no = #{empNo}
+                    OR feedback_emp_no = #{empNo}
+                    OR responsible_emp_no = #{empNo}
+                    OR proof_emp_no = #{empNo}
+                    OR reviewer_emp_no = #{empNo}
+                    OR EXISTS (
+                      SELECT 1
+                      FROM cps_issue_flow_log
+                      WHERE cps_issue_flow_log.issue_id = cps_issue.id
+                        AND cps_issue_flow_log.operator_emp_no = #{empNo}
+                    )
+                  )))
+        ) x
+        GROUP BY x.type_code
+        ORDER BY cnt DESC, x.type_code
     </select>
 
     <sql id="adminIssueFilter">

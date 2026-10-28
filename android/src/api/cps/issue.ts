@@ -6,6 +6,7 @@ import type {
   CpsIssueListItem,
   CpsIssueStatus,
   CpsIssueTab,
+  CpsIssueTypeSummary,
 } from '@/types/cps'
 
 const EMP_NO = import.meta.env.VITE_CPS_EMP_NO ?? '61016968'
@@ -23,6 +24,8 @@ export const listCpsIssues = (params: {
   tab: CpsIssueTab
   status?: CpsIssueStatus
   keyword?: string
+  /** 可选：按巡检类型过滤；不传等价于「全部类型」。 */
+  inspectionTypeCode?: string
   page: number
   pageSize: number
 }) => {
@@ -33,6 +36,13 @@ export const listCpsIssues = (params: {
 
 export const getCpsIssueDetail = (id: number) => {
   return request.get<CpsIssueDetail>(`/api/cps/issues/${id}`, { params: { empNo: EMP_NO } })
+}
+
+/** 巡检类型聚合：当前页签下各巡检类型的条数（首页类型筛选器）。 */
+export const getCpsIssueTypeSummary = (tab: CpsIssueTab) => {
+  return request.get<CpsIssueTypeSummary>('/api/cps/issues/type-summary', {
+    params: { tab, empNo: EMP_NO },
+  })
 }
 
 /** 页签角标：当前用户 4 个问题页签的条数 */

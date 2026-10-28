@@ -65,6 +65,48 @@ class CpsIssueServiceTest {
     }
 
     @Test
+    void typeSummaryGroupsCountsByInspectionType() {
+        java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
+        row.put("type_code", "ROOM_CHECK");
+        row.put("type_name", "辅房点检");
+        row.put("cnt", 3L);
+        java.util.Map<String, Object> legacy = new java.util.LinkedHashMap<>();
+        legacy.put("type_code", "CPS_INSPECTION");
+        legacy.put("type_name", "CPS巡检");
+        legacy.put("cnt", 2L);
+        when(issueMapper.countByTypeForTab("todo", "E00001"))
+                .thenReturn(java.util.Arrays.asList(row, legacy));
+
+        com.company.cps.dto.CpsIssueTypeSummaryResponse summary = service.typeSummary("todo", "E00001");
+
+        assertEquals(5L, summary.getTotal());
+        assertEquals(2, summary.getTypes().size());
+        assertEquals("ROOM_CHECK", summary.getTypes().get(0).getCode());
+        assertEquals("辅房点检", summary.getTypes().get(0).getName());
+        assertEquals(3L, summary.getTypes().get(0).getCount());
+    }
+
+    @Test
+    void listPassesInspectionTypeCodeToMapper() {
+        when(issueMapper.listByTab("todo", "E00001", "ROOM_CHECK", 20, 0))
+                .thenReturn(Collections.emptyList());
+
+        service.list("todo", 1, 20, "E00001", "ROOM_CHECK");
+
+        verify(issueMapper).listByTab("todo", "E00001", "ROOM_CHECK", 20, 0);
+    }
+
+    @Test
+    void listWithoutInspectionTypeCodeKeepsLegacyBehavior() {
+        when(issueMapper.listByTab("todo", "E00001", null, 20, 0))
+                .thenReturn(Collections.emptyList());
+
+        service.list("todo", 1, 20, "E00001");
+
+        verify(issueMapper).listByTab("todo", "E00001", null, 20, 0);
+    }
+
+    @Test
     void createIssueInitializesPendingRectifyAndCurrentHandler() {
         mockIssueInsertGeneratedId(900L);
         CpsIssueCreateRequest request = new CpsIssueCreateRequest();

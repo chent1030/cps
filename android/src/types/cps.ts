@@ -237,6 +237,19 @@ export interface CpsIssueActionRequest {
   categoryL2Id?: number
 }
 
+/** 单个巡检类型的条数（GET /api/cps/issues/type-summary）。 */
+export interface CpsIssueTypeCount {
+  code: string
+  name?: string | null
+  count: number
+}
+
+/** 当前页签下的巡检类型聚合结果。 */
+export interface CpsIssueTypeSummary {
+  total: number
+  types: CpsIssueTypeCount[]
+}
+
 export interface CpsIssueListItem {
   id: number
   status: CpsIssueStatus
@@ -248,6 +261,8 @@ export interface CpsIssueListItem {
   resourceNo?: string | null
   /** Phase B1：巡检类型编码。 */
   inspectionTypeCode?: string | null
+  /** Phase E：巡检类型中文名（后端 LEFT JOIN cps_inspection_type 带出）。 */
+  inspectionTypeName?: string | null
   /** Phase B1：动态字段 JSON 字符串。 */
   extraData?: string | null
   factoryName?: string

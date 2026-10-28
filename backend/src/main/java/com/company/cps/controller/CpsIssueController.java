@@ -6,6 +6,7 @@ import com.company.cps.dto.CpsIssueCreateRequest;
 import com.company.cps.dto.CpsIssueCreateResponse;
 import com.company.cps.dto.CpsIssueDetailResponse;
 import com.company.cps.dto.CpsIssueListItemResponse;
+import com.company.cps.dto.CpsIssueTypeSummaryResponse;
 import com.company.cps.dto.CpsInitialReviewTakeOverRequest;
 import com.company.cps.dto.CpsReviewerReassignRequest;
 import com.company.cps.dto.CpsReviewAdjudicateRequest;
@@ -53,9 +54,21 @@ public class CpsIssueController {
             @RequestParam(defaultValue = "todo") String tab,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam String empNo,
+            @RequestParam(required = false) String inspectionTypeCode
+    ) {
+        return issueService.list(tab, page, pageSize, resolveCurrentEmpNo(empNo), inspectionTypeCode);
+    }
+
+    /**
+     * 巡检类型聚合：当前页签下按巡检类型分组的条数（配合列表接口的 inspectionTypeCode 过滤）。
+     */
+    @GetMapping("/type-summary")
+    public CpsIssueTypeSummaryResponse typeSummary(
+            @RequestParam(defaultValue = "todo") String tab,
             @RequestParam String empNo
     ) {
-        return issueService.list(tab, page, pageSize, resolveCurrentEmpNo(empNo));
+        return issueService.typeSummary(tab, resolveCurrentEmpNo(empNo));
     }
 
     /**
