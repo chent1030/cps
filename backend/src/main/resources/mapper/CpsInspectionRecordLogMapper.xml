@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.cps.mapper.CpsInspectionRecordLogMapper">
+
+    <insert id="insert" parameterType="com.company.cps.domain.CpsInspectionRecordLog" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cps_inspection_record_log (
+            record_id, action, from_status, to_status, operator_emp_no, operator_emp_name, comment
+        ) VALUES (
+            #{recordId}, #{action}, #{fromStatus}, #{toStatus}, #{operatorEmpNo}, #{operatorEmpName}, #{comment}
+        )
+    </insert>
+
+    <select id="findByRecord" resultType="com.company.cps.domain.CpsInspectionRecordLog">
+        SELECT id, record_id, action, from_status, to_status, operator_emp_no, operator_emp_name, comment, created_at
+        FROM cps_inspection_record_log
+        WHERE record_id = #{recordId}
+        ORDER BY id ASC
+    </select>
+</mapper>

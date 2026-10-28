@@ -1,6 +1,7 @@
 package com.company.cps.service;
 
 import com.company.cps.config.CpsAgentFrameworkProperties;
+import com.company.cps.domain.CpsInspectionRecord;
 import com.company.cps.domain.CpsIssueAttachment;
 import com.company.cps.domain.CpsIssue;
 import com.company.cps.domain.CpsRectificationSubmission;
@@ -137,6 +138,60 @@ public class CpsAgentFrameworkClient {
         if (ref == null) {
             throw new IllegalStateException("Agent framework returned no review_task_ref for submission "
                     + submission.getId());
+        }
+        return String.valueOf(ref);
+    }
+
+    /**
+     * C-01（非 CPS 巡检整改）：以巡检记录为主体提交整改初审。
+     *
+     * <p>巡检记录不是问题单，契约里的 {@code issue_id} 用 {@code insp-{recordId}} 合成——Python 侧只用它
+     * 派生幂等键 {@code cps-rectify-{issue_id}-v{version_no}} 与留档，不做跨表校验。version_no 取记录已提交轮次
+     * （review_round），同一轮重复提交天然幂等。
+     *
+     * @param beforeRefs  整改前图片引用（巡检项回传照片，object_key 形态，由调用方从 item 组装）
+     * @param afterImages 整改后图片附件行（cps_issue_attachment，走 object_key 或 base64 回退）
+     * @return review_task_ref；client 禁用时返回 null 不投递
+     */
+    public String triggerInspectionRectifyReview(
+            CpsInspectionRecord record,
+            String reason,
+            String shortTerm,
+            String longTerm,
+            List<Map<String, Object>> beforeRefs,
+            List<CpsIssueAttachment> afterImages
+    ) {
+        if (!properties.isEnabled()) return null;
+        String issueRef = "insp-" + record.getId();
+        int round = record.getReviewRound() == null || record.getReviewRound() < 1 ? 1 : record.getReviewRound();
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("issue_id", issueRef);
+        payload.put("submission_id", issueRef + "-r" + round);
+        payload.put("version_no", round);
+        payload.put("reason", reason);
+        payload.put("short_term_measure", shortTerm);
+        payload.put("long_term_measure", longTerm);
+        payload.put("before_attachments", beforeRefs == null ? new ArrayList<>() : beforeRefs);
+        payload.put("after_attachments", attachmentRefs(afterImages));
+
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("issue_id", issueRef);
+        snapshot.put("source", "cps_inspection_record");
+        snapshot.put("record_id", String.valueOf(record.getId()));
+        snapshot.put("inspection_type", record.getTypeCode());
+        snapshot.put("area", record.getAreaName() == null ? record.getAreaCode() : record.getAreaName());
+        snapshot.put("keeper_emp_no", record.getRectifyEmpNo());
+        snapshot.put("description", "非 CPS 巡检整改（" + record.getTypeCode() + "）");
+        payload.put("issue_snapshot", snapshot);
+
+        Map response = client.postForObject(url("/agent/rectifications"), new HttpEntity<>(payload, headers()), Map.class);
+        if (response == null) {
+            throw new IllegalStateException("Agent framework returned no inspection rectification review response");
+        }
+        Object ref = response.get("review_task_ref") != null ? response.get("review_task_ref") : response.get("task_id");
+        if (ref == null) {
+            throw new IllegalStateException("Agent framework returned no review_task_ref for inspection record "
+                    + record.getId());
         }
         return String.valueOf(ref);
     }

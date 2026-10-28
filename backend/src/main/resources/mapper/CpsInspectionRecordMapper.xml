@@ -5,6 +5,11 @@
     <sql id="BaseColumns">
         id, type_code, area_id, area_code, area_name, plan_task_id, plan_id,
         check_emp_no, check_emp_name, record_status, judge_status, score,
+        ai_overall, ai_score, ai_reason, ai_judged_at,
+        review_round, review_emp_no, review_emp_name, review_opinion, reviewed_at,
+        rectify_emp_no, rectify_emp_name, rectify_reason, rectify_short_term, rectify_long_term,
+        rectify_attachment_ids, rectify_submitted_at, rectify_ai_overall, rectify_ai_reason,
+        current_handler_emp_no, current_handler_emp_name,
         started_at, submitted_at, source_record_id, created_at, updated_at
     </sql>
 
@@ -76,5 +81,70 @@
     <select id="countJudgedByPlanTask" resultType="long">
         SELECT COUNT(1) FROM cps_inspection_record
         WHERE plan_task_id = #{planTaskId} AND record_status = 'JUDGED'
+    </select>
+
+    <!-- 提交复核：IN_PROGRESS → PENDING_REVIEW（CAS：仅执行中可提交） -->
+    <update id="updateToReview">
+        UPDATE cps_inspection_record
+        SET record_status = #{toStatus},
+            judge_status = 'SUCCESS',
+            ai_overall = #{aiOverall},
+            ai_score = #{aiScore},
+            ai_reason = #{aiReason},
+            ai_judged_at = NOW(),
+            review_round = #{reviewRound},
+            rectify_emp_no = #{keeperEmpNo},
+            rectify_emp_name = #{keeperEmpName},
+            score = #{aiScore},
+            submitted_at = NOW(),
+            current_handler_emp_no = NULL,
+            current_handler_emp_name = NULL
+        WHERE id = #{id} AND record_status = 'IN_PROGRESS'
+    </update>
+
+    <!-- 复核裁决：通过→PENDING_RECTIFY（办理人=整改责任人）；退回→IN_PROGRESS（办理人=提交人） -->
+    <update id="updateReviewDecision">
+        UPDATE cps_inspection_record
+        SET record_status = #{toStatus},
+            review_emp_no = #{reviewEmpNo},
+            review_emp_name = #{reviewEmpName},
+            review_opinion = #{reviewOpinion},
+            reviewed_at = NOW(),
+            current_handler_emp_no = #{handlerEmpNo},
+            current_handler_emp_name = #{handlerEmpName}
+        WHERE id = #{id} AND record_status = 'PENDING_REVIEW'
+    </update>
+
+    <!-- 整改提交：PENDING_RECTIFY → JUDGED（流程结束） -->
+    <update id="updateRectify">
+        UPDATE cps_inspection_record
+        SET record_status = #{toStatus},
+            rectify_reason = #{reason},
+            rectify_short_term = #{shortTerm},
+            rectify_long_term = #{longTerm},
+            rectify_attachment_ids = #{attachmentIds},
+            rectify_submitted_at = NOW(),
+            rectify_ai_overall = #{aiOverall},
+            rectify_ai_reason = #{aiReason},
+            current_handler_emp_no = NULL,
+            current_handler_emp_name = NULL
+        WHERE id = #{id} AND record_status = 'PENDING_RECTIFY'
+    </update>
+
+    <select id="findByStatus" resultType="com.company.cps.domain.CpsInspectionRecord">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_inspection_record
+        WHERE record_status = #{recordStatus}
+        ORDER BY submitted_at ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="findByHandler" resultType="com.company.cps.domain.CpsInspectionRecord">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_inspection_record
+        WHERE current_handler_emp_no = #{empNo}
+          AND record_status = #{recordStatus}
+        ORDER BY updated_at DESC, id DESC
+        LIMIT #{limit}
     </select>
 </mapper>

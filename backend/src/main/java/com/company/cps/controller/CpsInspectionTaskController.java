@@ -3,6 +3,7 @@ package com.company.cps.controller;
 import com.company.cps.domain.CpsInspectionArea;
 import com.company.cps.domain.CpsInspectionRecord;
 import com.company.cps.domain.CpsInspectionRecordItem;
+import com.company.cps.dto.CpsInspectionRectifyRequest;
 import com.company.cps.service.CpsInspectionAreaService;
 import com.company.cps.service.CpsInspectionRecordService;
 import com.company.cps.service.CpsInspectionTypeService;
@@ -99,6 +100,39 @@ public class CpsInspectionTaskController {
     @GetMapping("/my-tasks")
     public List<com.company.cps.dto.CpsMyInspectionTaskDto> myTasks(@RequestParam String empNo) {
         return recordService.listMyTasks(empNo);
+    }
+
+    // ============================================================
+    // 非 CPS 复核 / 整改（提交 → AI 初审 → web 人工复核 → 责任人整改 → 结束）
+    // ============================================================
+
+    /** web 复核列表：全部待复核记录 */
+    @GetMapping("/pending-review")
+    public List<CpsInspectionRecord> pendingReview(@RequestParam(required = false) Integer limit) {
+        return recordService.listPendingReview(limit == null ? 100 : limit);
+    }
+
+    /** web 复核裁决：decision=PASS（转整改）/RETURN（退回提交人）；RETURN 必须写意见 */
+    @PostMapping("/{recordId}/review")
+    public CpsInspectionRecord review(@PathVariable Long recordId, @RequestBody Map<String, Object> body) {
+        return recordService.review(recordId,
+                str(body.get("decision")),
+                str(body.get("opinion")),
+                str(body.get("empNo")),
+                str(body.get("empName")));
+    }
+
+    /** Android 整改提交（区域责任人）：三要素 + 1~5 张照片，拖 C-01 后直接结束流程 */
+    @PostMapping("/{recordId}/rectify")
+    public CpsInspectionRecord rectify(@PathVariable Long recordId,
+                                       @RequestBody CpsInspectionRectifyRequest body) {
+        return recordService.submitRectify(recordId, body, body.getEmpNo(), body.getEmpName());
+    }
+
+    /** Android「我的待整改」 */
+    @GetMapping("/my-rectify")
+    public List<CpsInspectionRecord> myRectify(@RequestParam String empNo) {
+        return recordService.listMyRectify(empNo);
     }
 
     private static String str(Object o) {

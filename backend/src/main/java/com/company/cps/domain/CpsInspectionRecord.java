@@ -22,6 +22,31 @@ public class CpsInspectionRecord {
     /** AI判定服务状态：SUCCESS/PENDING（降级） */
     private String judgeStatus;
     private Integer score;
+    /** AI 初审（C-04 视觉判定 + 扣分策略）：PASS/PARTIAL/PROBLEM/NONE */
+    private String aiOverall;
+    private Integer aiScore;
+    private String aiReason;
+    private LocalDateTime aiJudgedAt;
+    /** 提交-复核轮数（退回后 +1，作为 AI 幂等键的一部分） */
+    private Integer reviewRound;
+    private String reviewEmpNo;
+    private String reviewEmpName;
+    private String reviewOpinion;
+    private LocalDateTime reviewedAt;
+    /** 整改责任人（分区域取 cps_inspection_area.keeper_emp_no，否则回退检查人） */
+    private String rectifyEmpNo;
+    private String rectifyEmpName;
+    private String rectifyReason;
+    private String rectifyShortTerm;
+    private String rectifyLongTerm;
+    /** 整改照片：cps_issue_attachment.id 逗号分隔 */
+    private String rectifyAttachmentIds;
+    private LocalDateTime rectifySubmittedAt;
+    /** 整改提交 C-01 初审结论 */
+    private String rectifyAiOverall;
+    private String rectifyAiReason;
+    private String currentHandlerEmpNo;
+    private String currentHandlerEmpName;
     private LocalDateTime startedAt;
     private LocalDateTime submittedAt;
     /** 迁移来源 cps_room_check_record.id */
@@ -53,6 +78,46 @@ public class CpsInspectionRecord {
     public void setJudgeStatus(String judgeStatus) { this.judgeStatus = judgeStatus; }
     public Integer getScore() { return score; }
     public void setScore(Integer score) { this.score = score; }
+    public String getAiOverall() { return aiOverall; }
+    public void setAiOverall(String aiOverall) { this.aiOverall = aiOverall; }
+    public Integer getAiScore() { return aiScore; }
+    public void setAiScore(Integer aiScore) { this.aiScore = aiScore; }
+    public String getAiReason() { return aiReason; }
+    public void setAiReason(String aiReason) { this.aiReason = aiReason; }
+    public LocalDateTime getAiJudgedAt() { return aiJudgedAt; }
+    public void setAiJudgedAt(LocalDateTime aiJudgedAt) { this.aiJudgedAt = aiJudgedAt; }
+    public Integer getReviewRound() { return reviewRound; }
+    public void setReviewRound(Integer reviewRound) { this.reviewRound = reviewRound; }
+    public String getReviewEmpNo() { return reviewEmpNo; }
+    public void setReviewEmpNo(String reviewEmpNo) { this.reviewEmpNo = reviewEmpNo; }
+    public String getReviewEmpName() { return reviewEmpName; }
+    public void setReviewEmpName(String reviewEmpName) { this.reviewEmpName = reviewEmpName; }
+    public String getReviewOpinion() { return reviewOpinion; }
+    public void setReviewOpinion(String reviewOpinion) { this.reviewOpinion = reviewOpinion; }
+    public LocalDateTime getReviewedAt() { return reviewedAt; }
+    public void setReviewedAt(LocalDateTime reviewedAt) { this.reviewedAt = reviewedAt; }
+    public String getRectifyEmpNo() { return rectifyEmpNo; }
+    public void setRectifyEmpNo(String rectifyEmpNo) { this.rectifyEmpNo = rectifyEmpNo; }
+    public String getRectifyEmpName() { return rectifyEmpName; }
+    public void setRectifyEmpName(String rectifyEmpName) { this.rectifyEmpName = rectifyEmpName; }
+    public String getRectifyReason() { return rectifyReason; }
+    public void setRectifyReason(String rectifyReason) { this.rectifyReason = rectifyReason; }
+    public String getRectifyShortTerm() { return rectifyShortTerm; }
+    public void setRectifyShortTerm(String rectifyShortTerm) { this.rectifyShortTerm = rectifyShortTerm; }
+    public String getRectifyLongTerm() { return rectifyLongTerm; }
+    public void setRectifyLongTerm(String rectifyLongTerm) { this.rectifyLongTerm = rectifyLongTerm; }
+    public String getRectifyAttachmentIds() { return rectifyAttachmentIds; }
+    public void setRectifyAttachmentIds(String rectifyAttachmentIds) { this.rectifyAttachmentIds = rectifyAttachmentIds; }
+    public LocalDateTime getRectifySubmittedAt() { return rectifySubmittedAt; }
+    public void setRectifySubmittedAt(LocalDateTime rectifySubmittedAt) { this.rectifySubmittedAt = rectifySubmittedAt; }
+    public String getRectifyAiOverall() { return rectifyAiOverall; }
+    public void setRectifyAiOverall(String rectifyAiOverall) { this.rectifyAiOverall = rectifyAiOverall; }
+    public String getRectifyAiReason() { return rectifyAiReason; }
+    public void setRectifyAiReason(String rectifyAiReason) { this.rectifyAiReason = rectifyAiReason; }
+    public String getCurrentHandlerEmpNo() { return currentHandlerEmpNo; }
+    public void setCurrentHandlerEmpNo(String currentHandlerEmpNo) { this.currentHandlerEmpNo = currentHandlerEmpNo; }
+    public String getCurrentHandlerEmpName() { return currentHandlerEmpName; }
+    public void setCurrentHandlerEmpName(String currentHandlerEmpName) { this.currentHandlerEmpName = currentHandlerEmpName; }
     public LocalDateTime getStartedAt() { return startedAt; }
     public void setStartedAt(LocalDateTime startedAt) { this.startedAt = startedAt; }
     public LocalDateTime getSubmittedAt() { return submittedAt; }

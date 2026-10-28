@@ -6,15 +6,20 @@ import com.company.cps.domain.CpsInspectionPlan;
 import com.company.cps.domain.CpsInspectionPlanTask;
 import com.company.cps.domain.CpsInspectionRecord;
 import com.company.cps.domain.CpsInspectionRecordItem;
+import com.company.cps.domain.CpsInspectionRecordLog;
 import com.company.cps.domain.CpsInspectionType;
+import com.company.cps.domain.CpsIssueAttachment;
+import com.company.cps.dto.CpsInspectionRectifyRequest;
 import com.company.cps.dto.CpsMyInspectionTaskDto;
 import com.company.cps.mapper.CpsCheckItemMapper;
 import com.company.cps.mapper.CpsInspectionAreaMapper;
 import com.company.cps.mapper.CpsInspectionPlanMapper;
 import com.company.cps.mapper.CpsInspectionPlanTaskMapper;
 import com.company.cps.mapper.CpsInspectionRecordItemMapper;
+import com.company.cps.mapper.CpsInspectionRecordLogMapper;
 import com.company.cps.mapper.CpsInspectionRecordMapper;
 import com.company.cps.mapper.CpsInspectionTypeMapper;
+import com.company.cps.mapper.CpsIssueAttachmentMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,6 +67,18 @@ public class CpsInspectionRecordService {
 
     @Autowired
     private CpsInspectionPlanMapper planMapper;
+
+    @Autowired
+    private CpsInspectionRecordLogMapper recordLogMapper;
+
+    @Autowired
+    private CpsIssueAttachmentMapper attachmentMapper;
+
+    @Autowired
+    private CpsInspectionJudgeClient judgeClient;
+
+    @Autowired
+    private CpsAgentFrameworkClient agentClient;
 
     // ============================================================
     // 开始执行
@@ -197,37 +214,194 @@ public class CpsInspectionRecordService {
         List<CpsInspectionRecordItem> items = itemMapper.findByRecord(recordId);
         require(!items.isEmpty(), "记录无点检项明细");
 
-        int deduct = 0;
+        // 1) 完整性校验（不合格即拒绝提交，不进入 AI 初审）
         for (CpsInspectionRecordItem item : items) {
             String types = item.getCheckTypes() == null ? "" : item.getCheckTypes();
-            // 拍照项：校验最低张数
             if (types.contains("PHOTO")) {
                 int min = item.getPhotoMinCount() == null ? 1 : item.getPhotoMinCount();
                 int actual = item.getPhotoCount() == null ? 0 : item.getPhotoCount();
                 require(actual >= min, "点检项「" + item.getContent() + "」照片不足：需至少 " + min + " 张，当前 " + actual + " 张");
             }
-            // 合格判定项：必填且计分
             if (types.contains("PASS_FAIL")) {
                 require(item.getPassResult() != null, "点检项「" + item.getContent() + "」尚未判定是否合格");
-                // final_result = 人工判定（无 AI 判定链路的统一模型）
-                itemMapper.updateJudge(item.getId(), null, null, item.getPassResult());
-                if ("FAIL".equals(item.getPassResult())) {
-                    deduct += item.getDeductScore() == null ? 0 : item.getDeductScore();
-                }
             }
-            // 文本项：必填校验
             if (types.contains("TEXT")) {
                 require(item.getTextValue() != null && !item.getTextValue().trim().isEmpty(),
                         "点检项「" + item.getContent() + "」需要填写文本说明");
             }
         }
+
+        // 2) AI 初审（C-04 逐项视觉判定）+ Java 侧扣分策略
+        int round = (record.getReviewRound() == null ? 0 : record.getReviewRound()) + 1;
+        List<CpsInspectionJudgeClient.ItemJudge> judges = judgeClient.judge(record, items, round);
+        int deduct = 0;
+        boolean anyFail = false;
+        boolean anyPass = false;
+        List<String> summary = new ArrayList<>();
+        for (int i = 0; i < items.size(); i++) {
+            CpsInspectionRecordItem item = items.get(i);
+            CpsInspectionJudgeClient.ItemJudge judge = i < judges.size() ? judges.get(i) : null;
+            String verdict = judge == null ? "PENDING" : judge.outcome;
+            String finalResult;
+            if ("PASS".equals(verdict) || "FAIL".equals(verdict)) {
+                finalResult = verdict;
+            } else {
+                // AI 无结论（未启用/无照片/调用失败）：沿用点检员自判，不阻塞流程
+                finalResult = item.getPassResult();
+            }
+            itemMapper.updateJudge(item.getId(), judge == null ? null : judge.outcome,
+                    judge == null ? null : judge.reason, finalResult);
+            if ("FAIL".equals(finalResult)) {
+                deduct += item.getDeductScore() == null ? 0 : item.getDeductScore();
+            }
+            if ("PASS".equals(verdict)) {
+                anyPass = true;
+                summary.add(item.getContent() + "=合格");
+            } else if ("FAIL".equals(verdict)) {
+                anyFail = true;
+                summary.add(item.getContent() + "=不合格");
+            }
+        }
         int score = Math.max(0, 100 - deduct);
-        int rows = recordMapper.submit(recordId, "IN_PROGRESS", "JUDGED", "SUCCESS", score);
+        String aiOverall = anyFail ? "PROBLEM" : (anyPass ? "PASS" : null);
+        String aiReason = summary.isEmpty() ? "AI 初审无结论（人工复核）" : String.join("；", summary);
+        // 整改责任人 = 区域责任人（cps_inspection_area.keeper_emp_no）；未配置区域的类型回退检查人自己
+        CpsInspectionArea area = record.getAreaId() == null ? null : areaMapper.findById(record.getAreaId());
+        String keeperEmpNo = area == null || isBlank(area.getKeeperEmpNo()) ? record.getCheckEmpNo() : area.getKeeperEmpNo();
+        String keeperEmpName = area == null || isBlank(area.getKeeperEmpNo()) ? record.getCheckEmpName() : area.getKeeperEmpName();
+
+        // 3) 进入 web 人工复核（Android 不再承载复核动作）
+        int rows = recordMapper.updateToReview(recordId, "PENDING_REVIEW", aiOverall, score, aiReason,
+                round, keeperEmpNo, keeperEmpName);
         require(rows == 1, "提交失败（状态已变化，请刷新）");
-        log.info("Inspection record submitted: id={} score={}", recordId, score);
-        // Phase D：计划任务完成度联动（全部覆盖区域判定完成后 COMPLETED）
+        insertLog(recordId, "SUBMIT", "IN_PROGRESS", "PENDING_REVIEW", record.getCheckEmpNo(), record.getCheckEmpName(),
+                "提交复核（第 " + round + " 轮），AI 初审：" + aiReason + "，得分 " + score);
+        log.info("Inspection record submitted for review: id={} round={} score={} ai={}", recordId, round, score, aiOverall);
+        return recordMapper.findById(recordId);
+    }
+
+    // ============================================================
+    // 人工复核（web）/ 整改（Android）
+    // ============================================================
+
+    /**
+     * web 复核裁决：通过 → PENDING_RECTIFY（办理人=区域整改责任人）；退回 → IN_PROGRESS（办理人=提交人，可改可重提）。
+     * 退回强制填写意见；重提会重新跑 AI 初审（轮数 +1，扣分重算）。
+     */
+    @Transactional
+    public CpsInspectionRecord review(Long recordId, String decision, String opinion, String empNo, String empName) {
+        requireText(empNo, "empNo");
+        require("PASS".equals(decision) || "RETURN".equals(decision), "decision 必须是 PASS/RETURN");
+        CpsInspectionRecord record = mustGetRecord(recordId);
+        require("PENDING_REVIEW".equals(record.getRecordStatus()),
+                "仅待复核的记录可裁决: status=" + record.getRecordStatus());
+        String toStatus;
+        String handlerEmpNo;
+        String handlerEmpName;
+        if ("PASS".equals(decision)) {
+            toStatus = "PENDING_RECTIFY";
+            requireText(record.getRectifyEmpNo(), "该记录未确定整改责任人（区域责任人），无法进入整改");
+            handlerEmpNo = record.getRectifyEmpNo();
+            handlerEmpName = record.getRectifyEmpName();
+        } else {
+            requireText(opinion, "opinion");
+            toStatus = "IN_PROGRESS";
+            handlerEmpNo = record.getCheckEmpNo();
+            handlerEmpName = record.getCheckEmpName();
+        }
+        int rows = recordMapper.updateReviewDecision(recordId, toStatus, empNo, empName, trimToNull(opinion),
+                handlerEmpNo, handlerEmpName);
+        require(rows == 1, "复核失败（状态已变化，请刷新）");
+        insertLog(recordId, "PASS".equals(decision) ? "REVIEW_PASS" : "REVIEW_RETURN",
+                "PENDING_REVIEW", toStatus, empNo, empName, trimToNull(opinion));
+        log.info("Inspection record reviewed: id={} decision={} operator={}", recordId, decision, empNo);
+        return recordMapper.findById(recordId);
+    }
+
+    /**
+     * Android 整改提交（区域责任人）：校验三要素 + 1~5 张照片，投递 C-01 初审后直接落 JUDGED（流程结束）。
+     * AI 投递失败不阻塞归档：结论写进 rectify_ai_reason，交人工追溯。
+     */
+    @Transactional
+    public CpsInspectionRecord submitRectify(Long recordId, CpsInspectionRectifyRequest request,
+                                             String empNo, String empName) {
+        requireText(empNo, "empNo");
+        require(request != null, "request is required");
+        CpsInspectionRecord record = mustGetRecord(recordId);
+        require("PENDING_RECTIFY".equals(record.getRecordStatus()),
+                "仅待整改的记录可提交整改: status=" + record.getRecordStatus());
+        require(empNo.equals(record.getRectifyEmpNo()), "仅整改责任人可提交整改");
+        requireText(request.getReason(), "reason");
+        requireText(request.getShortTermMeasure(), "shortTermMeasure");
+        requireText(request.getLongTermMeasure(), "longTermMeasure");
+        List<Long> attachmentIds = request.getAttachmentIds();
+        require(attachmentIds != null && !attachmentIds.isEmpty(), "attachmentIds 至少 1 张整改照片");
+        require(attachmentIds.size() <= 5, "整改照片最多 5 张");
+        List<CpsIssueAttachment> afterImages = new ArrayList<>();
+        for (Long attachmentId : attachmentIds) {
+            CpsIssueAttachment attachment = attachmentMapper.findById(attachmentId).orElse(null);
+            require(attachment != null, "整改照片不存在: " + attachmentId);
+            afterImages.add(attachment);
+        }
+
+        // 整改前证据：巡检项回传的照片（object_key 形态，同一张照片即整改前后对比的 before）
+        List<Map<String, Object>> beforeRefs = new ArrayList<>();
+        for (CpsInspectionRecordItem item : itemMapper.findByRecord(recordId)) {
+            if (item.getPhotoObjectKey() == null || item.getPhotoObjectKey().trim().isEmpty()) {
+                continue;
+            }
+            Map<String, Object> ref = new HashMap<>();
+            ref.put("object_key", item.getPhotoObjectKey());
+            ref.put("file_name", item.getPhotoFileName() == null ? item.getContent() : item.getPhotoFileName());
+            beforeRefs.add(ref);
+            if (beforeRefs.size() >= 20) {
+                break;
+            }
+        }
+
+        String aiOverall = null;
+        String aiReason;
+        try {
+            String reviewTaskRef = agentClient.triggerInspectionRectifyReview(record, request.getReason(),
+                    request.getShortTermMeasure(), request.getLongTermMeasure(), beforeRefs, afterImages);
+            if (reviewTaskRef == null) {
+                aiReason = "AI 初审未启用，整改已归档（人工追溯）";
+            } else {
+                aiOverall = "SUBMITTED";
+                aiReason = "已提交 AI 初审（task_ref=" + reviewTaskRef + "）";
+            }
+        } catch (RuntimeException error) {
+            aiReason = "AI 初审投递失败，整改已归档（人工追溯）：" + error.getMessage();
+            log.warn("Inspection rectification AI review failed: recordId={} cause={}", recordId, error.getMessage());
+        }
+
+        StringBuilder ids = new StringBuilder();
+        for (Long attachmentId : attachmentIds) {
+            if (ids.length() > 0) {
+                ids.append(',');
+            }
+            ids.append(attachmentId);
+        }
+        int rows = recordMapper.updateRectify(recordId, "JUDGED", request.getReason().trim(),
+                request.getShortTermMeasure().trim(), request.getLongTermMeasure().trim(),
+                ids.toString(), aiOverall, aiReason);
+        require(rows == 1, "整改提交失败（状态已变化，请刷新）");
+        insertLog(recordId, "RECTIFY_SUBMIT", "PENDING_RECTIFY", "JUDGED", empNo, empName, aiReason);
+        log.info("Inspection rectification submitted: id={} operator={} ai={}", recordId, empNo, aiOverall);
+        // 计划任务完成度联动（与提交同口径：全部区域 JUDGED 即 COMPLETED）
         advancePlanTask(record.getPlanTaskId(), "COMPLETED");
         return recordMapper.findById(recordId);
+    }
+
+    /** web 复核列表：全部待复核记录（按提交时间升序，先提交先处理） */
+    public List<CpsInspectionRecord> listPendingReview(int limit) {
+        return recordMapper.findByStatus("PENDING_REVIEW", limit <= 0 ? 100 : Math.min(limit, 200));
+    }
+
+    /** Android「我的待整改」：当前用户作为整改责任人的记录 */
+    public List<CpsInspectionRecord> listMyRectify(String empNo) {
+        requireText(empNo, "empNo");
+        return recordMapper.findByHandler("PENDING_RECTIFY", empNo.trim(), 50);
     }
 
     // ============================================================
@@ -258,8 +432,32 @@ public class CpsInspectionRecordService {
         Map<String, Object> result = new HashMap<>();
         result.put("record", record);
         result.put("items", items);
+        result.put("logs", recordLogMapper.findByRecord(recordId));
+        result.put("rectifyAttachments", loadRectifyAttachments(record));
         return result;
     }
+
+    /** 整改照片附件（ids 形如 "12,13"；web 详情与 Android 回显用） */
+    private List<CpsIssueAttachment> loadRectifyAttachments(CpsInspectionRecord record) {
+        List<CpsIssueAttachment> list = new ArrayList<>();
+        String raw = record.getRectifyAttachmentIds();
+        if (raw == null || raw.trim().isEmpty()) {
+            return list;
+        }
+        for (String part : raw.split(",")) {
+            String trimmed = part.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            try {
+                attachmentMapper.findById(Long.parseLong(trimmed)).ifPresent(list::add);
+            } catch (NumberFormatException ignored) {
+                // 历史脏数据忽略
+            }
+        }
+        return list;
+    }
+
 
     /** Android「我的执行中」：当前用户 IN_PROGRESS 记录（恢复现场用） */
     public List<CpsInspectionRecord> listInProgress(String empNo) {
@@ -354,5 +552,23 @@ public class CpsInspectionRecordService {
 
     private static void requireText(String value, String field) {
         require(value != null && !value.trim().isEmpty(), field + " is required");
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    /** 流转日志（提交/复核/整改各写一条，供详情时间线与审计追溯） */
+    private void insertLog(Long recordId, String action, String fromStatus, String toStatus,
+                           String operatorEmpNo, String operatorEmpName, String comment) {
+        CpsInspectionRecordLog entry = new CpsInspectionRecordLog();
+        entry.setRecordId(recordId);
+        entry.setAction(action);
+        entry.setFromStatus(fromStatus);
+        entry.setToStatus(toStatus);
+        entry.setOperatorEmpNo(operatorEmpNo);
+        entry.setOperatorEmpName(operatorEmpName);
+        entry.setComment(comment);
+        recordLogMapper.insert(entry);
     }
 }
