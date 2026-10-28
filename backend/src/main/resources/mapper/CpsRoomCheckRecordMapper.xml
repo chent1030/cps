@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsRoomCheckRecordMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsRoomCheckRecordMapper">
 
     <sql id="BaseColumns">
         id, plan_task_id, plan_id, room_id, room_code, room_name,
@@ -10,7 +10,7 @@
         started_at, submitted_at, created_at, updated_at
     </sql>
 
-    <resultMap id="recordMap" type="com.company.cps.domain.CpsRoomCheckRecord">
+    <resultMap id="recordMap" type="com.catlbattery.domain.entity.cps.CpsRoomCheckRecord">
         <id column="id" property="id"/>
         <result column="plan_task_id" property="planTaskId"/>
         <result column="plan_id" property="planId"/>
@@ -29,7 +29,7 @@
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
 
-    <insert id="insert" parameterType="com.company.cps.domain.CpsRoomCheckRecord" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsRoomCheckRecord" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_room_check_record (
             plan_task_id, plan_id, room_id, room_code, room_name,
             check_emp_no, check_emp_name, record_status, judge_status, score,
@@ -80,7 +80,7 @@
         ORDER BY submitted_at ASC
     </select>
 
-    <update id="updateJudgeResult" parameterType="com.company.cps.domain.CpsRoomCheckRecord">
+    <update id="updateJudgeResult" parameterType="com.catlbattery.domain.entity.cps.CpsRoomCheckRecord">
         UPDATE cps_room_check_record
         SET record_status = #{recordStatus},
             judge_status = #{judgeStatus},
@@ -91,7 +91,7 @@
     </update>
 
     <!-- 波次7 清单⑤：PENDING 降级单补判定重跑（JUDGED 后解锁 judge_status/score，record_status 与照片不变）。 -->
-    <update id="updateRejudgeResult" parameterType="com.company.cps.domain.CpsRoomCheckRecord">
+    <update id="updateRejudgeResult" parameterType="com.catlbattery.domain.entity.cps.CpsRoomCheckRecord">
         UPDATE cps_room_check_record
         SET judge_status = #{judgeStatus},
             judge_attempt = #{judgeAttempt},
@@ -100,7 +100,7 @@
     </update>
 
     <!-- PRD 24.2.2/24.2.6：点检人确认/修正后锁定计分（AWAIT_CONFIRM → JUDGED；并发护栏防重复确认）。 -->
-    <update id="updateConfirmResult" parameterType="com.company.cps.domain.CpsRoomCheckRecord">
+    <update id="updateConfirmResult" parameterType="com.catlbattery.domain.entity.cps.CpsRoomCheckRecord">
         UPDATE cps_room_check_record
         SET record_status = #{recordStatus},
             judge_status = #{judgeStatus},
@@ -139,7 +139,7 @@
         ORDER BY totalScore DESC, firstSubmittedAt ASC, roomCode ASC
     </select>
     <!-- B：admin 管理台点检记录列表（PRD §22 追溯：含明细数/不合格数/人工修正数）。 -->
-    <select id="pageRecords" resultType="com.company.cps.dto.CpsRoomCheckAdminRowDto">
+    <select id="pageRecords" resultType="com.catlbattery.domain.entity.cps.dto.CpsRoomCheckAdminRowDto">
         SELECT r.id            AS id,
                r.room_code     AS roomCode,
                r.room_name     AS roomName,

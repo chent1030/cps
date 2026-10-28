@@ -2,13 +2,13 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsInitialReviewConfigMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsInitialReviewConfigMapper">
 
-    <select id="findGlobal" resultType="com.company.cps.domain.CpsInitialReviewTriggerConfig">
+    <select id="findGlobal" resultType="com.catlbattery.domain.entity.cps.CpsInitialReviewTriggerConfig">
         SELECT * FROM cps_initial_review_config WHERE config_key = 'GLOBAL' LIMIT 1
     </select>
 
-    <insert id="insertGlobal" parameterType="com.company.cps.domain.CpsInitialReviewTriggerConfig"
+    <insert id="insertGlobal" parameterType="com.catlbattery.domain.entity.cps.CpsInitialReviewTriggerConfig"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_initial_review_config
             (config_key, auto_trigger_enabled, max_retry_attempts, retry_backoff_ms, timeout_seconds,
@@ -17,7 +17,7 @@
                 #{timeoutSeconds}, #{updatedBy}, NOW())
     </insert>
 
-    <update id="updateGlobal" parameterType="com.company.cps.domain.CpsInitialReviewTriggerConfig">
+    <update id="updateGlobal" parameterType="com.catlbattery.domain.entity.cps.CpsInitialReviewTriggerConfig">
         UPDATE cps_initial_review_config
         SET auto_trigger_enabled = #{autoTriggerEnabled},
             max_retry_attempts = #{maxRetryAttempts},

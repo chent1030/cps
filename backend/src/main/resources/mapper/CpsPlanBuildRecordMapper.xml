@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsPlanBuildRecordMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsPlanBuildRecordMapper">
 
-    <insert id="insert" parameterType="com.company.cps.domain.CpsPlanBuildRecord" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsPlanBuildRecord" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_plan_build_record (
             plan_id, task_type, result, error_msg, built_by, build_source
         ) VALUES (
@@ -12,7 +12,7 @@
         )
     </insert>
 
-    <select id="findByPlanId" resultType="com.company.cps.domain.CpsPlanBuildRecord">
+    <select id="findByPlanId" resultType="com.catlbattery.domain.entity.cps.CpsPlanBuildRecord">
         SELECT id, plan_id, task_type, result, error_msg, built_by, build_source, created_at
         FROM cps_plan_build_record
         WHERE plan_id = #{planId}

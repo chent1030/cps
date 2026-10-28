@@ -2,22 +2,22 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsKnowledgeCaseImageMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsKnowledgeCaseImageMapper">
 
-    <select id="findById" resultType="com.company.cps.domain.CpsKnowledgeCaseImage">
+    <select id="findById" resultType="com.catlbattery.domain.entity.cps.CpsKnowledgeCaseImage">
         SELECT *
         FROM cps_knowledge_case_image
         WHERE id = #{id}
     </select>
 
-    <select id="findByCaseId" resultType="com.company.cps.domain.CpsKnowledgeCaseImage">
+    <select id="findByCaseId" resultType="com.catlbattery.domain.entity.cps.CpsKnowledgeCaseImage">
         SELECT *
         FROM cps_knowledge_case_image
         WHERE case_id = #{caseId}
         ORDER BY sort_no, id
     </select>
 
-    <select id="findEnabledByIds" resultType="com.company.cps.domain.CpsKnowledgeCaseImage">
+    <select id="findEnabledByIds" resultType="com.catlbattery.domain.entity.cps.CpsKnowledgeCaseImage">
         SELECT ki.*
         FROM cps_knowledge_case_image ki
         JOIN cps_knowledge_case kc ON kc.id = ki.case_id
@@ -28,7 +28,7 @@
           </foreach>
     </select>
 
-    <select id="findSyncCandidates" resultType="com.company.cps.domain.CpsKnowledgeCaseImage">
+    <select id="findSyncCandidates" resultType="com.catlbattery.domain.entity.cps.CpsKnowledgeCaseImage">
         SELECT ki.*
         FROM cps_knowledge_case_image ki
         JOIN cps_knowledge_case kc ON kc.id = ki.case_id
@@ -41,7 +41,7 @@
         LIMIT #{limit}
     </select>
 
-    <insert id="upsert" parameterType="com.company.cps.domain.CpsKnowledgeCaseImage" useGeneratedKeys="true" keyProperty="id">
+    <insert id="upsert" parameterType="com.catlbattery.domain.entity.cps.CpsKnowledgeCaseImage" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_knowledge_case_image (
             id,
             case_id,

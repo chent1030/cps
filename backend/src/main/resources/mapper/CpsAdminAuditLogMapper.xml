@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsAdminAuditLogMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsAdminAuditLogMapper">
 
-    <resultMap id="CpsAdminAuditLogMap" type="com.company.cps.domain.CpsAdminAuditLog">
+    <resultMap id="CpsAdminAuditLogMap" type="com.catlbattery.domain.entity.cps.CpsAdminAuditLog">
         <id column="id" property="id" />
         <result column="emp_no" property="empNo" />
         <result column="emp_name" property="empName" />
@@ -17,7 +17,7 @@
         <result column="created_at" property="createdAt" />
     </resultMap>
 
-    <insert id="insert" parameterType="com.company.cps.domain.CpsAdminAuditLog" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsAdminAuditLog" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_admin_audit_log
             (emp_no, emp_name, action, target_type, target_id, detail, ip, user_agent, status, error_message)
         VALUES

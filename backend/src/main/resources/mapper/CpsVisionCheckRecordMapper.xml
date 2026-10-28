@@ -2,17 +2,17 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsVisionCheckRecordMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsVisionCheckRecordMapper">
 
     <sql id="BaseColumns">
         id, room_id, check_item_id, room_type, status,
         ai_overall, ai_score, ai_reason,
-        photo_object_key, photo_url, judge_fingerprint,
+        photo_url, judge_fingerprint,
         human_override_emp_no, human_override_reason,
         created_by, created_at, updated_at
     </sql>
 
-    <resultMap id="recordMap" type="com.company.cps.domain.CpsVisionCheckRecord">
+    <resultMap id="recordMap" type="com.catlbattery.domain.entity.cps.CpsVisionCheckRecord">
         <id column="id" property="id"/>
         <result column="room_id" property="roomId"/>
         <result column="check_item_id" property="checkItemId"/>
@@ -21,7 +21,6 @@
         <result column="ai_overall" property="aiOverall"/>
         <result column="ai_score" property="aiScore"/>
         <result column="ai_reason" property="aiReason"/>
-        <result column="photo_object_key" property="photoObjectKey"/>
         <result column="photo_url" property="photoUrl"/>
         <result column="judge_fingerprint" property="judgeFingerprint"/>
         <result column="human_override_emp_no" property="humanOverrideEmpNo"/>
@@ -31,18 +30,18 @@
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
 
-    <insert id="insert" parameterType="com.company.cps.domain.CpsVisionCheckRecord"
+    <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsVisionCheckRecord"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_vision_check_record (
             room_id, check_item_id, room_type, status,
             ai_overall, ai_score, ai_reason,
-            photo_object_key, photo_url, judge_fingerprint,
+            photo_url, judge_fingerprint,
             human_override_emp_no, human_override_reason,
             created_by
         ) VALUES (
             #{roomId}, #{checkItemId}, #{roomType}, #{status},
             #{aiOverall}, #{aiScore}, #{aiReason},
-            #{photoObjectKey}, #{photoUrl}, #{judgeFingerprint},
+            #{photoUrl}, #{judgeFingerprint},
             #{humanOverrideEmpNo}, #{humanOverrideReason},
             #{createdBy}
         )
@@ -118,7 +117,7 @@
     </select>
 
     <!-- AI 判定结果回写：要求 status='AI_JUDGING'，否则 0 行 = 重放/越权覆盖 -->
-    <update id="updateAiJudgeResult" parameterType="com.company.cps.domain.CpsVisionCheckRecord">
+    <update id="updateAiJudgeResult" parameterType="com.catlbattery.domain.entity.cps.CpsVisionCheckRecord">
         UPDATE cps_vision_check_record
         SET ai_overall = #{aiOverall},
             ai_score = #{aiScore},
@@ -130,7 +129,7 @@
     </update>
 
     <!-- 状态流转（AI_JUDGING/TIMEOUT/PENDING 回退）：不做 CAS，纯 setter，service 层守卫 state -->
-    <update id="updateStatusFields" parameterType="com.company.cps.domain.CpsVisionCheckRecord">
+    <update id="updateStatusFields" parameterType="com.catlbattery.domain.entity.cps.CpsVisionCheckRecord">
         UPDATE cps_vision_check_record
         <set>
             <if test="status != null">status = #{status},</if>

@@ -226,7 +226,7 @@ function ReviewDetailDrawer({ recordId, onClose, onReviewed }: { recordId: numbe
           {
             title: '照片',
             width: 160,
-            render: (_, item) => (item.checkTypes ?? '').includes('PHOTO') || item.photoObjectKey
+            render: (_, item) => (item.checkTypes ?? '').includes('PHOTO') || item.photoUrl
               ? <InspectionItemPhotos item={item} />
               : <Typography.Text type="secondary" style={{ fontSize: 12 }}>-</Typography.Text>,
           },

@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsInspectionPlanTaskMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsInspectionPlanTaskMapper">
 
     <sql id="BaseColumns">
         id, plan_id, task_type, title, target_emp_no, target_emp_name,
@@ -11,7 +11,7 @@
         created_at, updated_at
     </sql>
 
-    <resultMap id="taskMap" type="com.company.cps.domain.CpsInspectionPlanTask">
+    <resultMap id="taskMap" type="com.catlbattery.domain.entity.cps.CpsInspectionPlanTask">
         <id column="id" property="id"/>
         <result column="plan_id" property="planId"/>
         <result column="task_type" property="taskType"/>
@@ -44,7 +44,7 @@
         WHERE plan_id = #{planId} AND task_type = #{taskType}
     </select>
 
-    <insert id="insert" parameterType="com.company.cps.domain.CpsInspectionPlanTask" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsInspectionPlanTask" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_inspection_plan_task (
             plan_id, task_type, title, target_emp_no, target_emp_name,
             scheduled_at, frequency, acceptance_criteria, evidence_requirement, coverage_area_codes,

@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsCheckItemMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsCheckItemMapper">
 
     <sql id="BaseColumns">
         id, item_code, content, check_types, photo_min_count, photo_criteria, text_hint,
@@ -10,7 +10,7 @@
         applicable_room_types, config_version, enabled, created_by, updated_by, created_at, updated_at
     </sql>
 
-    <select id="findAll" resultType="com.company.cps.domain.CpsCheckItem">
+    <select id="findAll" resultType="com.catlbattery.domain.entity.cps.CpsCheckItem">
         SELECT <include refid="BaseColumns" />
         FROM cps_check_item
         WHERE 1 = 1
@@ -26,19 +26,19 @@
         ORDER BY config_version DESC, item_code ASC
     </select>
 
-    <select id="findById" resultType="com.company.cps.domain.CpsCheckItem">
+    <select id="findById" resultType="com.catlbattery.domain.entity.cps.CpsCheckItem">
         SELECT <include refid="BaseColumns" />
         FROM cps_check_item
         WHERE id = #{id}
     </select>
 
-    <select id="findByCode" resultType="com.company.cps.domain.CpsCheckItem">
+    <select id="findByCode" resultType="com.catlbattery.domain.entity.cps.CpsCheckItem">
         SELECT <include refid="BaseColumns" />
         FROM cps_check_item
         WHERE item_code = #{itemCode}
     </select>
 
-    <insert id="insert" parameterType="com.company.cps.domain.CpsCheckItem" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsCheckItem" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_check_item (
             item_code, content, check_types, photo_min_count, photo_criteria, text_hint,
             photo_category, deduct_score, status,
@@ -50,7 +50,7 @@
         )
     </insert>
 
-    <update id="update" parameterType="com.company.cps.domain.CpsCheckItem">
+    <update id="update" parameterType="com.catlbattery.domain.entity.cps.CpsCheckItem">
         UPDATE cps_check_item
         SET content = #{content},
             check_types = #{checkTypes},

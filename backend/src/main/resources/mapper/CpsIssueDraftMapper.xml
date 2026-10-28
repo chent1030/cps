@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsIssueDraftMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsIssueDraftMapper">
 
-  <resultMap id="BaseResultMap" type="com.company.cps.domain.CpsIssueDraft">
+  <resultMap id="BaseResultMap" type="com.catlbattery.domain.entity.cps.CpsIssueDraft">
     <id column="id" property="id" />
     <result column="creator_emp_no" property="creatorEmpNo" />
     <result column="creator_emp_name" property="creatorEmpName" />
@@ -22,7 +22,7 @@
     factory, area, draft_data, status, submitted_issue_id, created_at, updated_at
   </sql>
 
-  <insert id="insert" parameterType="com.company.cps.domain.CpsIssueDraft" useGeneratedKeys="true" keyProperty="id">
+  <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsIssueDraft" useGeneratedKeys="true" keyProperty="id">
     INSERT INTO cps_issue_draft (
       creator_emp_no, creator_emp_name, title, inspection_type_code,
       factory, area, draft_data, status, submitted_issue_id

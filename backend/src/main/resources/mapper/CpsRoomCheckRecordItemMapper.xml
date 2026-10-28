@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsRoomCheckRecordItemMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsRoomCheckRecordItemMapper">
 
     <sql id="BaseColumns">
         id, record_id, room_id, check_item_id, item_code, content, photo_category,
@@ -11,7 +11,7 @@
         final_modify_reason, judged_at, created_at, updated_at
     </sql>
 
-    <resultMap id="itemMap" type="com.company.cps.domain.CpsRoomCheckRecordItem">
+    <resultMap id="itemMap" type="com.catlbattery.domain.entity.cps.CpsRoomCheckRecordItem">
         <id column="id" property="id"/>
         <result column="record_id" property="recordId"/>
         <result column="room_id" property="roomId"/>
@@ -21,7 +21,7 @@
         <result column="photo_category" property="photoCategory"/>
         <result column="deduct_score" property="deductScore"/>
         <result column="config_version" property="configVersion"/>
-        <result column="photo_object_key" property="photoObjectKey"/>
+        <result column="photo_object_key" property="photoUrl"/>
         <result column="photo_file_name" property="photoFileName"/>
         <result column="judge_result" property="judgeResult"/>
         <result column="judge_reason" property="judgeReason"/>
@@ -42,7 +42,7 @@
         <foreach collection="items" item="item" separator=",">
             (#{item.recordId}, #{item.roomId}, #{item.checkItemId}, #{item.itemCode}, #{item.content},
              #{item.photoCategory}, #{item.deductScore}, #{item.configVersion},
-             #{item.photoObjectKey}, #{item.photoFileName})
+             #{item.photoUrl}, #{item.photoFileName})
         </foreach>
     </insert>
 
@@ -61,7 +61,7 @@
 
     <update id="updatePhoto">
         UPDATE cps_room_check_record_item
-        SET photo_object_key = #{photoObjectKey},
+        SET photo_object_key = #{photoUrl},
             photo_file_name = #{photoFileName}
         WHERE id = #{id}
     </update>

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsInspectionTypeMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsInspectionTypeMapper">
 
-  <resultMap id="BaseResultMap" type="com.company.cps.domain.CpsInspectionType">
+  <resultMap id="BaseResultMap" type="com.catlbattery.domain.entity.cps.CpsInspectionType">
     <id column="id" property="id" />
     <result column="code" property="code" />
     <result column="name" property="name" />
@@ -75,7 +75,7 @@
     FROM cps_inspection_type WHERE code = #{code}
   </select>
 
-  <insert id="insert" parameterType="com.company.cps.domain.CpsInspectionType"
+  <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsInspectionType"
           useGeneratedKeys="true" keyProperty="id">
     INSERT INTO cps_inspection_type (
       code, name, content, zone_flag, builtin, check_item_ids, description, icon, color, enabled, sort_order,
@@ -86,7 +86,7 @@
     )
   </insert>
 
-  <update id="updateById" parameterType="com.company.cps.domain.CpsInspectionType">
+  <update id="updateById" parameterType="com.catlbattery.domain.entity.cps.CpsInspectionType">
     UPDATE cps_inspection_type
     <set>
       <if test="code != null">code = #{code},</if>

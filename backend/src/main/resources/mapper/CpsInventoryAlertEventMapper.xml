@@ -2,14 +2,14 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsInventoryAlertEventMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsInventoryAlertEventMapper">
 
     <sql id="BaseColumns">
         id, item_id, status, first_triggered_at, last_eval_at, last_eval_qty,
         threshold_snapshot, closed_at, closed_by, close_reason, created_at, updated_at
     </sql>
 
-    <insert id="insert" parameterType="com.company.cps.domain.CpsInventoryAlertEvent" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsInventoryAlertEvent" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_inventory_alert_event (
             item_id, status, first_triggered_at, last_eval_at, last_eval_qty,
             threshold_snapshot, closed_at, closed_by, close_reason
@@ -19,7 +19,7 @@
         )
     </insert>
 
-    <update id="update" parameterType="com.company.cps.domain.CpsInventoryAlertEvent">
+    <update id="update" parameterType="com.catlbattery.domain.entity.cps.CpsInventoryAlertEvent">
         UPDATE cps_inventory_alert_event
         SET status = #{status},
             last_eval_at = #{lastEvalAt},
@@ -31,19 +31,19 @@
     </update>
 
     <!-- 合并事件判定：同物品当前 OPEN（DB 层 UNIQUE(open_item_id) 兜底唯一） -->
-    <select id="findOpenByItemId" resultType="com.company.cps.domain.CpsInventoryAlertEvent">
+    <select id="findOpenByItemId" resultType="com.catlbattery.domain.entity.cps.CpsInventoryAlertEvent">
         SELECT <include refid="BaseColumns" />
         FROM cps_inventory_alert_event
         WHERE item_id = #{itemId} AND status = 'OPEN'
     </select>
 
-    <select id="findById" resultType="com.company.cps.domain.CpsInventoryAlertEvent">
+    <select id="findById" resultType="com.catlbattery.domain.entity.cps.CpsInventoryAlertEvent">
         SELECT <include refid="BaseColumns" />
         FROM cps_inventory_alert_event
         WHERE id = #{id}
     </select>
 
-    <select id="page" resultType="com.company.cps.domain.CpsInventoryAlertEvent">
+    <select id="page" resultType="com.catlbattery.domain.entity.cps.CpsInventoryAlertEvent">
         SELECT e.id, e.item_id, e.status, e.first_triggered_at, e.last_eval_at, e.last_eval_qty,
                e.threshold_snapshot, e.closed_at, e.closed_by, e.close_reason, e.created_at, e.updated_at,
                i.item_code, i.item_name, i.unit,

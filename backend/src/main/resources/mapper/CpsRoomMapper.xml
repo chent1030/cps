@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsRoomMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsRoomMapper">
 
     <sql id="BaseColumns">
         id, room_code, building, door_no, room_name, room_type, risk_level, check_item_ids, dept_name,
@@ -10,7 +10,7 @@
         enabled, created_by, updated_by, created_at, updated_at
     </sql>
 
-    <select id="findAll" resultType="com.company.cps.domain.CpsRoom">
+    <select id="findAll" resultType="com.catlbattery.domain.entity.cps.CpsRoom">
         SELECT <include refid="BaseColumns" />
         FROM cps_room
         WHERE 1 = 1
@@ -26,19 +26,19 @@
         ORDER BY factory ASC, room_type ASC, room_code ASC
     </select>
 
-    <select id="findById" resultType="com.company.cps.domain.CpsRoom">
+    <select id="findById" resultType="com.catlbattery.domain.entity.cps.CpsRoom">
         SELECT <include refid="BaseColumns" />
         FROM cps_room
         WHERE id = #{id}
     </select>
 
-    <select id="findByCode" resultType="com.company.cps.domain.CpsRoom">
+    <select id="findByCode" resultType="com.catlbattery.domain.entity.cps.CpsRoom">
         SELECT <include refid="BaseColumns" />
         FROM cps_room
         WHERE room_code = #{roomCode}
     </select>
 
-    <insert id="insert" parameterType="com.company.cps.domain.CpsRoom" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsRoom" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_room (
             room_code, building, door_no, room_name, room_type, risk_level, check_item_ids, dept_name,
             base, factory, keeper_emp_no, keeper_emp_name, keeper_manager_emp_no, keeper_manager_emp_name,
@@ -50,7 +50,7 @@
         )
     </insert>
 
-    <update id="update" parameterType="com.company.cps.domain.CpsRoom">
+    <update id="update" parameterType="com.catlbattery.domain.entity.cps.CpsRoom">
         UPDATE cps_room
         SET building = #{building},
             door_no = #{doorNo},

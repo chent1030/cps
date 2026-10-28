@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsIssueMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsIssueMapper">
 
-    <insert id="insert" parameterType="com.company.cps.domain.CpsIssue" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsIssue" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_issue (
           agent_inspection_id, flow_version, status, factory, area, line, process, resource_no,
           inspection_type_code, extra_data,
@@ -62,14 +62,14 @@
         WHERE id = #{id} AND status = #{fromStatus}
     </update>
 
-    <select id="findById" resultType="com.company.cps.domain.CpsIssue">
+    <select id="findById" resultType="com.catlbattery.domain.entity.cps.CpsIssue">
         SELECT *
         FROM cps_issue
         WHERE id = #{id}
     </select>
 
     <!-- 审批中心补建历史待审核单：按状态取，id 升序，LIMIT 防爆 -->
-    <select id="findByStatus" resultType="com.company.cps.domain.CpsIssue">
+    <select id="findByStatus" resultType="com.catlbattery.domain.entity.cps.CpsIssue">
         SELECT *
         FROM cps_issue
         WHERE status = #{status}
@@ -79,7 +79,7 @@
 
     <!-- B4 周评分：created_at 落在 [weekStart, weekEnd+1day) 之间的 issue 全量。
          weekEnd 已在 service 层转为周日，limit 防爆。 -->
-    <select id="findForWeeklyScore" resultType="com.company.cps.domain.CpsIssue">
+    <select id="findForWeeklyScore" resultType="com.catlbattery.domain.entity.cps.CpsIssue">
         SELECT *
         FROM cps_issue
         WHERE created_at &gt;= #{weekStart}
@@ -88,7 +88,7 @@
         LIMIT #{limit}
     </select>
 
-    <update id="updateWorkflowFields" parameterType="com.company.cps.domain.CpsIssue">
+    <update id="updateWorkflowFields" parameterType="com.catlbattery.domain.entity.cps.CpsIssue">
         UPDATE cps_issue
         SET status = #{status},
             responsible_emp_no = #{responsibleEmpNo},
@@ -117,7 +117,7 @@
           AND lock_version = IFNULL(#{lockVersion}, 0)
     </update>
 
-    <select id="listByTab" resultType="com.company.cps.dto.CpsIssueListItemResponse">
+    <select id="listByTab" resultType="com.catlbattery.domain.entity.cps.dto.CpsIssueListItemResponse">
         SELECT id,
                status,
                factory,
@@ -307,14 +307,14 @@
         LEFT JOIN cps_problem_category c2 ON c2.id = i.category_l2_id
     </sql>
 
-    <select id="listForAdmin" resultType="com.company.cps.dto.CpsIssueListItemResponse">
+    <select id="listForAdmin" resultType="com.catlbattery.domain.entity.cps.dto.CpsIssueListItemResponse">
         SELECT <include refid="adminIssueColumns"/>
         <include refid="adminIssueFilter"/>
         ORDER BY submit_time DESC
         LIMIT #{limit} OFFSET #{offset}
     </select>
 
-    <select id="listForAdminExport" resultType="com.company.cps.dto.CpsIssueListItemResponse">
+    <select id="listForAdminExport" resultType="com.catlbattery.domain.entity.cps.dto.CpsIssueListItemResponse">
         SELECT <include refid="adminIssueColumns"/>
         <include refid="adminIssueFilter"/>
         ORDER BY submit_time DESC
@@ -356,7 +356,7 @@
       过滤维度：factory / category_l1_id / category_l2_id / status / submit_time 区间。
       与 listForAdmin 共用 adminIssueColumns 列集合，保证契约一致（CpsIssueMapperContractTest）。
     -->
-    <select id="findMemoryPage" resultType="com.company.cps.dto.CpsIssueListItemResponse">
+    <select id="findMemoryPage" resultType="com.catlbattery.domain.entity.cps.dto.CpsIssueListItemResponse">
         SELECT <include refid="adminIssueColumns"/>
         <where>
             <if test="factory != null and factory != ''">AND i.factory = #{factory}</if>

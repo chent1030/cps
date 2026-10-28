@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.company</groupId>
+    <groupId>com.catlbattery</groupId>
     <artifactId>cps-backend</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>cps-backend</name>

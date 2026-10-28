@@ -43,7 +43,7 @@ export const saveInspectionItemResult = (
   payload: {
     passResult?: 'PASS' | 'FAIL' | null
     textValue?: string | null
-    photoObjectKey?: string | null
+    photoUrl?: string | null
     photoFileName?: string | null
     photoCount?: number | null
   },
@@ -74,7 +74,7 @@ export const myRectify = (empNo: string = EMP_NO) => {
 }
 
 /**
- * 提交整改：原因分析 / 短期措施 / 长期措施各 ≥15 字 + 1~5 张照片。
+ * 提交整改：原因分析 / 短期措施 / 长期措施 + 整改照片附件。
  * 成功后记录变 JUDGED，流程结束。
  */
 export const submitRectify = (recordId: number, payload: CpsInspectionRectifyPayload) => {

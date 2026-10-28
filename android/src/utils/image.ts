@@ -42,7 +42,7 @@ const apiBase = () => (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, 
  * 把后端返回的站内相对路径（/api/...）补成绝对地址。
  * MinIO 之后上传接口/附件表返回的是可直接访问的绝对 URL，绝对地址原样返回，不再拼接。
  * 历史数据里的 /api/cps/attachments/{id}/content 代理路径才补 base；其它站内路径
- * （/storage/...、/uploads/...）与裸对象键保持原样，由调用方降级处理。可重复调用。
+ * （/storage/...、/uploads/...）原样返回，由调用方处理。可重复调用。
  */
 export const resolveAssetUrl = (path: string): string => {
   const value = (path ?? '').trim()
@@ -59,7 +59,7 @@ export const resolveAssetUrl = (path: string): string => {
 /**
  * 上传接口返回值的照片地址：新后端直接给绝对 URL（MinIO 直链），原样保存与回显；
  * 只有返回值里没有绝对 URL 时才回退历史拼法 /api/cps/attachments/{id}/content。
- * 二者都拿不到时保留原值（裸对象键），由渲染层降级。
+ * 二者都拿不到时保留原值，由渲染层降级。
  */
 export const resolveUploadedPhotoUrl = (uploaded: { id?: number | string | null; url?: string | null }): string => {
   const resolved = resolveAssetUrl(uploaded.url ?? '')

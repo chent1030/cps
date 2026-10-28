@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsInspectionRecordMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsInspectionRecordMapper">
 
     <sql id="BaseColumns">
         id, type_code, area_id, area_code, area_name, plan_task_id, plan_id,
@@ -13,7 +13,7 @@
         started_at, submitted_at, source_record_id, created_at, updated_at
     </sql>
 
-    <insert id="insert" parameterType="com.company.cps.domain.CpsInspectionRecord" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsInspectionRecord" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_inspection_record (
             type_code, area_id, area_code, area_name, plan_task_id, plan_id,
             check_emp_no, check_emp_name, record_status, judge_status, score,
@@ -25,7 +25,7 @@
         )
     </insert>
 
-    <select id="findById" resultType="com.company.cps.domain.CpsInspectionRecord">
+    <select id="findById" resultType="com.catlbattery.domain.entity.cps.CpsInspectionRecord">
         SELECT <include refid="BaseColumns" /> FROM cps_inspection_record WHERE id = #{id}
     </select>
 
@@ -44,7 +44,7 @@
         </where>
     </sql>
 
-    <select id="findPage" resultType="com.company.cps.domain.CpsInspectionRecord">
+    <select id="findPage" resultType="com.catlbattery.domain.entity.cps.CpsInspectionRecord">
         SELECT <include refid="BaseColumns" />
         FROM cps_inspection_record
         <include refid="PageWhere" />
@@ -131,7 +131,7 @@
         WHERE id = #{id} AND record_status = 'PENDING_RECTIFY'
     </update>
 
-    <select id="findByStatus" resultType="com.company.cps.domain.CpsInspectionRecord">
+    <select id="findByStatus" resultType="com.catlbattery.domain.entity.cps.CpsInspectionRecord">
         SELECT <include refid="BaseColumns" />
         FROM cps_inspection_record
         WHERE record_status = #{recordStatus}
@@ -139,7 +139,7 @@
         LIMIT #{limit}
     </select>
 
-    <select id="findByHandler" resultType="com.company.cps.domain.CpsInspectionRecord">
+    <select id="findByHandler" resultType="com.catlbattery.domain.entity.cps.CpsInspectionRecord">
         SELECT <include refid="BaseColumns" />
         FROM cps_inspection_record
         WHERE current_handler_emp_no = #{empNo}

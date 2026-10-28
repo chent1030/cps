@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsWeeklyScoreMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsWeeklyScoreMapper">
 
-    <resultMap id="CpsWeeklyScoreMap" type="com.company.cps.domain.CpsWeeklyScore">
+    <resultMap id="CpsWeeklyScoreMap" type="com.catlbattery.domain.entity.cps.CpsWeeklyScore">
         <id property="id" column="id"/>
         <result property="weekStartDate" column="week_start_date"/>
         <result property="empNo" column="emp_no"/>
@@ -20,7 +20,7 @@
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
 
-    <resultMap id="CpsWeeklyScoreLineMap" type="com.company.cps.domain.CpsWeeklyScoreLine">
+    <resultMap id="CpsWeeklyScoreLineMap" type="com.catlbattery.domain.entity.cps.CpsWeeklyScoreLine">
         <id property="id" column="id"/>
         <result property="weeklyScoreId" column="weekly_score_id"/>
         <result property="itemId" column="item_id"/>
@@ -29,7 +29,7 @@
         <result property="createdAt" column="created_at"/>
     </resultMap>
 
-    <insert id="insertHeader" parameterType="com.company.cps.domain.CpsWeeklyScore"
+    <insert id="insertHeader" parameterType="com.catlbattery.domain.entity.cps.CpsWeeklyScore"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_weekly_score (
             week_start_date, emp_no, emp_name,
@@ -44,7 +44,7 @@
         )
     </insert>
 
-    <update id="updateHeader" parameterType="com.company.cps.domain.CpsWeeklyScore">
+    <update id="updateHeader" parameterType="com.catlbattery.domain.entity.cps.CpsWeeklyScore">
         UPDATE cps_weekly_score
         SET emp_name = #{empName},
             region_supervisor_id = #{regionSupervisorId},
@@ -57,7 +57,7 @@
         WHERE id = #{id}
     </update>
 
-    <insert id="insertLine" parameterType="com.company.cps.domain.CpsWeeklyScoreLine"
+    <insert id="insertLine" parameterType="com.catlbattery.domain.entity.cps.CpsWeeklyScoreLine"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_weekly_score_line (
             weekly_score_id, item_id, score_delta, reason

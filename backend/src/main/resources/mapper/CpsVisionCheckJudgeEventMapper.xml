@@ -2,13 +2,13 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsVisionCheckJudgeEventMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsVisionCheckJudgeEventMapper">
 
     <sql id="BaseColumns">
         id, judge_fingerprint, event_type, detail, operator_emp_no, created_at
     </sql>
 
-    <resultMap id="eventMap" type="com.company.cps.domain.CpsVisionCheckJudgeEvent">
+    <resultMap id="eventMap" type="com.catlbattery.domain.entity.cps.CpsVisionCheckJudgeEvent">
         <id column="id" property="id"/>
         <result column="judge_fingerprint" property="judgeFingerprint"/>
         <result column="event_type" property="eventType"/>
@@ -17,7 +17,7 @@
         <result column="created_at" property="createdAt"/>
     </resultMap>
 
-    <insert id="insert" parameterType="com.company.cps.domain.CpsVisionCheckJudgeEvent"
+    <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsVisionCheckJudgeEvent"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_vision_check_judge_event (
             judge_fingerprint, event_type, detail, operator_emp_no

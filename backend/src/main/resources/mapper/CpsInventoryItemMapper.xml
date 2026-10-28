@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsInventoryItemMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsInventoryItemMapper">
 
     <sql id="BaseColumns">
         id, item_code, item_name, unit, stock_qty, alert_threshold,
@@ -10,7 +10,7 @@
         remark, enabled, created_by, updated_by, created_at, updated_at
     </sql>
 
-    <select id="findAll" resultType="com.company.cps.domain.CpsInventoryItem">
+    <select id="findAll" resultType="com.catlbattery.domain.entity.cps.CpsInventoryItem">
         SELECT <include refid="BaseColumns" />
         FROM cps_inventory_item
         WHERE 1 = 1
@@ -32,19 +32,19 @@
         ORDER BY factory ASC, storage_room ASC, item_code ASC
     </select>
 
-    <select id="findById" resultType="com.company.cps.domain.CpsInventoryItem">
+    <select id="findById" resultType="com.catlbattery.domain.entity.cps.CpsInventoryItem">
         SELECT <include refid="BaseColumns" />
         FROM cps_inventory_item
         WHERE id = #{id}
     </select>
 
-    <select id="findByCode" resultType="com.company.cps.domain.CpsInventoryItem">
+    <select id="findByCode" resultType="com.catlbattery.domain.entity.cps.CpsInventoryItem">
         SELECT <include refid="BaseColumns" />
         FROM cps_inventory_item
         WHERE item_code = #{itemCode}
     </select>
 
-    <insert id="insert" parameterType="com.company.cps.domain.CpsInventoryItem" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsInventoryItem" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_inventory_item (
             item_code, item_name, unit, stock_qty, alert_threshold,
             base, factory, storage_room, room_keeper_emp_no, room_keeper_emp_name,
@@ -56,7 +56,7 @@
         )
     </insert>
 
-    <update id="update" parameterType="com.company.cps.domain.CpsInventoryItem">
+    <update id="update" parameterType="com.catlbattery.domain.entity.cps.CpsInventoryItem">
         UPDATE cps_inventory_item
         SET item_name = #{itemName},
             unit = #{unit},
@@ -80,7 +80,7 @@
     </update>
 
     <!-- E2：出入库事务内悲观行锁（同件多次操作串行化；AC-33） -->
-    <select id="selectForUpdate" resultType="com.company.cps.domain.CpsInventoryItem">
+    <select id="selectForUpdate" resultType="com.catlbattery.domain.entity.cps.CpsInventoryItem">
         SELECT <include refid="BaseColumns" />
         FROM cps_inventory_item
         WHERE id = #{id}

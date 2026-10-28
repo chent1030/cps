@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsRectificationSubmissionMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsRectificationSubmissionMapper">
 
-    <insert id="insert" parameterType="com.company.cps.domain.CpsRectificationSubmission" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsRectificationSubmission" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_rectification_submission (
           issue_id, version_no, reason, short_term_measure, long_term_measure,
           responsible_emp_no, responsible_emp_name, attachment_ids,
@@ -18,15 +18,15 @@
         )
     </insert>
 
-    <select id="findById" resultType="com.company.cps.domain.CpsRectificationSubmission">
+    <select id="findById" resultType="com.catlbattery.domain.entity.cps.CpsRectificationSubmission">
         SELECT * FROM cps_rectification_submission WHERE id = #{id}
     </select>
 
-    <select id="findByIssueAndVersion" resultType="com.company.cps.domain.CpsRectificationSubmission">
+    <select id="findByIssueAndVersion" resultType="com.catlbattery.domain.entity.cps.CpsRectificationSubmission">
         SELECT * FROM cps_rectification_submission WHERE issue_id = #{issueId} AND version_no = #{versionNo}
     </select>
 
-    <select id="findLatestByIssueId" resultType="com.company.cps.domain.CpsRectificationSubmission">
+    <select id="findLatestByIssueId" resultType="com.catlbattery.domain.entity.cps.CpsRectificationSubmission">
         SELECT * FROM cps_rectification_submission
         WHERE issue_id = #{issueId}
         ORDER BY version_no DESC
@@ -45,7 +45,7 @@
         WHERE issue_id = #{issueId} AND version_no = #{versionNo}
     </update>
 
-    <select id="findByIssueId" resultType="com.company.cps.domain.CpsRectificationSubmission">
+    <select id="findByIssueId" resultType="com.catlbattery.domain.entity.cps.CpsRectificationSubmission">
         SELECT * FROM cps_rectification_submission WHERE issue_id = #{issueId} ORDER BY version_no ASC
     </select>
 </mapper>

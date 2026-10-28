@@ -1,15 +1,15 @@
 /**
- * 附件/照片渲染组件（绝对 URL 优先）。
+ * 附件/照片渲染组件（只有绝对 URL 一种落库形态）。
  * 地址解析规则集中在 ../lib/attachmentUrl：
  * - 绝对 http(s) 地址（MinIO 直链）直接作为 <img src>；
- * - /api/... 代理路径按 API base 补全；
- * - 裸对象键（cps/xxx.jpg）解析为空串，降级为文件名/张数文案，不渲染坏图。
+ * - /api/... 代理路径按 API base 补全（历史数据兼容）；
+ * - 无法识别的地址解析为空串，降级为文件名/张数文案，不渲染坏图。
  */
 import { Image, Space, Typography } from '@arco-design/web-react'
 import { useState } from 'react'
 import { resolveAttachmentUrl, splitAttachmentUrls } from '../lib/attachmentUrl'
 
-/** 单张附件缩略图：地址不可解析（裸对象键）或加载失败时返回 null，由外层降级。 */
+/** 单张附件缩略图：地址不可解析或加载失败时返回 null，由外层降级。 */
 export function AttachmentThumb({
   value,
   width = 64,
@@ -57,7 +57,7 @@ export function AttachmentThumbs({
 
 /**
  * 点检项照片墙 + 张数摘要，供巡检复核页与统一巡检记录页共用。
- * photoObjectKey 支持绝对 URL、/api/... 代理路径与纯数字附件 ID；裸对象键只保留张数摘要。
+ * photoUrl 为逗号分隔的绝对 URL（历史数据可能是 /api 代理路径或纯数字附件 ID）。
  */
 export function InspectionItemPhotos({
   item,
@@ -65,7 +65,7 @@ export function InspectionItemPhotos({
   height = 48,
 }: {
   item: {
-    photoObjectKey?: string | null
+    photoUrl?: string | null
     photoCount?: number
     photoMinCount?: number | null
     photoFileName?: string | null
@@ -74,7 +74,7 @@ export function InspectionItemPhotos({
   width?: number
   height?: number
 }) {
-  const urls = splitAttachmentUrls(item.photoObjectKey)
+  const urls = splitAttachmentUrls(item.photoUrl)
   const summary = `照片 ${item.photoCount ?? urls.length}/${item.photoMinCount ?? 1} 张${item.photoFileName ? ` · ${item.photoFileName}` : ''}`
   return <Space direction="vertical" size={4}>
     <AttachmentThumbs values={urls} width={width} height={height} alt={item.photoFileName || item.content || '点检照片'} />

@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsReviewAdjudicationMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsReviewAdjudicationMapper">
 
-    <insert id="insert" parameterType="com.company.cps.domain.CpsReviewAdjudication" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsReviewAdjudication" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_review_adjudication (
           issue_id, version_no, task_id, reviewer_emp_no, reviewer_emp_name,
           decision, ai_overall, ai_relation, reason, from_status, to_status, created_at
@@ -14,11 +14,11 @@
         )
     </insert>
 
-    <select id="findByIssueAndVersion" resultType="com.company.cps.domain.CpsReviewAdjudication">
+    <select id="findByIssueAndVersion" resultType="com.catlbattery.domain.entity.cps.CpsReviewAdjudication">
         SELECT * FROM cps_review_adjudication WHERE issue_id = #{issueId} AND version_no = #{versionNo}
     </select>
 
-    <select id="findLatestByIssueId" resultType="com.company.cps.domain.CpsReviewAdjudication">
+    <select id="findLatestByIssueId" resultType="com.catlbattery.domain.entity.cps.CpsReviewAdjudication">
         SELECT * FROM cps_review_adjudication WHERE issue_id = #{issueId} ORDER BY id DESC LIMIT 1
     </select>
 
@@ -27,7 +27,7 @@
       工厂/区域/分类需 JOIN cps_issue；裁决单表已含 decision/ai_relation/reviewer_emp_no。
       排序按 created_at DESC，id DESC 兜底同毫秒稳定。
     -->
-    <select id="findMemoryPage" resultType="com.company.cps.domain.CpsReviewAdjudication">
+    <select id="findMemoryPage" resultType="com.catlbattery.domain.entity.cps.CpsReviewAdjudication">
         SELECT a.id, a.issue_id, a.version_no, a.task_id,
                a.reviewer_emp_no, a.reviewer_emp_name,
                a.decision, a.ai_overall, a.ai_relation,

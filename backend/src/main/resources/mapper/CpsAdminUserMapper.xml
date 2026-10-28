@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsAdminUserMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsAdminUserMapper">
 
-    <resultMap id="CpsAdminUserMap" type="com.company.cps.domain.CpsAdminUser">
+    <resultMap id="CpsAdminUserMap" type="com.catlbattery.domain.entity.cps.CpsAdminUser">
         <id column="id" property="id" />
         <result column="emp_no" property="empNo" />
         <result column="emp_name" property="empName" />
@@ -71,7 +71,7 @@
         ORDER BY id ASC
     </select>
 
-    <insert id="insert" parameterType="com.company.cps.domain.CpsAdminUser" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsAdminUser" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_admin_user
             (emp_no, emp_name, password_hash, salt, must_change_password, status, page_permissions, remark, enabled)
         VALUES

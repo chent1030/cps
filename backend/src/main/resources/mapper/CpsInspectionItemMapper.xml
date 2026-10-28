@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsInspectionItemMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsInspectionItemMapper">
 
     <sql id="BaseColumns">
         id, item_code, item_name, factory, enabled, remark, created_by, updated_by, created_at, updated_at
@@ -12,7 +12,7 @@
         id, item_id, emp_no, emp_name, created_by, created_at
     </sql>
 
-    <select id="findAll" resultType="com.company.cps.domain.CpsInspectionItem">
+    <select id="findAll" resultType="com.catlbattery.domain.entity.cps.CpsInspectionItem">
         SELECT <include refid="BaseColumns" />
         FROM cps_inspection_item
         WHERE 1 = 1
@@ -25,19 +25,19 @@
         ORDER BY item_code ASC
     </select>
 
-    <select id="findById" resultType="com.company.cps.domain.CpsInspectionItem">
+    <select id="findById" resultType="com.catlbattery.domain.entity.cps.CpsInspectionItem">
         SELECT <include refid="BaseColumns" />
         FROM cps_inspection_item
         WHERE id = #{id}
     </select>
 
-    <select id="findByCode" resultType="com.company.cps.domain.CpsInspectionItem">
+    <select id="findByCode" resultType="com.catlbattery.domain.entity.cps.CpsInspectionItem">
         SELECT <include refid="BaseColumns" />
         FROM cps_inspection_item
         WHERE item_code = #{itemCode}
     </select>
 
-    <insert id="insert" parameterType="com.company.cps.domain.CpsInspectionItem" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsInspectionItem" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_inspection_item (
             item_code, item_name, factory, enabled, remark, created_by, updated_by
         ) VALUES (
@@ -45,7 +45,7 @@
         )
     </insert>
 
-    <update id="update" parameterType="com.company.cps.domain.CpsInspectionItem">
+    <update id="update" parameterType="com.catlbattery.domain.entity.cps.CpsInspectionItem">
         UPDATE cps_inspection_item
         SET item_name = #{itemName},
             factory = #{factory},
@@ -61,7 +61,7 @@
         WHERE id = #{id}
     </update>
 
-    <select id="findPermissions" resultType="com.company.cps.domain.CpsInspectionItemPermission">
+    <select id="findPermissions" resultType="com.catlbattery.domain.entity.cps.CpsInspectionItemPermission">
         SELECT <include refid="PermissionColumns" />
         FROM cps_inspection_item_permission
         WHERE item_id = #{itemId}
@@ -87,7 +87,7 @@
         WHERE item_id = #{itemId}
     </select>
 
-    <insert id="insertPermission" parameterType="com.company.cps.domain.CpsInspectionItemPermission">
+    <insert id="insertPermission" parameterType="com.catlbattery.domain.entity.cps.CpsInspectionItemPermission">
         INSERT INTO cps_inspection_item_permission (item_id, emp_no, emp_name, created_by)
         VALUES (#{itemId}, #{empNo}, #{empName}, #{createdBy})
     </insert>

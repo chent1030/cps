@@ -18,7 +18,7 @@
 ### 1.2 文件清单
 
 - `cps/backend/src/test/resources/application.yml`：mock 开关（`cps.agent-framework.enabled=false` / `cps.vision.enabled=false`）。
-- `cps/backend/src/test/java/com/company/cps/service/CpsWave13IntegrationTest.java`：4 条端到端链 + 5 个不变量 + helpers。
+- `cps/backend/src/test/java/com/catlbattery/app/service/cps/CpsWave13IntegrationTest.java`：4 条端到端链 + 5 个不变量 + helpers。
 
 ## 2. C7 系统化测试：4 条端到端链
 
@@ -117,7 +117,7 @@
 ## 7. 文件清单（仅本波次变更）
 
 - 新增：`cps/backend/src/test/resources/application.yml`
-- 新增：`cps/backend/src/test/java/com/company/cps/service/CpsWave13IntegrationTest.java`
+- 新增：`cps/backend/src/test/java/com/catlbattery/app/service/cps/CpsWave13IntegrationTest.java`
 - 新增：`cps/docs/波次13-Java侧-C7系统化测试与J联调.md`
 
 无生产代码改动（仅测试 + 文档），符合"测试驱动验收"范围。

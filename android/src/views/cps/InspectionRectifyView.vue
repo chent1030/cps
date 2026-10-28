@@ -68,12 +68,11 @@
         </view>
       </view>
 
-      <!-- 待整改：填写三要素 + 上传 1~5 张照片 -->
+      <!-- 待整改：填写三要素 + 上传整改照片 -->
       <template v-if="editable">
         <view class="u-card cps-form-card">
           <view class="cps-card-title">
             <text class="cps-card-title__main">整改内容</text>
-            <text class="cps-card-title__hint">三项均需 ≥{{ MIN_LEN }} 字</text>
           </view>
 
           <view class="cps-field">
@@ -81,15 +80,12 @@
               <text class="cps-field__label">
                 原因分析<text class="cps-field__required">*</text>
               </text>
-              <text class="cps-field__count" :class="{ 'cps-field__count--lack': reasonLen < MIN_LEN }">
-                {{ reasonLen }}/{{ MIN_LEN }}
-              </text>
             </view>
             <textarea
               class="u-textarea"
               :value="form.reason"
               :maxlength="500"
-              placeholder="说明问题产生的根本原因（≥15 字）"
+              placeholder="说明问题产生的根本原因"
               auto-height
               @input="onInput('reason', $event)"
             />
@@ -100,15 +96,12 @@
               <text class="cps-field__label">
                 短期措施<text class="cps-field__required">*</text>
               </text>
-              <text class="cps-field__count" :class="{ 'cps-field__count--lack': shortTermLen < MIN_LEN }">
-                {{ shortTermLen }}/{{ MIN_LEN }}
-              </text>
             </view>
             <textarea
               class="u-textarea"
               :value="form.shortTermMeasure"
               :maxlength="500"
-              placeholder="说明立即采取的纠正措施（≥15 字）"
+              placeholder="说明立即采取的纠正措施"
               auto-height
               @input="onInput('shortTermMeasure', $event)"
             />
@@ -119,15 +112,12 @@
               <text class="cps-field__label">
                 长期措施<text class="cps-field__required">*</text>
               </text>
-              <text class="cps-field__count" :class="{ 'cps-field__count--lack': longTermLen < MIN_LEN }">
-                {{ longTermLen }}/{{ MIN_LEN }}
-              </text>
             </view>
             <textarea
               class="u-textarea"
               :value="form.longTermMeasure"
               :maxlength="500"
-              placeholder="说明防止再发的长期措施（≥15 字）"
+              placeholder="说明防止再发的长期措施"
               auto-height
               @input="onInput('longTermMeasure', $event)"
             />
@@ -138,11 +128,8 @@
               <text class="cps-field__label">
                 整改照片<text class="cps-field__required">*</text>
               </text>
-              <text class="cps-field__count" :class="{ 'cps-field__count--lack': !photos.length }">
-                {{ photos.length }}/{{ MAX_PHOTOS }}
-              </text>
             </view>
-            <text class="cps-field__hint">上传 1~{{ MAX_PHOTOS }} 张整改后照片，支持拍照或从相册选择</text>
+            <text class="cps-field__hint">上传整改后照片，支持拍照或从相册选择</text>
             <view class="cps-photo-grid">
               <view
                 v-for="(photo, index) in photos"
@@ -155,7 +142,6 @@
                 <text class="cps-photo-del" @click.stop="removePhoto(index)">×</text>
               </view>
               <button
-                v-if="photos.length < MAX_PHOTOS"
                 class="cps-photo-add"
                 hover-class="u-tap"
                 :disabled="uploading"
@@ -205,11 +191,6 @@ import { onLoad } from '@dcloudio/uni-app'
 import type { CpsInspectionRecord, CpsInspectionType, CpsUploadedImage } from '@/types/cps'
 import { resolveAssetUrl, resolveUploadedPhotoUrl, resolveUploadSources } from '@/utils/image'
 
-/** 后端校验三要素各 ≥15 字 */
-const MIN_LEN = 15
-/** 后端校验整改照片 1~5 张 */
-const MAX_PHOTOS = 5
-
 const recordId = ref<number>(0)
 const loading = ref(false)
 const submitting = ref(false)
@@ -248,7 +229,7 @@ const statusDesc = (s: string) =>
     PENDING: '巡检尚未开始执行。',
     IN_PROGRESS: '巡检执行中，请先回到「执行中」页签完成巡检。',
     PENDING_REVIEW: '巡检已提交，等待 web 端复核；复核通过后会转入「待整改」。',
-    PENDING_RECTIFY: '请填写原因分析、短期措施、长期措施并上传 1~5 张照片后提交整改。',
+    PENDING_RECTIFY: '请填写原因分析、短期措施、长期措施并上传整改照片后提交整改。',
     JUDGED: '整改已提交，流程结束。',
     AWAIT_CONFIRM: '记录已锁定。',
   }[s] ?? '当前状态不可提交整改。')
@@ -260,10 +241,6 @@ const typeName = computed(() => {
 })
 
 const editable = computed(() => record.value?.recordStatus === 'PENDING_RECTIFY')
-
-const reasonLen = computed(() => form.reason.trim().length)
-const shortTermLen = computed(() => form.shortTermMeasure.trim().length)
-const longTermLen = computed(() => form.longTermMeasure.trim().length)
 
 const aiConclusion = computed(() => {
   const r = record.value
@@ -291,11 +268,10 @@ const reviewMeta = computed(() => {
 })
 
 const formHint = computed(() => {
-  if (reasonLen.value < MIN_LEN) return `原因分析还需 ${MIN_LEN - reasonLen.value} 字`
-  if (shortTermLen.value < MIN_LEN) return `短期措施还需 ${MIN_LEN - shortTermLen.value} 字`
-  if (longTermLen.value < MIN_LEN) return `长期措施还需 ${MIN_LEN - longTermLen.value} 字`
+  if (!form.reason.trim()) return '请填写原因分析'
+  if (!form.shortTermMeasure.trim()) return '请填写短期措施'
+  if (!form.longTermMeasure.trim()) return '请填写长期措施'
   if (!photos.value.length) return '请至少上传 1 张整改照片'
-  if (photos.value.length > MAX_PHOTOS) return `整改照片最多 ${MAX_PHOTOS} 张`
   return ''
 })
 
@@ -336,9 +312,8 @@ const uploadPhotos = async (sources: ReturnType<typeof resolveUploadSources>) =>
   uploading.value = true
   try {
     for (const source of sources) {
-      if (photos.value.length >= MAX_PHOTOS) break
       const uploaded = await cpsApi.uploadCpsAttachment(source)
-      // MinIO 之后 url 是可直接访问的绝对地址，原样保存与回显；仅旧后端回退 /content 拼法。
+      // MinIO 上传后 url 是可直接访问的绝对地址，原样保存与回显。
       photos.value.push({ id: uploaded.id, url: resolveUploadedPhotoUrl(uploaded), name: uploaded.name })
     }
   } catch (error) {
@@ -350,9 +325,8 @@ const uploadPhotos = async (sources: ReturnType<typeof resolveUploadSources>) =>
 
 // 拍照/选图：uni 原生 chooseImage（App 端调起系统相机/相册）
 const pickPhotos = () => {
-  if (photos.value.length >= MAX_PHOTOS) return
   uni.chooseImage({
-    count: MAX_PHOTOS - photos.value.length,
+    count: 9,
     sizeType: ['compressed'],
     sourceType: ['camera', 'album'],
     success: (result) => {

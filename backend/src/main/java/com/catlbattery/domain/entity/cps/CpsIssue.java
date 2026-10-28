@@ -1,0 +1,138 @@
+package com.catlbattery.domain.entity.cps;
+
+import java.time.LocalDateTime;
+
+public class CpsIssue {
+    private Long id;
+    private String agentInspectionId;
+    /** 流程版本：legacy（旧状态机，冻结）/ v2（整改域新流程）。 */
+    private String flowVersion;
+    private CpsIssueStatus status;
+    private String factory;
+    private String area;
+    private String line;
+    private String process;
+    /** 资源号：巡检现场手动录入的物理资源标识（PRD 24.2.6），与 factory/area/line/process 共同构成位置维度。 */
+    private String resourceNo;
+    /** 巡检类型编码（Phase B1）：关联 cps_inspection_type.code，决定 extraData 的 schema 形态。 */
+    private String inspectionTypeCode;
+    /** 动态字段值（Phase B1，JSON 字符串）：与 inspectionType 的 formSchemaJson 对应。 */
+    private String extraData;
+    private Long aiCategoryL1Id;
+    private Long aiCategoryL2Id;
+    private Long categoryL1Id;
+    private Long categoryL2Id;
+    private Boolean categoryModifiedFlag;
+    private String description;
+    private String creatorEmpNo;
+    private String feedbackEmpNo;
+    private String responsibleEmpNo;
+    private String proofEmpNo;
+    private String reviewerEmpNo;
+    private String currentHandlerEmpNo;
+    private String creatorEmpName;
+    private String feedbackEmpName;
+    private String responsibleEmpName;
+    private String proofEmpName;
+    private String reviewerEmpName;
+    private String currentHandlerEmpName;
+    private String reasonAnalysis;
+    private String correctiveMeasure;
+    private String shortTermMeasure;
+    private String longTermMeasure;
+    private Integer currentSubmissionVersion;
+    private Long inspectionItemId;
+    /** 乐观锁版本号（A2/AC-24）：DB 默认 0；更新时 CAS 校验并自增，防并发编辑。 */
+    private Integer lockVersion;
+    private String rectifyRemark;
+    private String reviewOpinion;
+    private LocalDateTime submitTime;
+    private LocalDateTime closeTime;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getAgentInspectionId() { return agentInspectionId; }
+    public void setAgentInspectionId(String agentInspectionId) { this.agentInspectionId = agentInspectionId; }
+    public String getFlowVersion() { return flowVersion; }
+    public void setFlowVersion(String flowVersion) { this.flowVersion = flowVersion; }
+    public CpsIssueStatus getStatus() { return status; }
+    public void setStatus(CpsIssueStatus status) { this.status = status; }
+    public String getFactory() { return factory; }
+    public void setFactory(String factory) { this.factory = factory; }
+    public String getArea() { return area; }
+    public void setArea(String area) { this.area = area; }
+    public String getLine() { return line; }
+    public void setLine(String line) { this.line = line; }
+    public String getProcess() { return process; }
+    public void setProcess(String process) { this.process = process; }
+    public String getResourceNo() { return resourceNo; }
+    public void setResourceNo(String resourceNo) { this.resourceNo = resourceNo; }
+    public String getInspectionTypeCode() { return inspectionTypeCode; }
+    public void setInspectionTypeCode(String inspectionTypeCode) { this.inspectionTypeCode = inspectionTypeCode; }
+    public String getExtraData() { return extraData; }
+    public void setExtraData(String extraData) { this.extraData = extraData; }
+    public Long getAiCategoryL1Id() { return aiCategoryL1Id; }
+    public void setAiCategoryL1Id(Long aiCategoryL1Id) { this.aiCategoryL1Id = aiCategoryL1Id; }
+    public Long getAiCategoryL2Id() { return aiCategoryL2Id; }
+    public void setAiCategoryL2Id(Long aiCategoryL2Id) { this.aiCategoryL2Id = aiCategoryL2Id; }
+    public Long getCategoryL1Id() { return categoryL1Id; }
+    public void setCategoryL1Id(Long categoryL1Id) { this.categoryL1Id = categoryL1Id; }
+    public Long getCategoryL2Id() { return categoryL2Id; }
+    public void setCategoryL2Id(Long categoryL2Id) { this.categoryL2Id = categoryL2Id; }
+    public Boolean getCategoryModifiedFlag() { return categoryModifiedFlag; }
+    public void setCategoryModifiedFlag(Boolean categoryModifiedFlag) { this.categoryModifiedFlag = categoryModifiedFlag; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public String getCreatorEmpNo() { return creatorEmpNo; }
+    public void setCreatorEmpNo(String creatorEmpNo) { this.creatorEmpNo = creatorEmpNo; }
+    public String getFeedbackEmpNo() { return feedbackEmpNo; }
+    public void setFeedbackEmpNo(String feedbackEmpNo) { this.feedbackEmpNo = feedbackEmpNo; }
+    public String getResponsibleEmpNo() { return responsibleEmpNo; }
+    public void setResponsibleEmpNo(String responsibleEmpNo) { this.responsibleEmpNo = responsibleEmpNo; }
+    public String getProofEmpNo() { return proofEmpNo; }
+    public void setProofEmpNo(String proofEmpNo) { this.proofEmpNo = proofEmpNo; }
+    public String getReviewerEmpNo() { return reviewerEmpNo; }
+    public void setReviewerEmpNo(String reviewerEmpNo) { this.reviewerEmpNo = reviewerEmpNo; }
+    public String getCurrentHandlerEmpNo() { return currentHandlerEmpNo; }
+    public void setCurrentHandlerEmpNo(String currentHandlerEmpNo) { this.currentHandlerEmpNo = currentHandlerEmpNo; }
+    public String getCreatorEmpName() { return creatorEmpName; }
+    public void setCreatorEmpName(String creatorEmpName) { this.creatorEmpName = creatorEmpName; }
+    public String getFeedbackEmpName() { return feedbackEmpName; }
+    public void setFeedbackEmpName(String feedbackEmpName) { this.feedbackEmpName = feedbackEmpName; }
+    public String getResponsibleEmpName() { return responsibleEmpName; }
+    public void setResponsibleEmpName(String responsibleEmpName) { this.responsibleEmpName = responsibleEmpName; }
+    public String getProofEmpName() { return proofEmpName; }
+    public void setProofEmpName(String proofEmpName) { this.proofEmpName = proofEmpName; }
+    public String getReviewerEmpName() { return reviewerEmpName; }
+    public void setReviewerEmpName(String reviewerEmpName) { this.reviewerEmpName = reviewerEmpName; }
+    public String getCurrentHandlerEmpName() { return currentHandlerEmpName; }
+    public void setCurrentHandlerEmpName(String currentHandlerEmpName) { this.currentHandlerEmpName = currentHandlerEmpName; }
+    public String getReasonAnalysis() { return reasonAnalysis; }
+    public void setReasonAnalysis(String reasonAnalysis) { this.reasonAnalysis = reasonAnalysis; }
+    public String getCorrectiveMeasure() { return correctiveMeasure; }
+    public void setCorrectiveMeasure(String correctiveMeasure) { this.correctiveMeasure = correctiveMeasure; }
+    public String getShortTermMeasure() { return shortTermMeasure; }
+    public void setShortTermMeasure(String shortTermMeasure) { this.shortTermMeasure = shortTermMeasure; }
+    public String getLongTermMeasure() { return longTermMeasure; }
+    public void setLongTermMeasure(String longTermMeasure) { this.longTermMeasure = longTermMeasure; }
+    public Integer getCurrentSubmissionVersion() { return currentSubmissionVersion; }
+    public void setCurrentSubmissionVersion(Integer currentSubmissionVersion) { this.currentSubmissionVersion = currentSubmissionVersion; }
+    public Long getInspectionItemId() { return inspectionItemId; }
+    public void setInspectionItemId(Long inspectionItemId) { this.inspectionItemId = inspectionItemId; }
+    public Integer getLockVersion() { return lockVersion; }
+    public void setLockVersion(Integer lockVersion) { this.lockVersion = lockVersion; }
+    public String getRectifyRemark() { return rectifyRemark; }
+    public void setRectifyRemark(String rectifyRemark) { this.rectifyRemark = rectifyRemark; }
+    public String getReviewOpinion() { return reviewOpinion; }
+    public void setReviewOpinion(String reviewOpinion) { this.reviewOpinion = reviewOpinion; }
+    public LocalDateTime getSubmitTime() { return submitTime; }
+    public void setSubmitTime(LocalDateTime submitTime) { this.submitTime = submitTime; }
+    public LocalDateTime getCloseTime() { return closeTime; }
+    public void setCloseTime(LocalDateTime closeTime) { this.closeTime = closeTime; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+}

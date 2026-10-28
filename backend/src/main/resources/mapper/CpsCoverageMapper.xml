@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsCoverageMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsCoverageMapper">
 
     <!--
       共用过滤 SQL 片段（frequency 子查询展开）。

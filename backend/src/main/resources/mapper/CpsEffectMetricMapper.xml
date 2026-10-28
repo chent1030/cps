@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsEffectMetricMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsEffectMetricMapper">
 
     <!--
       FR-12 效果评估指标（波次11）：

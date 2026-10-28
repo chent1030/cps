@@ -1,0 +1,272 @@
+package com.catlbattery.app.service.cps;
+
+import com.catlbattery.infra.config.CpsAgentFrameworkProperties;
+import com.catlbattery.domain.entity.cps.CpsIssue;
+import com.catlbattery.domain.entity.cps.CpsIssueAttachment;
+import com.catlbattery.domain.entity.cps.CpsRectificationSubmission;
+import com.catlbattery.domain.entity.cps.dto.CpsIssueCreateRequest;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestTemplate;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+
+/**
+ * C-01/C-03 契约与 P0 附件转发回归：
+ * 新附件（content NULL、仅 object_key）经 resolver 流读取后必须以 base64 出现在 evidence 载荷中——
+ * 旧实现此处静默跳过导致线上无图巡检。
+ */
+class CpsAgentFrameworkClientTest {
+
+    private static final String BASE_URL = "http://python.test/api/v1";
+
+    private CpsAttachmentContentResolver contentResolver;
+    private RestTemplate restTemplate;
+    private MockRestServiceServer server;
+    private CpsAgentFrameworkClient client;
+
+    @BeforeEach
+    void setUp() {
+        contentResolver = mock(CpsAttachmentContentResolver.class);
+        restTemplate = new RestTemplate();
+        server = MockRestServiceServer.bindTo(restTemplate).build();
+        CpsAgentFrameworkProperties properties = new CpsAgentFrameworkProperties();
+        properties.setEnabled(true);
+        properties.setBaseUrl(BASE_URL);
+        properties.setTimeoutMs(2000);
+        client = new CpsAgentFrameworkClient(properties, contentResolver, restTemplate);
+    }
+
+    @Test
+    void runtimeStatusSendsNoAuthorizationHeader() {
+        // A：Java↔Python 内部 token 已删除，请求不应再带 Authorization。
+        server.expect(requestTo(BASE_URL + "/cps/metrics"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(headerDoesNotExist("Authorization"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        Map<String, Object> status = client.runtimeStatus();
+        assertEquals("ONLINE", status.get("state"));
+        server.verify();
+    }
+
+    @Test
+    void legacyCreateAndStartForwardsMinioAttachmentAsEvidence() {
+        CpsIssueAttachment attachment = new CpsIssueAttachment();
+        attachment.setId(9L);
+        attachment.setFileName("before.png");
+        attachment.setFileType("image/png");
+        // P0 断点场景：content 为 NULL，仅 object_key
+        attachment.setContent(null);
+        attachment.setFileUrl("cps/before-9.png");
+        when(contentResolver.resolve(attachment)).thenReturn("minio-bytes".getBytes(StandardCharsets.UTF_8));
+
+        server.expect(requestTo(BASE_URL + "/cps/inspections"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{\"id\":7,\"version\":1}", MediaType.APPLICATION_JSON));
+        // 关键断点回归：必须出现 evidence POST 且带 base64 内容（旧代码此处被静默跳过）
+        server.expect(requestTo(BASE_URL + "/cps/inspections/7/evidence"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.kind").value("before"))
+                .andExpect(jsonPath("$.content_base64")
+                        .value(Base64.getEncoder().encodeToString("minio-bytes".getBytes(StandardCharsets.UTF_8))))
+                .andRespond(withSuccess("{\"version\":2}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/cps/inspections/7/start"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        String inspectionId = client.createAndStart(1L, "E001", createRequest(),
+                Collections.singletonList(attachment));
+        assertEquals("7", inspectionId);
+        server.verify();
+    }
+
+    @Test
+    void resolverFailureAbortsCreateInsteadOfSilentSkip() {
+        CpsIssueAttachment attachment = new CpsIssueAttachment();
+        attachment.setId(9L);
+        attachment.setFileUrl("cps/missing.png");
+        attachment.setContent(null);
+        when(contentResolver.resolve(attachment)).thenThrow(new IllegalStateException("minio unavailable"));
+
+        server.expect(requestTo(BASE_URL + "/cps/inspections"))
+                .andRespond(withSuccess("{\"id\":7,\"version\":1}", MediaType.APPLICATION_JSON));
+
+        assertThrows(IllegalStateException.class,
+                () -> client.createAndStart(1L, "E001", createRequest(), Collections.singletonList(attachment)));
+        server.verify();
+    }
+
+    @Test
+    void triggerInitialReviewPostsFrozenContractPayloadWithUrls() {
+        // 波次7 J线（C7 冻结 schema，additionalProperties=false）：issue_id/submission_id/version_no 必填；
+        // 附件 AttachmentRef.url（file_url 落库即 MinIO 绝对 URL），file_url 缺失才回退 content_base64
+        CpsRectificationSubmission submission = submission();
+        CpsIssue issue = issue();
+        CpsIssueAttachment before = attachment(31L, "http://127.0.0.1:9000/cps-attachments/cps/before-1.png");
+        CpsIssueAttachment after = attachment(32L, "http://127.0.0.1:9000/cps-attachments/cps/after-1.png");
+
+        server.expect(requestTo(BASE_URL + "/agent/rectifications"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.issue_id").value("101"))
+                .andExpect(jsonPath("$.submission_id").value("55"))
+                .andExpect(jsonPath("$.version_no").value(2))
+                .andExpect(jsonPath("$.reason").value("root cause"))
+                .andExpect(jsonPath("$.short_term_measure").value("short"))
+                .andExpect(jsonPath("$.long_term_measure").value("long"))
+                .andExpect(jsonPath("$.before_attachments[0].attachment_id").value("31"))
+                .andExpect(jsonPath("$.before_attachments[0].url")
+                        .value("http://127.0.0.1:9000/cps-attachments/cps/before-1.png"))
+                .andExpect(jsonPath("$.before_attachments[0].object_key").doesNotExist())
+                .andExpect(jsonPath("$.before_attachments[0].file_name").value("before-1.png"))
+                .andExpect(jsonPath("$.after_attachments[0].url")
+                        .value("http://127.0.0.1:9000/cps-attachments/cps/after-1.png"))
+                .andExpect(jsonPath("$.issue_snapshot.issue_id").value("101"))
+                .andExpect(jsonPath("$.issue_snapshot.factory").value("F1"))
+                .andExpect(jsonPath("$.issue_snapshot.description").value("desc"))
+                .andExpect(jsonPath("$.idempotency_key").doesNotExist())
+                .andExpect(jsonPath("$.callback").doesNotExist())
+                .andExpect(jsonPath("$.responsible_emp_no").doesNotExist())
+                .andExpect(jsonPath("$.before_images").doesNotExist())
+                .andRespond(withSuccess("{\"review_task_ref\":\"rr-77\",\"task_id\":\"cps-rectify-101-v2\"}",
+                        MediaType.APPLICATION_JSON));
+
+        String reviewTaskRef = client.triggerInitialReview(submission, issue,
+                Collections.singletonList(before), Collections.singletonList(after));
+        assertEquals("rr-77", reviewTaskRef);
+        server.verify();
+    }
+
+    @Test
+    void triggerInitialReviewUsesUrlFieldForAbsoluteFileUrl() {
+        // C-01 新契约：file_url 已是 MinIO 绝对 URL → AttachmentRef.url；不再输出去 object_key。
+        String beforeUrl = "http://127.0.0.1:9000/cps-attachments/cps/before-1.png";
+        String afterUrl = "http://127.0.0.1:9000/cps-attachments/cps/after-1.png";
+        CpsIssueAttachment before = attachment(41L, beforeUrl);
+        CpsIssueAttachment after = attachment(42L, afterUrl);
+
+        server.expect(requestTo(BASE_URL + "/agent/rectifications"))
+                .andExpect(jsonPath("$.before_attachments[0].attachment_id").value("41"))
+                .andExpect(jsonPath("$.before_attachments[0].url").value(beforeUrl))
+                .andExpect(jsonPath("$.before_attachments[0].object_key").doesNotExist())
+                .andExpect(jsonPath("$.before_attachments[0].file_name").value("before-1.png"))
+                .andExpect(jsonPath("$.after_attachments[0].url").value(afterUrl))
+                .andExpect(jsonPath("$.after_attachments[0].object_key").doesNotExist())
+                .andExpect(jsonPath("$.after_attachments[0].content_base64").doesNotExist())
+                .andRespond(withSuccess("{\"review_task_ref\":\"rr-79\"}", MediaType.APPLICATION_JSON));
+
+        String reviewTaskRef = client.triggerInitialReview(submission(), issue(),
+                Collections.singletonList(before), Collections.singletonList(after));
+        assertEquals("rr-79", reviewTaskRef);
+        server.verify();
+    }
+
+    @Test
+    void triggerInitialReviewSkipsAttachmentWithoutUrl() {
+        // 附件只有 url 一种形态：没有 file_url 的行走不进载荷（Python 侧按「不判定」处理）
+        CpsIssueAttachment noUrl = attachment(33L, null);
+        server.expect(requestTo(BASE_URL + "/agent/rectifications"))
+                .andExpect(jsonPath("$.before_attachments").isEmpty())
+                .andExpect(jsonPath("$.after_attachments[0].url")
+                        .value("http://minio/cps-attachments/cps/after.png"))
+                .andRespond(withSuccess("{\"review_task_ref\":\"rr-78\"}", MediaType.APPLICATION_JSON));
+        String ref = client.triggerInitialReview(submission(), issue(),
+                Collections.singletonList(noUrl), Collections.singletonList(attachment(34L, "http://minio/cps-attachments/cps/after.png")));
+        assertEquals("rr-78", ref);
+        server.verify();
+    }
+
+    @Test
+    void triggerInitialReviewAcceptsTaskIdFieldAsRefFallback() {
+        server.expect(requestTo(BASE_URL + "/agent/rectifications"))
+                .andRespond(withSuccess("{\"task_id\":\"alt-48\"}", MediaType.APPLICATION_JSON));
+        String reviewTaskRef = client.triggerInitialReview(submission(), issue(), null, null);
+        assertEquals("alt-48", reviewTaskRef);
+        server.verify();
+    }
+
+    @Test
+    void initialReviewStatusQueriesRemoteRef() {
+        server.expect(requestTo(BASE_URL + "/agent/rectifications/rr-77"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("{\"state\":\"running\"}", MediaType.APPLICATION_JSON));
+        Map<String, Object> status = client.initialReviewStatus("rr-77");
+        assertEquals("running", status.get("state"));
+        server.verify();
+    }
+
+    @Test
+    void disabledClientSkipsDelivery() {
+        CpsAgentFrameworkProperties properties = new CpsAgentFrameworkProperties();
+        properties.setEnabled(false);
+        CpsAgentFrameworkClient disabled = new CpsAgentFrameworkClient(properties, contentResolver, restTemplate);
+        assertEquals(null, disabled.triggerInitialReview(submission(), issue(), null, null));
+        assertEquals(Boolean.FALSE, disabled.initialReviewStatus("rr-1").get("enabled"));
+        server.verify();
+    }
+
+    private CpsIssueCreateRequest createRequest() {
+        CpsIssueCreateRequest request = new CpsIssueCreateRequest();
+        request.setDescription("line defect");
+        request.setFactory("F1");
+        request.setArea("A1");
+        request.setLine("L1");
+        request.setProcess("P1");
+        request.setFeedbackEmpNo("E001");
+        return request;
+    }
+
+    private CpsRectificationSubmission submission() {
+        CpsRectificationSubmission submission = new CpsRectificationSubmission();
+        submission.setId(55L);
+        submission.setIssueId(101L);
+        submission.setVersionNo(2);
+        submission.setReason("root cause");
+        submission.setShortTermMeasure("short");
+        submission.setLongTermMeasure("long");
+        submission.setResponsibleEmpNo("E777");
+        return submission;
+    }
+
+    private CpsIssue issue() {
+        CpsIssue issue = new CpsIssue();
+        issue.setId(101L);
+        issue.setFactory("F1");
+        issue.setArea("A1");
+        issue.setLine("L1");
+        issue.setProcess("P1");
+        issue.setDescription("desc");
+        return issue;
+    }
+
+    private CpsIssueAttachment attachment(Long id, String fileUrl) {
+        CpsIssueAttachment attachment = new CpsIssueAttachment();
+        attachment.setId(id);
+        attachment.setFileName(fileUrl == null ? "no-url-" + id + ".png"
+                : fileUrl.substring(fileUrl.lastIndexOf('/') + 1));
+        attachment.setFileType("image/png");
+        attachment.setFileUrl(fileUrl);
+        attachment.setContent(null);
+        return attachment;
+    }
+}

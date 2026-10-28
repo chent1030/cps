@@ -271,14 +271,14 @@ const goRectify = () => {
   uni.redirectTo({ url: `/views/cps/InspectionRectifyView?recordId=${record.value.id}` })
 }
 
-/** 照片列表：本地缓冲优先，其次远端快照（photoObjectKey 逗号分隔） */
+/** 照片列表：本地缓冲优先，其次远端快照（photoUrl 逗号分隔） */
 const photoList = (item: CpsInspectionRecordItem): PhotoEntry[] => {
   const buffered = local[item.id]?.photos
   if (buffered) return buffered
-  if (!item.photoObjectKey) return []
-  const keys = item.photoObjectKey.split(',').filter(Boolean)
+  if (!item.photoUrl) return []
+  const urls = item.photoUrl.split(',').filter(Boolean)
   const names = (item.photoFileName ?? '').split(',').filter(Boolean)
-  return keys.map((k, i) => ({ url: k, name: names[i] ?? `照片${i + 1}` }))
+  return urls.map((url, i) => ({ url, name: names[i] ?? `照片${i + 1}` }))
 }
 
 /** 图片 src：绝对 URL 原样，历史 /api 代理路径补 base */
@@ -335,7 +335,7 @@ const uploadItemPhotos = async (
     const current = [...photoList(item)]
     for (const source of sources) {
       const uploaded = await cpsApi.uploadCpsAttachment(source)
-      // MinIO 之后 url 是可直接访问的绝对地址，原样落库为 photoObjectKey；仅旧后端回退 /content 拼法。
+      // MinIO 上传后 url 是可直接访问的绝对地址，原样落库为 photoUrl。
       current.push({ url: resolveUploadedPhotoUrl(uploaded), name: uploaded.name })
     }
     local[item.id] = { ...local[item.id], photos: current }
@@ -417,7 +417,7 @@ const persistItem = async (item: CpsInspectionRecordItem) => {
     await cpsApi.saveInspectionItemResult(item.id, {
       passResult: (local[item.id]?.passResult ?? item.passResult ?? null) as 'PASS' | 'FAIL' | null,
       textValue: local[item.id]?.textValue ?? item.textValue ?? null,
-      photoObjectKey: photos.length ? photos.map((p) => p.url).join(',') : null,
+      photoUrl: photos.length ? photos.map((p) => p.url).join(',') : null,
       photoFileName: photos.length ? photos.map((p) => p.name).join(',') : null,
       photoCount: photos.length,
     })
@@ -426,7 +426,7 @@ const persistItem = async (item: CpsInspectionRecordItem) => {
     if (saved?.passResult) item.passResult = saved.passResult as 'PASS' | 'FAIL'
     if (saved?.textValue != null) item.textValue = saved.textValue
     if (saved?.photos) {
-      item.photoObjectKey = saved.photos.map((p) => p.url).join(',')
+      item.photoUrl = saved.photos.map((p) => p.url).join(',')
       item.photoFileName = saved.photos.map((p) => p.name).join(',')
       item.photoCount = saved.photos.length
     }

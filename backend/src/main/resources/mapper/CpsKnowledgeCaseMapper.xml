@@ -2,25 +2,25 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsKnowledgeCaseMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsKnowledgeCaseMapper">
 
-    <select id="findEnabledById" resultType="com.company.cps.domain.CpsKnowledgeCase">
+    <select id="findEnabledById" resultType="com.catlbattery.domain.entity.cps.CpsKnowledgeCase">
         SELECT *
         FROM cps_knowledge_case
         WHERE id = #{id}
           AND enabled = 1
     </select>
 
-    <select id="findById" resultType="com.company.cps.domain.CpsKnowledgeCase">
+    <select id="findById" resultType="com.catlbattery.domain.entity.cps.CpsKnowledgeCase">
         SELECT *
         FROM cps_knowledge_case
         WHERE id = #{id}
     </select>
-    <select id="findByCategoryL2Id" resultType="com.company.cps.domain.CpsKnowledgeCase">
+    <select id="findByCategoryL2Id" resultType="com.catlbattery.domain.entity.cps.CpsKnowledgeCase">
         SELECT * FROM cps_knowledge_case WHERE category_l2_id = #{categoryL2Id} ORDER BY id ASC LIMIT 1
     </select>
 
-    <select id="findEnabledByIds" resultType="com.company.cps.domain.CpsKnowledgeCase">
+    <select id="findEnabledByIds" resultType="com.catlbattery.domain.entity.cps.CpsKnowledgeCase">
         SELECT *
         FROM cps_knowledge_case
         WHERE enabled = 1
@@ -30,7 +30,7 @@
           </foreach>
     </select>
 
-    <select id="findAll" resultType="com.company.cps.domain.CpsKnowledgeCase">
+    <select id="findAll" resultType="com.catlbattery.domain.entity.cps.CpsKnowledgeCase">
         SELECT *
         FROM cps_knowledge_case
         <where>
@@ -55,7 +55,7 @@
         </where>
     </sql>
 
-    <select id="findAdminPage" resultType="com.company.cps.domain.CpsKnowledgeCase">
+    <select id="findAdminPage" resultType="com.catlbattery.domain.entity.cps.CpsKnowledgeCase">
         SELECT kc.*, image.file_url AS image_url, image.reason, image.measure, image.milvus_vector_id, image.vector_retry_count, image.vector_updated_at, image.vector_status, image.vector_error_msg
         FROM cps_knowledge_case kc
         LEFT JOIN cps_knowledge_case_image image ON image.id = (SELECT MIN(i2.id) FROM cps_knowledge_case_image i2 WHERE i2.case_id = kc.id)
@@ -64,7 +64,7 @@
         LIMIT #{limit} OFFSET #{offset}
     </select>
 
-    <select id="findAdminExport" resultType="com.company.cps.domain.CpsKnowledgeCase">
+    <select id="findAdminExport" resultType="com.catlbattery.domain.entity.cps.CpsKnowledgeCase">
         SELECT kc.*, image.file_url AS image_url, image.reason, image.measure, image.milvus_vector_id, image.vector_retry_count, image.vector_updated_at, image.vector_status, image.vector_error_msg
         FROM cps_knowledge_case kc
         LEFT JOIN cps_knowledge_case_image image ON image.id = (SELECT MIN(i2.id) FROM cps_knowledge_case_image i2 WHERE i2.case_id = kc.id)
@@ -79,7 +79,7 @@
         <include refid="adminFilter"/>
     </select>
 
-    <insert id="upsert" parameterType="com.company.cps.domain.CpsKnowledgeCase" useGeneratedKeys="true" keyProperty="id">
+    <insert id="upsert" parameterType="com.catlbattery.domain.entity.cps.CpsKnowledgeCase" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_knowledge_case (
             id,
             category_l1_id,

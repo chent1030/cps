@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsInventoryTxnMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsInventoryTxnMapper">
 
-    <insert id="insert" parameterType="com.company.cps.domain.CpsInventoryTxn" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsInventoryTxn" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_inventory_txn (
             item_id, txn_type, qty, before_qty, after_qty, unit,
             operator_emp_no, operator_name, remark
@@ -14,7 +14,7 @@
         )
     </insert>
 
-    <select id="page" resultType="com.company.cps.domain.CpsInventoryTxn">
+    <select id="page" resultType="com.catlbattery.domain.entity.cps.CpsInventoryTxn">
         SELECT t.id, t.item_id, t.txn_type, t.qty, t.before_qty, t.after_qty, t.unit,
                t.operator_emp_no, t.operator_name, t.remark, t.created_at,
                i.item_code, i.item_name

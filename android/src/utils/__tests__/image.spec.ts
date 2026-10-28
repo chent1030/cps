@@ -20,7 +20,7 @@ describe('resolveAssetUrl（绝对 URL 优先）', () => {
     expect(resolveAssetUrl('/api/cps/attachments/7/content')).toBe('/api/cps/attachments/7/content')
   })
 
-  it('裸对象键与空值不做拼装', () => {
+  it('非 URL 相对路径与空值不做拼装', () => {
     expect(resolveAssetUrl('cps/xxx.jpg')).toBe('cps/xxx.jpg')
     expect(resolveAssetUrl('')).toBe('')
     expect(resolveAssetUrl('   ')).toBe('')

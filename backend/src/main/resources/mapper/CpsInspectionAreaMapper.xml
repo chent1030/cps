@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.cps.mapper.CpsInspectionAreaMapper">
+<mapper namespace="com.catlbattery.infra.mapper.cps.CpsInspectionAreaMapper">
 
     <sql id="BaseColumns">
         id, area_code, type_code, area_name, factory, area, line_or_room_type, process,
@@ -8,7 +8,7 @@
         remark, enabled, source_room_id, created_by, updated_by, created_at, updated_at
     </sql>
 
-    <insert id="insert" parameterType="com.company.cps.domain.CpsInspectionArea" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.catlbattery.domain.entity.cps.CpsInspectionArea" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_inspection_area (
             area_code, type_code, area_name, factory, area, line_or_room_type, process,
             building, door_no, risk_level, keeper_emp_no, keeper_emp_name, check_item_ids,
@@ -20,7 +20,7 @@
         )
     </insert>
 
-    <update id="update" parameterType="com.company.cps.domain.CpsInspectionArea">
+    <update id="update" parameterType="com.catlbattery.domain.entity.cps.CpsInspectionArea">
         UPDATE cps_inspection_area
         SET type_code = #{typeCode},
             area_name = #{areaName},
@@ -40,15 +40,15 @@
         WHERE id = #{id}
     </update>
 
-    <select id="findById" resultType="com.company.cps.domain.CpsInspectionArea">
+    <select id="findById" resultType="com.catlbattery.domain.entity.cps.CpsInspectionArea">
         SELECT <include refid="BaseColumns" /> FROM cps_inspection_area WHERE id = #{id}
     </select>
 
-    <select id="findByCode" resultType="com.company.cps.domain.CpsInspectionArea">
+    <select id="findByCode" resultType="com.catlbattery.domain.entity.cps.CpsInspectionArea">
         SELECT <include refid="BaseColumns" /> FROM cps_inspection_area WHERE area_code = #{areaCode}
     </select>
 
-    <select id="findPage" resultType="com.company.cps.domain.CpsInspectionArea">
+    <select id="findPage" resultType="com.catlbattery.domain.entity.cps.CpsInspectionArea">
         SELECT <include refid="BaseColumns" />
         FROM cps_inspection_area
         <where>
@@ -81,7 +81,7 @@
         </where>
     </select>
 
-    <select id="listEnabledByType" resultType="com.company.cps.domain.CpsInspectionArea">
+    <select id="listEnabledByType" resultType="com.catlbattery.domain.entity.cps.CpsInspectionArea">
         SELECT <include refid="BaseColumns" />
         FROM cps_inspection_area
         WHERE type_code = #{typeCode} AND enabled = 1
