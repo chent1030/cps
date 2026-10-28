@@ -13,12 +13,13 @@
     </view>
 
     <view class="u-card u-card--pad-none cps-tabs-card">
-      <view class="u-tabs cps-list-tabs">
+      <view class="u-tabs cps-list-tabs" :style="tabBarStyle">
         <view
           v-for="item in tabs"
           :key="item.value"
           class="u-tabs__item cps-tab"
           :class="{ 'u-tabs__item--active': tab === item.value }"
+          :style="tabItemStyle"
           @click="tab = item.value"
         >
           <text class="cps-tab__label">{{ item.label }}</text>
@@ -268,6 +269,21 @@ const restoreDraft = (id: number) => {
 
 const resumeRecord = (id: number) => {
   uni.navigateTo({ url: `/views/cps/InspectionExecuteView?recordId=${id}` })
+}
+
+// App 端（app-vue）里 uni-view 的默认布局与 scoped 样式的命中都不稳定，
+// 页签横排再用内联样式兜底一次，保证任何环境下都是横向排列。
+const tabBarStyle = {
+  display: 'flex',
+  flexDirection: 'row' as const,
+  flexWrap: 'nowrap' as const,
+  alignItems: 'center' as const,
+}
+const tabItemStyle = {
+  display: 'inline-flex',
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+  flex: 'none' as const,
 }
 
 watch(tab, () => {
