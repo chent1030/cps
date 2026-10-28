@@ -24,9 +24,10 @@ import java.util.Map;
 /**
  * 非 CPS 巡检提交时的 AI 初审（C-04 视觉判定，Python /api/v1/agent/room-checks/judge）。
  *
- * <p>与 {@link CpsRoomCheckJudgeClient} 同一 Python 契约（单 item 一次调用、snake_case、
- * 照片绝对 URL 走 photo_urls / 裸对象键走 photo_object_keys），
+ * <p>与 {@link CpsRoomCheckJudgeClient} 同一 Python 契约（单 item 一次调用、snake_case），
  * 区别只在主体是 {@code cps_inspection_record}（统一巡检记录）而非辅房点检记录。
+ * 照片：{@code cps_inspection_record_item.photo_object_key} 落库的就是 MinIO 绝对 URL，
+ * 原样放进 {@code photo_urls}，不再做对象键/URL 判定。
  * 扣分策略仍在 Java：判定 FAIL 的项按其 deduct_score 扣分，得分 = max(0, 100 - Σ扣分)。
  *
  * <p>降级约定：服务未启用 / item 无照片 / 调用失败 / 非 JUDGED ⇒ 该项 PENDING（不伪造判定），
@@ -104,11 +105,8 @@ public class CpsInspectionJudgeClient {
         payload.put("attempt", attempt);
         payload.put("item_content", item.getContent());
         payload.put("item_type", item.getCheckTypes() == null ? "PHOTO" : item.getCheckTypes());
-        // C-04 照片二选一：绝对 URL 走 photo_urls，历史裸对象键走 photo_object_keys（恰有一个非空）。
-        String photo = item.getPhotoObjectKey().trim();
-        boolean photoIsUrl = MinioStorageService.isAbsoluteUrl(photo);
-        payload.put("photo_urls", photoIsUrl ? List.of(photo) : List.of());
-        payload.put("photo_object_keys", photoIsUrl ? List.of() : List.of(photo));
+        // 落库即完整图片地址（MinIO 绝对 URL），直接作为 photo_urls 下发。
+        payload.put("photo_urls", List.of(item.getPhotoObjectKey().trim()));
         payload.put("deduction", item.getDeductScore());
         payload.put("config_version", item.getConfigVersion() == null ? null : String.valueOf(item.getConfigVersion()));
         payload.put("room_name", nameOf(record));

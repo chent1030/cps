@@ -97,8 +97,8 @@ public class CpsAgentFrameworkClient {
      * C-01：触发整改初审（事务提交后投递，POST {base}/agent/rectifications）。
      * 波次7 J线（C7 冻结 schema，additionalProperties=false）：必填 issue_id/submission_id/version_no；
      * 可选 reason/short_term_measure/long_term_measure/before_attachments/after_attachments/issue_snapshot。
-     * 附件走 AttachmentRef：file_url 为 MinIO 绝对 URL 时用 url 字段，历史裸对象键时用 object_key
-     * （Python 自取流，避免大图 base64 内联——联调清单④同口径）；幂等 task_ref 由 Python 派生（cps-rectify-{issue_id}-v{version_no}）；
+     * 附件走 AttachmentRef.url（file_url 落库即 MinIO 绝对 URL，Python 侧按 URL 自取流，
+     * 避免大图 base64 内联——联调清单④同口径）；幂等 task_ref 由 Python 派生（cps-rectify-{issue_id}-v{version_no}）；
      * 回调地址由 Python 配置（JavaCallbackConfig base_url + 固定 path），不经请求体传递。
      *
      * @return review_task_ref（Python 侧初审任务引用；client 禁用时返回 null 不投递）
@@ -198,8 +198,8 @@ public class CpsAgentFrameworkClient {
 
     /**
      * C-01 附件引用（AttachmentRef，additionalProperties=false）：
-     * file_url 是 MinIO 绝对 URL → 用 url 字段；历史裸对象键 → 用 object_key 字段（老行为）；
-     * 两者都没有时回退 content_base64（经 contentResolver 读流）。
+     * file_url 落库即 MinIO 绝对 URL → 用 url 字段；
+     * file_url 缺失时回退 content_base64（经 contentResolver 读流）。
      */
     private List<Map<String, Object>> attachmentRefs(List<CpsIssueAttachment> images) {
         List<Map<String, Object>> payloads = new ArrayList<>();
@@ -210,7 +210,7 @@ public class CpsAgentFrameworkClient {
             item.put("attachment_id", image.getId() == null ? null : String.valueOf(image.getId()));
             item.put("file_name", image.getFileName());
             if (image.getFileUrl() != null && !image.getFileUrl().trim().isEmpty()) {
-                item.put(attachmentRefField(image.getFileUrl()), image.getFileUrl().trim());
+                item.put("url", image.getFileUrl().trim());
             } else {
                 byte[] content = contentResolver.resolve(image);
                 if (content == null || content.length == 0) continue;
@@ -221,13 +221,6 @@ public class CpsAgentFrameworkClient {
         return payloads;
     }
 
-    /**
-     * C-01 附件引用字段名：file_url 已是绝对 URL（MinIO 公开地址）→ {@code url}；
-     * 历史裸对象键 → {@code object_key}。巡检整改 before_refs 复用同一判定。
-     */
-    public static String attachmentRefField(String fileUrl) {
-        return MinioStorageService.isAbsoluteUrl(fileUrl) ? "url" : "object_key";
-    }
 
     /** C-03：查询 Python 侧初审执行状态（GET {base}/api/agent/rectifications/{ref}）；三态由 Java 判定。 */
     public Map<String, Object> initialReviewStatus(String reviewTaskRef) {

@@ -200,7 +200,7 @@ public class CpsRoomCheckService {
         return toResponse(requireRecord(recordId));
     }
 
-    /** 照片上传：关联 MinIO object_key（对齐 A1 附件机制），首张照片推进 IN_PROGRESS。 */
+    /** 照片上传：落 MinIO 并把**可访问的绝对 URL**写进 photo_object_key，首张照片推进 IN_PROGRESS。 */
     public CpsRoomCheckRecordResponse uploadPhoto(Long recordId, Long itemId, MultipartFile file, String empNo) {
         CpsRoomCheckRecord record = requireRecord(recordId);
         requireOwner(record, empNo);
@@ -221,7 +221,7 @@ public class CpsRoomCheckService {
         } catch (Exception error) {
             throw new IllegalStateException("Unable to store room check photo in MinIO", error);
         }
-        itemMapper.updatePhoto(itemId, objectKey, fileName);
+        itemMapper.updatePhoto(itemId, storage.publicObjectUrl(objectKey), fileName);
         if (CpsRoomCheckRecordStatus.PENDING.name().equals(record.getRecordStatus())) {
             recordMapper.updateStatusFields(recordId, CpsRoomCheckRecordStatus.IN_PROGRESS.name(), LocalDateTime.now());
         }

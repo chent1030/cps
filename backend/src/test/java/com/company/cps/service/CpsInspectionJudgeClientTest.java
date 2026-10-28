@@ -68,7 +68,8 @@ class CpsInspectionJudgeClientTest {
     void judgedPassAndFailAreAdopted() {
         server.expect(requestTo(URL))
                 .andExpect(method(HttpMethod.POST))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"photo_object_keys\":[\"cps/ok.jpg\"]")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "\"photo_urls\":[\"http://127.0.0.1:9000/cps-attachments/cps/ok.jpg\"]")))
                 .andRespond(withSuccess("{\"status\":\"JUDGED\",\"verdict\":\"PASS\",\"reason\":\"照片干净\"}",
                         MediaType.APPLICATION_JSON));
         server.expect(requestTo(URL))
@@ -77,7 +78,9 @@ class CpsInspectionJudgeClientTest {
                         MediaType.APPLICATION_JSON));
 
         List<CpsInspectionJudgeClient.ItemJudge> results = client.judge(record(),
-                Arrays.asList(photoItem(1L, "cps/ok.jpg"), photoItem(2L, "cps/bad.jpg")), 1);
+                Arrays.asList(
+                        photoItem(1L, "http://127.0.0.1:9000/cps-attachments/cps/ok.jpg"),
+                        photoItem(2L, "http://127.0.0.1:9000/cps-attachments/cps/bad.jpg")), 1);
 
         assertEquals(2, results.size());
         assertEquals("PASS", results.get(0).outcome);
@@ -87,13 +90,14 @@ class CpsInspectionJudgeClientTest {
     }
 
     @Test
-    void absolutePhotoUrlGoesToPhotoUrlsField() {
-        // C-04 新契约：绝对 URL → photo_urls，photo_object_keys 为空数组。
+    void photoUrlIsForwardedAsIs() {
+        // 落库即 MinIO 绝对 URL → 原样放进 photo_urls，不再有 photo_object_keys 分支。
         String url = "http://127.0.0.1:9000/cps-attachments/cps/abs.jpg";
         server.expect(requestTo(URL))
                 .andExpect(method(HttpMethod.POST))
-                .andExpect(content().json("{\"photo_urls\":[\"" + url + "\"],"
-                        + "\"photo_object_keys\":[]}", false))
+                .andExpect(content().json("{\"photo_urls\":[\"" + url + "\"]}", false))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("photo_object_keys"))))
                 .andRespond(withSuccess("{\"status\":\"JUDGED\",\"verdict\":\"PASS\"}",
                         MediaType.APPLICATION_JSON));
 

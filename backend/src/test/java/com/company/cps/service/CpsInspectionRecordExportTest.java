@@ -48,7 +48,6 @@ class CpsInspectionRecordExportTest {
     @Mock private CpsIssueAttachmentMapper attachmentMapper;
     @Mock private CpsInspectionJudgeClient judgeClient;
     @Mock private CpsAgentFrameworkClient agentClient;
-    @Mock private MinioStorageService minioStorageService;
 
     @InjectMocks private CpsInspectionRecordService service;
 
@@ -59,12 +58,10 @@ class CpsInspectionRecordExportTest {
         type.setName("辅房点检");
         when(typeMapper.findByCode("ROOM_CHECK")).thenReturn(type);
 
-        CpsIssueAttachment legacyKey = new CpsIssueAttachment();
-        legacyKey.setId(11L);
-        legacyKey.setFileUrl("cps/a.png");
-        when(attachmentMapper.findById(11L)).thenReturn(Optional.of(legacyKey));
-        when(minioStorageService.publicObjectUrl("cps/a.png"))
-                .thenReturn("http://127.0.0.1:9000/cps-attachments/cps/a.png");
+        CpsIssueAttachment photo = new CpsIssueAttachment();
+        photo.setId(11L);
+        photo.setFileUrl("http://127.0.0.1:9000/cps-attachments/cps/a.png");
+        when(attachmentMapper.findById(11L)).thenReturn(Optional.of(photo));
         when(attachmentMapper.findById(12L)).thenReturn(Optional.empty());
     }
 

@@ -117,13 +117,13 @@ class CpsAgentFrameworkClientTest {
     }
 
     @Test
-    void triggerInitialReviewPostsFrozenContractPayloadWithObjectKeys() {
+    void triggerInitialReviewPostsFrozenContractPayloadWithUrls() {
         // 波次7 J线（C7 冻结 schema，additionalProperties=false）：issue_id/submission_id/version_no 必填；
-        // 附件 AttachmentRef.object_key 优先（file_url 即 MinIO key），无 object_key 才回退 content_base64
+        // 附件 AttachmentRef.url（file_url 落库即 MinIO 绝对 URL），file_url 缺失才回退 content_base64
         CpsRectificationSubmission submission = submission();
         CpsIssue issue = issue();
-        CpsIssueAttachment before = attachment(31L, "cps/before-1.png");
-        CpsIssueAttachment after = attachment(32L, "cps/after-1.png");
+        CpsIssueAttachment before = attachment(31L, "http://127.0.0.1:9000/cps-attachments/cps/before-1.png");
+        CpsIssueAttachment after = attachment(32L, "http://127.0.0.1:9000/cps-attachments/cps/after-1.png");
 
         server.expect(requestTo(BASE_URL + "/agent/rectifications"))
                 .andExpect(method(HttpMethod.POST))
@@ -135,9 +135,12 @@ class CpsAgentFrameworkClientTest {
                 .andExpect(jsonPath("$.short_term_measure").value("short"))
                 .andExpect(jsonPath("$.long_term_measure").value("long"))
                 .andExpect(jsonPath("$.before_attachments[0].attachment_id").value("31"))
-                .andExpect(jsonPath("$.before_attachments[0].object_key").value("cps/before-1.png"))
+                .andExpect(jsonPath("$.before_attachments[0].url")
+                        .value("http://127.0.0.1:9000/cps-attachments/cps/before-1.png"))
+                .andExpect(jsonPath("$.before_attachments[0].object_key").doesNotExist())
                 .andExpect(jsonPath("$.before_attachments[0].file_name").value("before-1.png"))
-                .andExpect(jsonPath("$.after_attachments[0].object_key").value("cps/after-1.png"))
+                .andExpect(jsonPath("$.after_attachments[0].url")
+                        .value("http://127.0.0.1:9000/cps-attachments/cps/after-1.png"))
                 .andExpect(jsonPath("$.issue_snapshot.issue_id").value("101"))
                 .andExpect(jsonPath("$.issue_snapshot.factory").value("F1"))
                 .andExpect(jsonPath("$.issue_snapshot.description").value("desc"))
@@ -179,12 +182,13 @@ class CpsAgentFrameworkClientTest {
     }
 
     @Test
-    void triggerInitialReviewFallsBackToBase64WhenObjectKeyMissing() {
+    void triggerInitialReviewFallsBackToBase64WhenFileUrlMissing() {
         CpsIssueAttachment legacy = attachment(33L, null);
         when(contentResolver.resolve(legacy)).thenReturn("legacy-img".getBytes(StandardCharsets.UTF_8));
         server.expect(requestTo(BASE_URL + "/agent/rectifications"))
                 .andExpect(jsonPath("$.before_attachments[0].content_base64")
                         .value(Base64.getEncoder().encodeToString("legacy-img".getBytes(StandardCharsets.UTF_8))))
+                .andExpect(jsonPath("$.before_attachments[0].url").doesNotExist())
                 .andExpect(jsonPath("$.before_attachments[0].object_key").doesNotExist())
                 .andRespond(withSuccess("{\"review_task_ref\":\"rr-78\"}", MediaType.APPLICATION_JSON));
         String ref = client.triggerInitialReview(submission(), issue(),
