@@ -8,6 +8,7 @@
         SELECT *
         FROM cps_problem_category
         WHERE enabled = 1
+          AND deleted = 0
           AND parent_id = COALESCE(#{parentId}, 0)
         ORDER BY sort_no ASC, id ASC
     </select>
@@ -15,7 +16,7 @@
     <select id="findAll" resultType="com.company.cps.domain.CpsProblemCategory">
         SELECT *
         FROM cps_problem_category
-        WHERE 1 = 1
+        WHERE deleted = 0
         <if test="parentId != null">
           AND parent_id = #{parentId}
         </if>
@@ -30,6 +31,7 @@
 
     <sql id="adminFilter">
         <where>
+            AND deleted = 0
             <if test="allLevels != true and parentId != null">
                 AND parent_id = #{parentId}
             </if>
@@ -72,6 +74,7 @@
                category_name AS label
         FROM cps_problem_category
         WHERE enabled = 1
+          AND deleted = 0
           AND parent_id = COALESCE(#{parentId}, 0)
         ORDER BY sort_no ASC, id ASC
     </select>
@@ -80,15 +83,25 @@
         SELECT *
         FROM cps_problem_category
         WHERE id = #{id}
+          AND deleted = 0
+    </select>
+
+    <!-- 新建分类时先查同名（含已软删除的）：命中软删除的就复用该行，历史引用不断链 -->
+    <select id="findAnyByParentAndName" resultType="com.company.cps.domain.CpsProblemCategory">
+        SELECT *
+        FROM cps_problem_category
+        WHERE parent_id = #{parentId}
+          AND category_name = #{categoryName}
+        LIMIT 1
     </select>
 
     <insert id="upsert" parameterType="com.company.cps.domain.CpsProblemCategory" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cps_problem_category (
           id, parent_id, category_level, category_name,
-          sort_no, enabled, created_by, updated_by
+          sort_no, enabled, deleted, created_by, updated_by
         ) VALUES (
           #{id}, #{parentId}, #{categoryLevel}, #{categoryName},
-          #{sortNo}, #{enabled}, #{createdBy}, #{updatedBy}
+          #{sortNo}, #{enabled}, 0, #{createdBy}, #{updatedBy}
         )
         ON DUPLICATE KEY UPDATE
           parent_id = VALUES(parent_id),
@@ -96,6 +109,7 @@
           category_name = VALUES(category_name),
           sort_no = VALUES(sort_no),
           enabled = VALUES(enabled),
+          deleted = 0,
           updated_by = VALUES(updated_by)
     </insert>
 
@@ -104,28 +118,21 @@
         SET enabled = #{enabled},
             updated_by = #{updatedBy}
         WHERE id = #{id}
+          AND deleted = 0
     </update>
 
-    <delete id="deleteById">
-        DELETE FROM cps_problem_category WHERE id = #{id}
-    </delete>
+    <!-- 软删除：只打标记，历史问题/案例仍能按 ID 关联到分类名 -->
+    <update id="softDelete">
+        UPDATE cps_problem_category
+        SET deleted = 1,
+            enabled = 0,
+            updated_by = #{updatedBy}
+        WHERE id = #{id}
+          AND deleted = 0
+    </update>
 
     <select id="countChildren" resultType="long">
-        SELECT COUNT(*) FROM cps_problem_category WHERE parent_id = #{id}
-    </select>
-
-    <!-- 历史引用：问题、知识案例、AI 建议与匹配结果都把分类 ID 落库，删掉分类会丢失这些记录的分类信息 -->
-    <select id="countReferences" resultType="long">
-        SELECT
-            (SELECT COUNT(*) FROM cps_issue
-              WHERE category_l1_id = #{id} OR category_l2_id = #{id})
-          + (SELECT COUNT(*) FROM cps_knowledge_case
-              WHERE category_l1_id = #{id} OR category_l2_id = #{id})
-          + (SELECT COUNT(*) FROM cps_issue_ai_match
-              WHERE ai_category_l1_id = #{id} OR ai_category_l2_id = #{id}
-                 OR confirmed_category_l1_id = #{id} OR confirmed_category_l2_id = #{id})
-          + (SELECT COUNT(*) FROM cps_issue_ai_suggestion
-              WHERE ai_category_l1_id = #{id} OR ai_category_l2_id = #{id})
+        SELECT COUNT(*) FROM cps_problem_category WHERE parent_id = #{id} AND deleted = 0
     </select>
 
 </mapper>

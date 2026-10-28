@@ -9,6 +9,7 @@ public class CpsProblemCategory {
     private String categoryName;
     private Integer sortNo;
     private Boolean enabled;
+    private Boolean deleted;
     private String createdBy;
     private String updatedBy;
     private LocalDateTime createdAt;
@@ -26,6 +27,8 @@ public class CpsProblemCategory {
     public void setSortNo(Integer sortNo) { this.sortNo = sortNo; }
     public Boolean getEnabled() { return enabled; }
     public void setEnabled(Boolean enabled) { this.enabled = enabled; }
+    public Boolean getDeleted() { return deleted; }
+    public void setDeleted(Boolean deleted) { this.deleted = deleted; }
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
     public String getUpdatedBy() { return updatedBy; }

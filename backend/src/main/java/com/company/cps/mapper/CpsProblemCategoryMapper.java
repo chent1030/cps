@@ -43,15 +43,17 @@ public interface CpsProblemCategoryMapper {
 
     Optional<CpsProblemCategory> findById(@Param("id") Long id);
 
+    /** 按父级 + 名称查（含已软删除的），用于新建时复用被删过的同名分类。 */
+    Optional<CpsProblemCategory> findAnyByParentAndName(@Param("parentId") Long parentId,
+                                                       @Param("categoryName") String categoryName);
+
     int upsert(CpsProblemCategory category);
 
     int setEnabled(@Param("id") Long id, @Param("enabled") Boolean enabled, @Param("updatedBy") String updatedBy);
 
-    int deleteById(@Param("id") Long id);
+    /** 软删除：deleted=1，历史数据仍按 ID 关联到分类名。 */
+    int softDelete(@Param("id") Long id, @Param("updatedBy") String updatedBy);
 
-    /** 下级分类数量：一级分类还有子分类时不允许删除。 */
+    /** 未删除的下级分类数量：还有子分类时不允许删除。 */
     long countChildren(@Param("id") Long id);
-
-    /** 历史业务引用数量（问题/知识案例/AI 建议与匹配）：被引用过的分类不允许删除。 */
-    long countReferences(@Param("id") Long id);
 }

@@ -123,7 +123,7 @@ export function CategoriesPage() {
         ? <Tooltip content="停用后才能删除"><Button type="text" size="small" status="danger" disabled icon={<IconDelete />}>删除</Button></Tooltip>
         : <Popconfirm
             title={`删除分类「${item.categoryName}」？`}
-            content="删除后不可恢复；已被问题或案例引用的分类不允许删除。"
+            content="删除后不再出现在新增与筛选选项中，历史问题仍显示该分类名称；之后用同名新建会复用这条分类。"
             onOk={() => void remove(item)}
           >
             <Button type="text" size="small" status="danger" icon={<IconDelete />}>删除</Button>

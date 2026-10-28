@@ -144,6 +144,18 @@ public class CpsMasterDataService {
         category.setEnabled(request.getEnabled() == null ? Boolean.TRUE : request.getEnabled());
         category.setCreatedBy(currentEmpNo);
         category.setUpdatedBy(currentEmpNo);
+        if (category.getId() == null) {
+            // 同名分类可能只是被软删除过：复用那一行，历史问题/案例的关联不会断
+            CpsProblemCategory existing = categoryMapper
+                    .findAnyByParentAndName(category.getParentId(), category.getCategoryName())
+                    .orElse(null);
+            if (existing != null) {
+                if (!Boolean.TRUE.equals(existing.getDeleted())) {
+                    throw new IllegalArgumentException("该父级下已存在同名分类：" + category.getCategoryName());
+                }
+                category.setId(existing.getId());
+            }
+        }
         categoryMapper.upsert(category);
         return category;
     }
@@ -159,8 +171,10 @@ public class CpsMasterDataService {
     }
 
     /**
-     * 删除问题分类。三条护栏：必须已停用、不能还有下级分类、不能被历史业务数据引用。
-     * 历史问题/知识案例只存分类 ID，删掉分类会让它们的分类信息变成空值，因此这类分类只能停用不能删除。
+     * 软删除问题分类：必须已停用，且没有未删除的下级分类。
+     *
+     * <p>只打删除标记，不物理删除：分类不再出现在新增/筛选选项里，历史问题与知识案例仍按 ID
+     * 关联到它、名称照常显示；同名分类再次新建时复用这一行，历史关联自动恢复。
      */
     @Transactional
     public void deleteCategory(Long id, String currentEmpNo) {
@@ -174,15 +188,11 @@ public class CpsMasterDataService {
         if (children > 0) {
             throw new IllegalArgumentException("该分类下还有 " + children + " 个下级分类，请先删除下级分类");
         }
-        long references = categoryMapper.countReferences(id);
-        if (references > 0) {
-            throw new IllegalArgumentException("该分类已被 " + references + " 条历史数据引用，删除会丢失这些问题/案例的分类信息，请保留该分类（可继续停用）");
-        }
-        if (categoryMapper.deleteById(id) != 1) {
+        if (categoryMapper.softDelete(id, currentEmpNo) != 1) {
             throw new IllegalArgumentException("分类不存在: " + id);
         }
         auditLogService.record(currentEmpNo, null, "CATEGORY_DELETE", "MASTER_DATA", String.valueOf(id),
-                "分类：" + category.getCategoryName(), null, null, "SUCCESS", null);
+                "分类（软删除）：" + category.getCategoryName(), null, null, "SUCCESS", null);
     }
 
     public List<CpsAreaPersonConfig> listAreaPersonConfigs(String factory, String area, Boolean enabled) {
