@@ -10,6 +10,7 @@ import com.company.cps.dto.CpsEnabledRequest;
 import com.company.cps.dto.CpsAdminPageResponse;
 import com.company.cps.service.CpsMasterDataService;
 import com.company.cps.support.CpsExcelWriter;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -117,6 +118,20 @@ public class CpsMasterAdminController {
             @RequestBody CpsEnabledRequest request
     ) {
         masterDataService.setCategoryEnabled(id, request.getEnabled(), resolveCurrentEmpNo(request.getEmpNo()));
+    }
+
+    /**
+     * 删除问题分类：仅允许删除已停用、无下级分类且未被历史数据引用的分类。
+     */
+    @DeleteMapping("/categories/{id}")
+    public Map<String, Object> deleteCategory(
+            @PathVariable Long id,
+            @RequestParam(required = false) String empNo
+    ) {
+        masterDataService.deleteCategory(id, resolveCurrentEmpNo(empNo));
+        Map<String, Object> body = new HashMap<>();
+        body.put("ok", true);
+        return body;
     }
 
     /**

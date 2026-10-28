@@ -46,4 +46,12 @@ public interface CpsProblemCategoryMapper {
     int upsert(CpsProblemCategory category);
 
     int setEnabled(@Param("id") Long id, @Param("enabled") Boolean enabled, @Param("updatedBy") String updatedBy);
+
+    int deleteById(@Param("id") Long id);
+
+    /** 下级分类数量：一级分类还有子分类时不允许删除。 */
+    long countChildren(@Param("id") Long id);
+
+    /** 历史业务引用数量（问题/知识案例/AI 建议与匹配）：被引用过的分类不允许删除。 */
+    long countReferences(@Param("id") Long id);
 }

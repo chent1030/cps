@@ -1,6 +1,6 @@
-import { Button, Card, Empty, Form, Input, Message, Modal, Pagination, Select, Space, Spin, Table } from '@arco-design/web-react'
+import { Button, Card, Empty, Form, Input, Message, Modal, Pagination, Popconfirm, Select, Space, Spin, Table, Tooltip } from '@arco-design/web-react'
 import type { TableColumnProps } from '@arco-design/web-react'
-import { IconDownload, IconEdit, IconFilter, IconPlus } from '@arco-design/web-react/icon'
+import { IconDelete, IconDownload, IconEdit, IconFilter, IconPlus } from '@arco-design/web-react/icon'
 import { useState } from 'react'
 import { api } from '../api'
 import { Enabled, PageHead, StatePanel, Toggle } from '../components/PageParts'
@@ -86,6 +86,17 @@ export function CategoriesPage() {
     }
   }
 
+  async function remove(item: Category) {
+    try {
+      await api.deleteCategory(item.id)
+      Message.success('分类已删除')
+      setChildrenByParent({})
+      await Promise.all([remote.refresh(), parents.refresh()])
+    } catch (error) {
+      Message.error(errorMessage(error))
+    }
+  }
+
   async function exportRows() {
     setExporting(true)
     try {
@@ -105,7 +116,19 @@ export function CategoriesPage() {
     },
     { title: '层级', width: 130, render: (_, item) => isPrimary(item) ? '一级分类' : '二级分类' },
     { title: '状态', width: 110, render: (_, item) => <Enabled value={item.enabled} /> },
-    { title: '操作', width: 156, align: 'right', render: (_, item) => <Space size={4}><Button type="text" size="small" icon={<IconEdit />} onClick={(event) => { event.stopPropagation(); openEdit(item) }}>编辑</Button><Toggle value={item.enabled} onClick={() => void toggle(item)} /></Space> },
+    { title: '操作', width: 220, align: 'right', render: (_, item) => <Space size={4}>
+      <Button type="text" size="small" icon={<IconEdit />} onClick={(event) => { event.stopPropagation(); openEdit(item) }}>编辑</Button>
+      <Toggle value={item.enabled} onClick={() => void toggle(item)} />
+      {item.enabled
+        ? <Tooltip content="停用后才能删除"><Button type="text" size="small" status="danger" disabled icon={<IconDelete />}>删除</Button></Tooltip>
+        : <Popconfirm
+            title={`删除分类「${item.categoryName}」？`}
+            content="删除后不可恢复；已被问题或案例引用的分类不允许删除。"
+            onOk={() => void remove(item)}
+          >
+            <Button type="text" size="small" status="danger" icon={<IconDelete />}>删除</Button>
+          </Popconfirm>}
+    </Space> },
   ]
 
   const secondaryColumns: TableColumnProps<Category>[] = columns.map((column) => ({ ...column, title: column.title === '分类名称' ? '二级分类名称' : column.title }))

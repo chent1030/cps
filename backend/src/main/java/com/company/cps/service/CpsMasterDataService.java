@@ -158,6 +158,33 @@ public class CpsMasterDataService {
         }
     }
 
+    /**
+     * 删除问题分类。三条护栏：必须已停用、不能还有下级分类、不能被历史业务数据引用。
+     * 历史问题/知识案例只存分类 ID，删掉分类会让它们的分类信息变成空值，因此这类分类只能停用不能删除。
+     */
+    @Transactional
+    public void deleteCategory(Long id, String currentEmpNo) {
+        requireNonNull(id, "id is required");
+        CpsProblemCategory category = categoryMapper.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("分类不存在: " + id));
+        if (Boolean.TRUE.equals(category.getEnabled())) {
+            throw new IllegalArgumentException("请先停用该分类再删除：" + category.getCategoryName());
+        }
+        long children = categoryMapper.countChildren(id);
+        if (children > 0) {
+            throw new IllegalArgumentException("该分类下还有 " + children + " 个下级分类，请先删除下级分类");
+        }
+        long references = categoryMapper.countReferences(id);
+        if (references > 0) {
+            throw new IllegalArgumentException("该分类已被 " + references + " 条历史数据引用，删除会丢失这些问题/案例的分类信息，请保留该分类（可继续停用）");
+        }
+        if (categoryMapper.deleteById(id) != 1) {
+            throw new IllegalArgumentException("分类不存在: " + id);
+        }
+        auditLogService.record(currentEmpNo, null, "CATEGORY_DELETE", "MASTER_DATA", String.valueOf(id),
+                "分类：" + category.getCategoryName(), null, null, "SUCCESS", null);
+    }
+
     public List<CpsAreaPersonConfig> listAreaPersonConfigs(String factory, String area, Boolean enabled) {
         return areaPersonConfigMapper.findAll(trimToNull(factory), trimToNull(area), enabled);
     }

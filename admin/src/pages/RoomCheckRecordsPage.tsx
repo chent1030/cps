@@ -4,18 +4,19 @@
  * - 详情：逐项 点检类型 / 合格判定 / 文本说明 / 照片张数 / 最终结果 + 修正留痕
  * - 历史辅房点检记录已由 V20261024 迁移进本表（sourceRecordId 追溯）
  */
-import { Button, Card, Descriptions, Divider, Drawer, Form, Input, Select, Space, Spin, Table, Tag, Typography } from '@arco-design/web-react'
+import { Button, Card, Descriptions, Divider, Drawer, Form, Input, Message, Select, Space, Spin, Table, Tag, Typography } from '@arco-design/web-react'
 import type { TableColumnProps } from '@arco-design/web-react'
-import { IconFilter, IconRefresh } from '@arco-design/web-react/icon'
+import { IconDownload, IconFilter, IconRefresh } from '@arco-design/web-react/icon'
 import { useState } from 'react'
 import { api } from '../api'
 import { InspectionItemPhotos } from '../components/AttachmentImages'
 import { useRemote } from '../hooks/useRemote'
 import { PageHead, StatePanel } from '../components/PageParts'
+import { errorMessage } from '../lib/presentation'
 import type { InspectionRecord, InspectionRecordItem } from '../types'
 
-const recordStatusColor: Record<string, string> = { PENDING: 'arcoblue', IN_PROGRESS: 'orange', AWAIT_CONFIRM: 'cyan', JUDGED: 'green' }
-const recordStatusLabel: Record<string, string> = { PENDING: '待执行', IN_PROGRESS: '进行中', AWAIT_CONFIRM: '待确认', JUDGED: '已判定' }
+const recordStatusColor: Record<string, string> = { PENDING: 'arcoblue', IN_PROGRESS: 'orange', AWAIT_CONFIRM: 'cyan', PENDING_REVIEW: 'gold', PENDING_RECTIFY: 'red', JUDGED: 'green' }
+const recordStatusLabel: Record<string, string> = { PENDING: '待执行', IN_PROGRESS: '进行中', AWAIT_CONFIRM: '待确认', PENDING_REVIEW: '待复核', PENDING_RECTIFY: '待整改', JUDGED: '已结束' }
 const resultColor: Record<string, string> = { PASS: 'green', FAIL: 'red', TYPE_MISMATCH: 'orange', UNJUDGEABLE: 'orange', PENDING: 'gray' }
 const resultLabel: Record<string, string> = { PASS: '合格', FAIL: '不合格', TYPE_MISMATCH: '类型不符', UNJUDGEABLE: '无法判定', PENDING: '待判定' }
 const checkTypeLabel: Record<string, string> = { PASS_FAIL: '合格判定', TEXT: '文本', PHOTO: '拍照' }
@@ -99,6 +100,7 @@ export function RoomCheckRecordsPage() {
   const [applied, setApplied] = useState({ status: '', typeCode: '', keyword: '' })
   const [page, setPage] = useState(1)
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [exporting, setExporting] = useState(false)
 
   const typesRemote = useRemote(() => api.inspectionTypes(), [])
   const typeOptions = (typesRemote.data ?? []).map((t) => ({ value: t.code, label: `${t.name}（${t.code}）` }))
@@ -131,8 +133,26 @@ export function RoomCheckRecordsPage() {
     setApplied({ status: statusFilter, typeCode: typeFilter, keyword: keyword.trim() })
   }
 
+  async function exportRows() {
+    setExporting(true)
+    try {
+      await api.exportInspectionRecords({
+        recordStatus: applied.status || undefined,
+        typeCode: applied.typeCode || undefined,
+        keyword: applied.keyword || undefined,
+      })
+      Message.success('导出文件已生成')
+    } catch (error) {
+      Message.error(errorMessage(error))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return <>
-    <PageHead title="巡检记录" detail="统一巡检记录追溯（含历史辅房点检迁移数据）；得分 = max(0, 100 − Σ不合格扣分)" />
+    <PageHead title="巡检记录" detail="统一巡检记录追溯（含历史辅房点检迁移数据）；得分 = max(0, 100 − Σ不合格扣分）">
+      <Button icon={<IconDownload />} loading={exporting} onClick={() => void exportRows()}>导出 Excel</Button>
+    </PageHead>
     <div className="page-body">
       <Card className="filter-card">
         <Form layout="inline" className="filter-bar" onSubmit={() => apply()}>

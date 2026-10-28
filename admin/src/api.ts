@@ -68,6 +68,11 @@ export const api = {
   exportCategories: (params: Record<string, string | number | boolean | undefined>) => download(`/cps/admin/master/categories/export${query(params)}`, 'cps-categories.xlsx'),
   saveCategory: (body: Partial<Category>) => request<Category>('/cps/admin/master/categories', { method: 'POST', body: JSON.stringify(body) }),
   setCategoryEnabled: (id: number, enabled: boolean) => request<void>(`/cps/admin/master/categories/${id}/enabled`, { method: 'PATCH', body: JSON.stringify({ enabled }) }),
+  /** 删除分类：后端只允许删除已停用、无下级分类且未被历史数据引用的分类。 */
+  deleteCategory: (id: number) => {
+    const operator = getAdminOperator()
+    return request<{ ok: boolean }>(`/cps/admin/master/categories/${id}${query({ empNo: operator?.empNo })}`, { method: 'DELETE' })
+  },
   people: () => request<AreaPersonConfig[]>('/cps/admin/master/area-person-configs'),
   peoplePage: (params: Record<string, string | number | boolean | undefined>) => request<PageResult<AreaPersonConfig>>(`/cps/admin/master/area-person-configs/page${query(params)}`),
   exportPeople: (params: Record<string, string | number | boolean | undefined>) => download(`/cps/admin/master/area-person-configs/export${query(params)}`, 'cps-area-person-configs.xlsx'),
@@ -130,6 +135,9 @@ export const api = {
   inspectionRecordPage: (params: Record<string, string | number | undefined>) =>
     request<PageResult<InspectionRecord>>(`/cps/admin/inspection-records/page${query(params)}`),
   inspectionRecordDetail: (id: number) => request<InspectionRecordDetail>(`/cps/admin/inspection-records/${id}`),
+  /** 巡检记录导出（非 CPS 巡检）：筛选条件与列表一致。 */
+  exportInspectionRecords: (params: Record<string, string | number | undefined>) =>
+    download(`/cps/admin/inspection-records/export${query(params)}`, 'cps-inspection-records.xlsx'),
   // ---- 波次 8 E 线：物品台账 / 出入库 / 库存预警 ----
   inventoryItems: (params: Record<string, string | number | boolean | undefined>) => request<InventoryItem[]>(`/cps/admin/inventory-items${query(params)}`),
   saveInventoryItem: (body: Partial<InventoryItem>) => {

@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -46,6 +47,11 @@ import java.util.Map;
 public class CpsInspectionRecordService {
 
     private static final Logger log = LoggerFactory.getLogger(CpsInspectionRecordService.class);
+
+    /** 导出上限：避免一次导出把整库拉进内存。 */
+    private static final int MAX_EXPORT_ROWS = 10000;
+
+    private static final DateTimeFormatter EXPORT_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Autowired
     private CpsInspectionRecordMapper recordMapper;
@@ -79,6 +85,9 @@ public class CpsInspectionRecordService {
 
     @Autowired
     private CpsAgentFrameworkClient agentClient;
+
+    @Autowired
+    private MinioStorageService minioStorageService;
 
     // ============================================================
     // 开始执行
@@ -443,6 +452,55 @@ public class CpsInspectionRecordService {
         return result;
     }
 
+    /**
+     * 巡检记录导出（Excel）：与列表相同的筛选条件，一次性取上限行数，按导出列顺序返回字符串行。
+     * 状态、AI 结论都翻成中文，整改照片输出可访问的地址（多张以空格分隔）。
+     */
+    public List<String[]> exportRows(String typeCode, Long areaId, String recordStatus, String checkEmpNo,
+                                     String keyword) {
+        List<CpsInspectionRecord> rows = recordMapper.findPage(trimToNull(typeCode), areaId,
+                trimToNull(recordStatus), trimToNull(checkEmpNo), trimToNull(keyword), MAX_EXPORT_ROWS, 0);
+        List<String[]> data = new ArrayList<>();
+        for (CpsInspectionRecord record : rows) {
+            data.add(new String[] {
+                    String.valueOf(record.getId()),
+                    typeName(record.getTypeCode()),
+                    firstNonBlank(record.getAreaName(), record.getAreaCode()),
+                    firstNonBlank(record.getCheckEmpName(), record.getCheckEmpNo()),
+                    recordStatusLabel(record.getRecordStatus()),
+                    formatTime(record.getSubmittedAt()),
+                    record.getScore() == null ? "" : String.valueOf(record.getScore()),
+                    aiOverallLabel(record.getAiOverall()),
+                    nullToEmpty(record.getAiReason()),
+                    firstNonBlank(record.getReviewEmpName(), record.getReviewEmpNo()),
+                    formatTime(record.getReviewedAt()),
+                    nullToEmpty(record.getReviewOpinion()),
+                    firstNonBlank(record.getRectifyEmpName(), record.getRectifyEmpNo()),
+                    formatTime(record.getRectifySubmittedAt()),
+                    nullToEmpty(record.getRectifyReason()),
+                    nullToEmpty(record.getRectifyShortTerm()),
+                    nullToEmpty(record.getRectifyLongTerm()),
+                    rectifyPhotoUrls(record)
+            });
+        }
+        return data;
+    }
+
+    private String typeName(String typeCode) {
+        if (isBlank(typeCode)) return "";
+        CpsInspectionType type = typeMapper.findByCode(typeCode.trim());
+        return type == null || isBlank(type.getName()) ? typeCode.trim() : type.getName();
+    }
+
+    private String rectifyPhotoUrls(CpsInspectionRecord record) {
+        List<String> urls = new ArrayList<>();
+        for (CpsIssueAttachment attachment : loadRectifyAttachments(record)) {
+            String url = photoUrl(attachment);
+            if (!url.isEmpty()) urls.add(url);
+        }
+        return String.join(" ", urls);
+    }
+
     /** 整改照片附件（ids 形如 "12,13"；web 详情与 Android 回显用） */
     private List<CpsIssueAttachment> loadRectifyAttachments(CpsInspectionRecord record) {
         List<CpsIssueAttachment> list = new ArrayList<>();
@@ -550,6 +608,72 @@ public class CpsInspectionRecordService {
         if (s == null) return null;
         String t = s.trim();
         return t.isEmpty() ? null : t;
+    }
+
+    private static String nullToEmpty(String s) {
+        return s == null ? "" : s;
+    }
+
+    /** 取第一个非空字符串，全部为空时返回兜底值（导出里优先显示姓名、回退工号）。 */
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.trim().isEmpty()) return value.trim();
+        }
+        return "";
+    }
+
+    /** 附件地址统一成可直接点开的绝对 URL：新数据已是 URL，历史数据是裸对象键。 */
+    private String photoUrl(CpsIssueAttachment attachment) {
+        if (attachment == null) {
+            return "";
+        }
+        String fileUrl = trimToNull(attachment.getFileUrl());
+        if (fileUrl == null) {
+            return "";
+        }
+        if (MinioStorageService.isAbsoluteUrl(fileUrl)) {
+            return fileUrl;
+        }
+        return minioStorageService.publicObjectUrl(fileUrl);
+    }
+
+    private static String formatTime(LocalDateTime time) {
+        return time == null ? "" : EXPORT_TIME_FORMAT.format(time);
+    }
+
+    /** 记录状态中文：导出与 web 列表口径一致。 */
+    private static String recordStatusLabel(String status) {
+        if (status == null) return "";
+        switch (status) {
+            case "PENDING":
+                return "待执行";
+            case "IN_PROGRESS":
+                return "执行中";
+            case "AWAIT_CONFIRM":
+                return "待确认（历史）";
+            case "PENDING_REVIEW":
+                return "待复核";
+            case "PENDING_RECTIFY":
+                return "待整改";
+            case "JUDGED":
+                return "已结束";
+            default:
+                return status;
+        }
+    }
+
+    private static String aiOverallLabel(String overall) {
+        if (overall == null) return "";
+        switch (overall) {
+            case "PASS":
+                return "通过";
+            case "PARTIAL":
+                return "部分通过";
+            case "PROBLEM":
+                return "有问题";
+            default:
+                return overall;
+        }
     }
 
     private static void require(boolean cond, String message) {

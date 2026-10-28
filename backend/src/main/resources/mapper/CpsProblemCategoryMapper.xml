@@ -106,4 +106,26 @@
         WHERE id = #{id}
     </update>
 
+    <delete id="deleteById">
+        DELETE FROM cps_problem_category WHERE id = #{id}
+    </delete>
+
+    <select id="countChildren" resultType="long">
+        SELECT COUNT(*) FROM cps_problem_category WHERE parent_id = #{id}
+    </select>
+
+    <!-- 历史引用：问题、知识案例、AI 建议与匹配结果都把分类 ID 落库，删掉分类会丢失这些记录的分类信息 -->
+    <select id="countReferences" resultType="long">
+        SELECT
+            (SELECT COUNT(*) FROM cps_issue
+              WHERE category_l1_id = #{id} OR category_l2_id = #{id})
+          + (SELECT COUNT(*) FROM cps_knowledge_case
+              WHERE category_l1_id = #{id} OR category_l2_id = #{id})
+          + (SELECT COUNT(*) FROM cps_issue_ai_match
+              WHERE ai_category_l1_id = #{id} OR ai_category_l2_id = #{id}
+                 OR confirmed_category_l1_id = #{id} OR confirmed_category_l2_id = #{id})
+          + (SELECT COUNT(*) FROM cps_issue_ai_suggestion
+              WHERE ai_category_l1_id = #{id} OR ai_category_l2_id = #{id})
+    </select>
+
 </mapper>
