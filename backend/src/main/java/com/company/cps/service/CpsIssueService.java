@@ -773,6 +773,11 @@ public class CpsIssueService {
                 issue.setResponsibleEmpNo(request.getResponsibleEmpNo().trim());
                 issue.setResponsibleEmpName(empName(issue.getResponsibleEmpNo()));
             }
+            // 暂存也要落整改照片：草稿态就把 PROOF 附件绑到问题单，重新进入详情才能回显；
+            // attachToIssue 对已绑定本单的附件幂等（仅重排 sort_no），提交整改时会再绑一次。
+            if (request.getProofAttachmentIds() != null && !request.getProofAttachmentIds().isEmpty()) {
+                attachFiles(issue.getId(), request.getProofAttachmentIds(), "PROOF", currentEmpNo);
+            }
         } else if (request.getAction() == CpsIssueAction.TRANSFER) {
             // 转办：仅当前承办人办理并接收退回，原办理人失权；责任员工不变（PRD §28.3）
             issue.setCurrentHandlerEmpNo(request.getTargetEmpNo().trim());

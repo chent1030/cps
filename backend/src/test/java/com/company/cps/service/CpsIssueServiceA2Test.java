@@ -27,6 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -112,6 +114,34 @@ class CpsIssueServiceA2Test {
         verify(issueMapper).updateWorkflowFields(captor.capture());
         assertEquals(Integer.valueOf(5), captor.getValue().getLockVersion());
         assertEquals("draft reason", captor.getValue().getReasonAnalysis());
+    }
+
+    @Test
+    void saveDraftBindsProofAttachmentsSoReentryCanRenderThem() {
+        CpsIssue issue = v2Issue(CpsIssueStatus.PENDING_RECTIFY, "E30001");
+        when(issueMapper.findById(900L)).thenReturn(Optional.of(issue));
+        when(issueMapper.updateWorkflowFields(any(CpsIssue.class))).thenReturn(1);
+        when(attachmentMapper.attachToIssue(any(), any(), any(), anyInt(), any(), any())).thenReturn(1);
+        CpsIssueActionRequest request = action(CpsIssueAction.SAVE_DRAFT);
+        request.setReasonAnalysis("draft reason");
+        request.setProofAttachmentIds(java.util.Arrays.asList(11L, 12L));
+
+        service.executeAction(900L, request, "E30001");
+
+        // 暂存也要绑 PROOF 附件：重新进入详情时按 proofAttachments 回显草稿照片
+        verify(attachmentMapper).attachToIssue(eq(11L), eq(900L), eq("PROOF"), eq(1), eq("E30001"), any());
+        verify(attachmentMapper).attachToIssue(eq(12L), eq(900L), eq("PROOF"), eq(2), eq("E30001"), any());
+    }
+
+    @Test
+    void saveDraftWithoutAttachmentsDoesNotTouchAttachmentMapper() {
+        CpsIssue issue = v2Issue(CpsIssueStatus.PENDING_RECTIFY, "E30001");
+        when(issueMapper.findById(900L)).thenReturn(Optional.of(issue));
+        when(issueMapper.updateWorkflowFields(any(CpsIssue.class))).thenReturn(1);
+
+        service.executeAction(900L, action(CpsIssueAction.SAVE_DRAFT), "E30001");
+
+        verifyNoInteractions(attachmentMapper);
     }
 
     @Test

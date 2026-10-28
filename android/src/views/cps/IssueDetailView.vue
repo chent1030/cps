@@ -176,7 +176,7 @@
                 </view>
                 <view class="cps-ai-item">
                   <text class="cps-ai-item__label">人工措施</text>
-                  <text class="cps-ai-item__text">{{ detail.correctiveMeasure || '-' }}</text>
+                  <text class="cps-ai-item__text">{{ manualMeasureText }}</text>
                 </view>
               </view>
             </view>
@@ -862,6 +862,43 @@ const applyDefaultPersons = () => {
   }
 }
 
+/**
+ * v2 暂存整改回填：SAVE_DRAFT 把原因/短期/长期措施/整改说明/责任员工写进问题主表，
+ * 重新进入详情时必须按已保存内容回填，否则「暂存整改」下次进来就是空白。
+ * 必须在 applyDefaultPersons 之后执行，让已暂存的责任员工覆盖默认人员。
+ */
+const prefillRectifyDraft = () => {
+  const current = detail.value
+  if (!current || current.flowVersion !== 'v2' || current.status !== 'PENDING_RECTIFY') return
+  actionForm.value.reasonAnalysis = current.reasonAnalysis ?? ''
+  actionForm.value.shortTermMeasure = current.shortTermMeasure ?? ''
+  actionForm.value.longTermMeasure = current.longTermMeasure ?? ''
+  actionForm.value.rectifyRemark = current.rectifyRemark ?? ''
+  if (current.responsibleEmpNo) {
+    const empNo = current.responsibleEmpNo
+    actionForm.value.responsibleEmpNo = empNo
+    selectedPeople.value = {
+      ...selectedPeople.value,
+      [empNo]: { empNo, empName: current.responsibleEmpName || empNo },
+    }
+    defaultAppliedFields.value.delete('responsibleEmpNo')
+  }
+}
+
+// 人工原因/措施展示：v2 用短期+长期措施，v1 沿用 correctiveMeasure
+const manualMeasureText = computed(() => {
+  const current = detail.value
+  if (!current) return '-'
+  if (current.flowVersion === 'v2') {
+    const parts = [
+      current.shortTermMeasure ? `短期：${current.shortTermMeasure}` : '',
+      current.longTermMeasure ? `长期：${current.longTermMeasure}` : '',
+    ].filter(Boolean)
+    return parts.length ? parts.join('\n') : '-'
+  }
+  return current.correctiveMeasure || '-'
+})
+
 // 分类选项加载
 const loadLevel1Categories = async () => {
   if (!level1Categories.value.length) {
@@ -896,6 +933,7 @@ const load = async () => {
   const sources = await loadAttachmentImageSources([...detail.value.issueAttachments, ...detail.value.proofAttachments])
   attachmentImageSources.value = sources
   applyDefaultPersons()
+  prefillRectifyDraft()
 }
 
 // 人员选择器（内联）
@@ -952,7 +990,7 @@ const buildActionPayload = (action: CpsIssueAction) => {
     shortTermMeasure: actionForm.value.shortTermMeasure || undefined,
     longTermMeasure: actionForm.value.longTermMeasure || undefined,
     proofAttachmentIds:
-      action === 'UPLOAD_PROOF' || action === 'SUBMIT_RECTIFICATION'
+      action === 'UPLOAD_PROOF' || action === 'SUBMIT_RECTIFICATION' || action === 'SAVE_DRAFT'
         ? proofImages.value.map((image) => image.id)
         : undefined,
     targetEmpNo: actionForm.value.targetEmpNo || undefined,
