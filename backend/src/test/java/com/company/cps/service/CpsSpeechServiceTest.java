@@ -21,18 +21,18 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** F3 语音上传链路：白名单校验 / RustFS 落桶 / C-06 透传 / 降级文案。 */
+/** F3 语音上传链路：白名单校验 / MinIO 落桶 / C-06 透传 / 降级文案。 */
 class CpsSpeechServiceTest {
 
     private CpsSpeechProperties properties;
-    private RustFsStorageService storage;
+    private MinioStorageService storage;
     private CpsSpeechTranscribeClient transcribeClient;
     private CpsSpeechService service;
 
     @BeforeEach
     void setUp() {
         properties = new CpsSpeechProperties();
-        storage = mock(RustFsStorageService.class);
+        storage = mock(MinioStorageService.class);
         transcribeClient = mock(CpsSpeechTranscribeClient.class);
         service = new CpsSpeechService(properties, storage, transcribeClient);
     }
@@ -128,7 +128,7 @@ class CpsSpeechServiceTest {
     void storageFailureSurfacesAsIllegalState() {
         // put 为 void 方法且声明受检异常：用 doThrow 桩运行时异常
         try {
-            doThrow(new RuntimeException("rustfs down"))
+            doThrow(new RuntimeException("minio down"))
                     .when(storage)
                     .put(anyString(), any(byte[].class), anyString());
         } catch (Exception ignored) {

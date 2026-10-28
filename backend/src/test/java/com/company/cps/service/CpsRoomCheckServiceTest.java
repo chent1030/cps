@@ -49,7 +49,7 @@ class CpsRoomCheckServiceTest {
     private CpsRoomCheckRecordItemMapper itemMapper;
     private CpsInspectionPlanTaskMapper taskMapper;
     private CpsRoomCheckJudgeClient judgeClient;
-    private RustFsStorageService storage;
+    private MinioStorageService storage;
     private CpsRoomCheckService service;
 
     @BeforeEach
@@ -60,10 +60,10 @@ class CpsRoomCheckServiceTest {
         itemMapper = mock(CpsRoomCheckRecordItemMapper.class);
         taskMapper = mock(CpsInspectionPlanTaskMapper.class);
         judgeClient = mock(CpsRoomCheckJudgeClient.class);
-        storage = mock(RustFsStorageService.class);
+        storage = mock(MinioStorageService.class);
         service = new CpsRoomCheckService(recordMapper, itemMapper, roomMapper,
                 checkItemMapper, taskMapper, judgeClient, storage);
-        when(storage.publicObjectUrl(anyString())).thenReturn("http://rustfs/x");
+        when(storage.publicObjectUrl(anyString())).thenReturn("http://minio/x");
     }
 
     private CpsRoom room() {

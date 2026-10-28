@@ -566,7 +566,7 @@ import { onLoad } from '@dcloudio/uni-app'
 
 
 import type { CpsAttachmentUploadSource, CpsEmployeeOption, CpsOption } from '@/api/index'
-import { loadAttachmentImageSources, resolveAssetUrl, resolveUploadSources, toImageUrl } from '@/utils/image'
+import { loadAttachmentImageSources, resolveAssetUrl, resolveUploadedPhotoUrl, resolveUploadSources, toImageUrl } from '@/utils/image'
 import { statusMeta, issueLocation as formatLocation, issueCategory as formatCategory, personLabel as formatPersonLabel } from '@/utils/format'
 import { resolveDefaultPersons, type ActionPersonField } from '@/utils/personDefault'
 import type {
@@ -1093,9 +1093,11 @@ const uploadProofImages = async (sources: CpsAttachmentUploadSource[]) => {
   try {
     for (const source of sources) {
       const uploaded = await cpsApi.uploadCpsAttachment(source)
-      proofImages.value = [...proofImages.value, uploaded]
+      // MinIO 之后返回绝对 URL，原样保存与预览；仅旧后端回退 /content 拼法。
+      const photoUrl = resolveUploadedPhotoUrl(uploaded)
+      proofImages.value = [...proofImages.value, { ...uploaded, url: photoUrl }]
       // 同步加载预览源
-      const previewSources = await loadAttachmentImageSources([{ id: uploaded.id, fileUrl: uploaded.url, fileName: uploaded.name }])
+      const previewSources = await loadAttachmentImageSources([{ id: uploaded.id, fileUrl: photoUrl, fileName: uploaded.name }])
       attachmentImageSources.value = { ...attachmentImageSources.value, ...previewSources }
     }
   } catch (error) {

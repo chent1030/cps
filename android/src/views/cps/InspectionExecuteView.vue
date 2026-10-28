@@ -174,7 +174,7 @@ import { cpsApi } from '@/api/index'
 import { computed, reactive, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import type { CpsInspectionRecord, CpsInspectionRecordItem } from '@/types/cps'
-import { resolveAssetUrl, resolveUploadSources } from '@/utils/image'
+import { resolveAssetUrl, resolveUploadedPhotoUrl, resolveUploadSources } from '@/utils/image'
 
 interface PhotoEntry {
   url: string
@@ -281,7 +281,7 @@ const photoList = (item: CpsInspectionRecordItem): PhotoEntry[] => {
   return keys.map((k, i) => ({ url: k, name: names[i] ?? `照片${i + 1}` }))
 }
 
-/** 图片 src：后端存的是站内相对路径，显示前补成绝对地址 */
+/** 图片 src：绝对 URL 原样，历史 /api 代理路径补 base */
 const photoUrl = (entry: PhotoEntry) => resolveAssetUrl(entry.url)
 
 const photoCount = (item: CpsInspectionRecordItem) => photoList(item).length
@@ -335,7 +335,8 @@ const uploadItemPhotos = async (
     const current = [...photoList(item)]
     for (const source of sources) {
       const uploaded = await cpsApi.uploadCpsAttachment(source)
-      current.push({ url: uploaded.url, name: uploaded.name })
+      // MinIO 之后 url 是可直接访问的绝对地址，原样落库为 photoObjectKey；仅旧后端回退 /content 拼法。
+      current.push({ url: resolveUploadedPhotoUrl(uploaded), name: uploaded.name })
     }
     local[item.id] = { ...local[item.id], photos: current }
     await persistItem(item)

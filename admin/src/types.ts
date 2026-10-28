@@ -17,6 +17,7 @@ export interface Issue {
   overdue: boolean
   aiCategoryL1Name?: string; aiCategoryL2Name?: string; categoryL1Name?: string; categoryL2Name?: string
   creatorEmpNo?: string; creatorEmpName?: string; feedbackEmpNo?: string; feedbackEmpName?: string; allFlowHandlers?: string
+  /** 问题/整改图片：逗号分隔的附件 ID 或绝对 URL（绝对 URL 优先；裸对象键无法解析时不渲染）。 */
   issueImageIds?: string; proofImageIds?: string; reasonAnalysis?: string; correctiveMeasure?: string; rectifyRemark?: string; reviewOpinion?: string; updatedAt?: string
 }
 
@@ -95,6 +96,7 @@ export interface AdminAuditLog {
 export interface KnowledgeCase {
   id: number; categoryL1Id?: number; categoryL2Id?: number; categoryL1Name?: string; categoryL2Name?: string; enabled: boolean; imageUrl?: string; reason?: string; measure?: string; milvusVectorId?: string; vectorRetryCount?: number; vectorUpdatedAt?: string; vectorStatus?: string; vectorErrorMsg?: string
 }
+/** 知识库素材：fileUrl 为绝对 URL 优先（MinIO 直链），历史数据可能是 /api 代理路径或裸对象键（无法解析时不渲染）。 */
 export interface KnowledgeMaterial { id: number; caseId: number; fileUrl: string; fileName?: string; reason: string; measure: string; milvusVectorId?: string; vectorRetryCount?: number; vectorUpdatedAt?: string; vectorStatus?: string; vectorErrorMsg?: string }
 
 export interface AgentRuntime {
@@ -345,6 +347,7 @@ export interface RoomCheckRecordItemDetail {
   content: string
   photoCategory: string | null
   deductScore: number | null
+  /** 点检照片：绝对 URL 优先；历史数据可能是 /api/cps/attachments/{id}/content 或裸对象键。 */
   photoUrl: string | null
   photoFileName: string | null
   judgeResult: string | null
@@ -624,6 +627,7 @@ export interface InspectionRecordItem {
   deductScore: number
   passResult?: 'PASS' | 'FAIL' | string | null
   textValue?: string | null
+  /** 点检照片：逗号分隔的绝对 URL（MinIO）/ /api 代理路径 / 附件 ID；裸对象键无法解析时前端降级为张数。 */
   photoObjectKey?: string | null
   photoFileName?: string | null
   photoCount?: number
@@ -654,7 +658,7 @@ export interface InspectionRecordLog {
   createdAt?: string | null
 }
 
-/** 整改照片（cps_issue_attachment），图片地址 /api/cps/attachments/{id}/content。 */
+/** 整改照片（cps_issue_attachment）：fileUrl 为绝对 URL 优先；历史数据缺失/裸对象键时回退 /api/cps/attachments/{id}/content。 */
 export interface InspectionRectifyAttachment {
   id: number
   fileUrl?: string | null

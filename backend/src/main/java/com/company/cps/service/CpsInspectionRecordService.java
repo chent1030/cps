@@ -348,14 +348,16 @@ public class CpsInspectionRecordService {
             afterImages.add(attachment);
         }
 
-        // 整改前证据：巡检项回传的照片（object_key 形态，同一张照片即整改前后对比的 before）
+        // 整改前证据：巡检项回传的照片（同一张照片即整改前后对比的 before）。
+        // 契约同 C-01 AttachmentRef：绝对 URL 用 url 字段，历史裸对象键用 object_key。
         List<Map<String, Object>> beforeRefs = new ArrayList<>();
         for (CpsInspectionRecordItem item : itemMapper.findByRecord(recordId)) {
             if (item.getPhotoObjectKey() == null || item.getPhotoObjectKey().trim().isEmpty()) {
                 continue;
             }
             Map<String, Object> ref = new HashMap<>();
-            ref.put("object_key", item.getPhotoObjectKey());
+            ref.put(CpsAgentFrameworkClient.attachmentRefField(item.getPhotoObjectKey()),
+                    item.getPhotoObjectKey().trim());
             ref.put("file_name", item.getPhotoFileName() == null ? item.getContent() : item.getPhotoFileName());
             beforeRefs.add(ref);
             if (beforeRefs.size() >= 20) {

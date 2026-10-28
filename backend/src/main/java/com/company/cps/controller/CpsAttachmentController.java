@@ -31,11 +31,11 @@ public class CpsAttachmentController {
             @RequestParam("file") MultipartFile file,
             @RequestParam("empNo") String empNo
     ) {
-        CpsAttachmentUploadResponse response = attachmentService.upload(file, resolveCurrentEmpNo(empNo));
-        response.setUrl("/api/cps/attachments/" + response.getId() + "/content");
-        return response;
+        // url 直接返回 MinIO 公开地址（与 file_url 同值），不再拼接 /api/cps/attachments/{id}/content。
+        return attachmentService.upload(file, resolveCurrentEmpNo(empNo));
     }
 
+    /** 兼容入口：file_url 为历史裸对象键时仍可通过该端点读取内容。 */
     @GetMapping("/{id}/content")
     public ResponseEntity<byte[]> content(@PathVariable Long id) {
         return attachmentService.content(id);

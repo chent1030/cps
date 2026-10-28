@@ -439,7 +439,7 @@ import { onLoad } from '@dcloudio/uni-app'
 
 import type { CpsAttachmentUploadSource, CpsEmployeeOption } from '@/api/index'
 import type { CpsAiSuggestionPayload, CpsCheckItemInfo, CpsInspectionArea, CpsInspectionType, CpsIssueCheckResult, CpsIssueDraftData, CpsOption, CpsUploadedImage } from '@/types/cps'
-import { resolveAssetUrl, resolveUploadSources, toImageUrl } from '@/utils/image'
+import { resolveAssetUrl, resolveUploadedPhotoUrl, resolveUploadSources, toImageUrl } from '@/utils/image'
 
 // 新建问题表单状态：只存在于当前页面实例，**不写任何本地缓存**（不做草稿暂存/回填）。
 // 从「我的草稿」进入时，由 restoreDraft 通过接口 cpsApi.getCpsIssueDraft 拉取后回填。
@@ -618,7 +618,7 @@ const onChooseImageFail = (err: unknown, fallback: string) => {
   uni.showToast({ title: message || fallback, icon: 'none' })
 }
 
-/** 点检项照片的显示地址：后端存的是站内相对路径，显示前补成绝对地址 */
+/** 点检项照片的显示地址：绝对 URL 原样，历史 /api 代理路径补 base */
 const checkPhotoUrl = (entry: { url: string }) => resolveAssetUrl(entry.url)
 
 const uploadCheckPhotos = async (itemCode: string, sources: CpsAttachmentUploadSource[]) => {
@@ -627,7 +627,8 @@ const uploadCheckPhotos = async (itemCode: string, sources: CpsAttachmentUploadS
     const current = [...(checkEntries.value[itemCode]?.photos ?? [])]
     for (const source of sources) {
       const uploaded = await cpsApi.uploadCpsAttachment(source)
-      current.push({ id: uploaded.id, url: uploaded.url, name: uploaded.name })
+      // MinIO 之后 url 是可直接访问的绝对地址，原样保存；仅旧后端回退 /content 拼法。
+      current.push({ id: uploaded.id, url: resolveUploadedPhotoUrl(uploaded), name: uploaded.name })
     }
     setCheckField(itemCode, 'photos', current)
   } catch (error) {
@@ -937,10 +938,11 @@ const uploadDraftImages = async (sources: CpsAttachmentUploadSource[]) => {
     for (const source of sources) {
       const shouldInspectFirst = draft.images.length === 0
       const uploaded = await cpsApi.uploadCpsAttachment(source)
-      draft.images = [...draft.images, uploaded]
-      // 直接使用后端返回的 /api/cps/attachments/{id}/content 路径作为预览地址，
+      // MinIO 之后返回的是绝对 URL，原样保存与预览；仅旧后端回退 /api/cps/attachments/{id}/content。
       // 免掉 base64 转换与 /api/cps/attachments/base64 接口（已下线）。
-      draft.imagePreviewSources = { ...draft.imagePreviewSources, [uploaded.id]: resolveAssetUrl(uploaded.url) }
+      const photoUrl = resolveUploadedPhotoUrl(uploaded)
+      draft.images = [...draft.images, { ...uploaded, url: photoUrl }]
+      draft.imagePreviewSources = { ...draft.imagePreviewSources, [uploaded.id]: photoUrl }
       if (shouldInspectFirst) {
         await onFirstImageReady(uploaded.id)
       }

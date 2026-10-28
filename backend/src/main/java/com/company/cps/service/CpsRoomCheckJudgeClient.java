@@ -22,10 +22,11 @@ import java.util.Map;
  * C-04 辅房点检同步判定客户端（Java→Python，POST {base}/api/v1/agent/room-checks/judge，波次7 J线联调对齐）。
  *
  * 契约（basic-project 波次4 B6C04 设计 §1 + C7 冻结 schema）：**单 item 一次调用**，snake_case：
- * {submission_id, item_id, attempt, item_content, item_type, photo_object_keys[1..8], deduction,
+ * {submission_id, item_id, attempt, item_content, item_type, photo_urls[], photo_object_keys[], deduction,
  *  config_version, room_name, idempotency_key=room-judge-{submissionId}-{itemId}-{attempt}}；
+ * 照片二选一：file_url 是绝对 URL（新数据）→ photo_urls=[url]，否则 photo_object_keys=[裸对象键]；
  * 200 响应 {status: TYPE_MISMATCH|JUDGED|UNJUDGEABLE|SKIPPED, verdict: PASS|FAIL, reason, evidence, ...}。
- * Python 侧自带 RustFS 取图，Java 不再回传 photoBase64（清单④：大图 payload 切 object_key 模式）。
+ * Python 侧自带 MinIO 取图，Java 不再回传 photoBase64（清单④：大图 payload 切 URL/object_key 模式）。
  * 错误语义：403/422/502（detail.error_code）⇒ 该 item 按 PENDING 降级（清单③：非 200 一律降级不报错）。
  *
  * 降级约定：服务未启用 / 无明细 ⇒ 返回 null（整单降级）；单 item 调用失败 / SKIPPED ⇒ 该 item
@@ -94,8 +95,12 @@ public class CpsRoomCheckJudgeClient {
         payload.put("attempt", attempt);
         payload.put("item_content", item.getContent());
         payload.put("item_type", item.getPhotoCategory());
-        payload.put("photo_object_keys", item.getPhotoObjectKey() == null
-                ? List.of() : List.of(item.getPhotoObjectKey()));
+        // C-04 照片二选一：绝对 URL 走 photo_urls，历史裸对象键走 photo_object_keys（恰有一个非空）。
+        String photo = item.getPhotoObjectKey() == null ? null : item.getPhotoObjectKey().trim();
+        boolean photoIsUrl = photo != null && MinioStorageService.isAbsoluteUrl(photo);
+        payload.put("photo_urls", photoIsUrl ? List.of(photo) : List.of());
+        payload.put("photo_object_keys", photo == null || photo.isEmpty() || photoIsUrl
+                ? List.of() : List.of(photo));
         payload.put("deduction", item.getDeductScore());
         payload.put("config_version", item.getConfigVersion() == null ? null : String.valueOf(item.getConfigVersion()));
         payload.put("room_name", record.getRoomCode() + "-" + record.getRoomName());
@@ -145,7 +150,7 @@ public class CpsRoomCheckJudgeClient {
             return new ItemJudge(item.getCheckItemId(), "UNJUDGEABLE", reason);
         }
         if ("SKIPPED".equalsIgnoreCase(status)) {
-            return pending(item, "judge skipped by python side (model/provider/rustfs not configured): "
+            return pending(item, "judge skipped by python side (model/provider/minio not configured): "
                     + root.path("reason").asText(""));
         }
         return pending(item, "unknown judge status: " + status);

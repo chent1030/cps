@@ -16,9 +16,9 @@ cps:
     timeout-ms: 10000
 ```
 
-旧 CPS 与 Agent 框架可以在受信任网络内直接调用，不需要 JWT。Agent 框架通过 `config/cps.yaml` 的 `internal_trust: true` 和 `trusted_networks` 控制允许访问的来源网段；未匹配的外部访问仍然需要 JWT。
+旧 CPS 与 Agent 框架之间不再有鉴权：双方只要把对方的地址填进配置即可（CPS 侧 `cps.agent-framework.base-url`，Agent 侧 `config/cps.yaml` 的回调地址），Java 调 Agent 不再带 Bearer 令牌，Agent 回调 `/api/cps/initial-review/callback` 也不再校验来源 IP 或共享令牌。可信边界交给部署网络，建议用内网或网关把回调入口限制在 Agent 主机。
 
-固定 IP 部署时，把 Agent 服务所在机器的网段写入 `trusted_networks`。Kubernetes 部署时写入旧 CPS Pod 可能使用的 Pod CIDR，并使用 NetworkPolicy 只允许旧 CPS 命名空间访问 Agent Service；不要填写 Pod 单个 IP，因为 Pod 重建后 IP 会变化。
+附件存储使用 MinIO：上传接口直接写入并返回可访问的绝对 URL（`http://<minio>/<bucket>/<object>`），C-01、C-04 请求里的图片字段同样下发该 URL（不再下发对象键）。
 
 ## 调用关系
 

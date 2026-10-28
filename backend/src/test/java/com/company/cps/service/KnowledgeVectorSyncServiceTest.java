@@ -30,7 +30,7 @@ class KnowledgeVectorSyncServiceTest {
     @Mock
     private MilvusVectorService milvusVectorService;
     @Mock
-    private RustFsStorageService storage;
+    private MinioStorageService storage;
 
     private KnowledgeVectorSyncService service;
 

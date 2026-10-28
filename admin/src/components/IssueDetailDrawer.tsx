@@ -1,18 +1,20 @@
-import { Descriptions, Divider, Drawer, Image, Space, Tag, Typography } from '@arco-design/web-react'
+import { Descriptions, Divider, Drawer, Tag, Typography } from '@arco-design/web-react'
+import { AttachmentThumbs } from './AttachmentImages'
+import { splitAttachmentUrls } from '../lib/attachmentUrl'
 import { formatDate, statusLabel } from '../lib/presentation'
 import type { Issue, IssueStatus } from '../types'
 
 const statusColor: Record<IssueStatus, string> = { PENDING_FEEDBACK: 'orange', PENDING_RECTIFY: 'red', PENDING_UPLOAD_PROOF: 'arcoblue', PENDING_REVIEW: 'purple', CLOSED: 'green' }
-const attachmentUrl = (id: string) => `${(import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')}/cps/attachments/${id}/content`
 const person = (empNo?: string, empName?: string) => empNo ? `${empNo}（${empName || '-'}）` : '-'
 const formatJson = (s: string) => {
   try { return JSON.stringify(JSON.parse(s), null, 2) } catch { return s }
 }
 
+/** 问题图片 / 整改图片：字段是逗号分隔的附件 ID，也可能已经是绝对 URL（绝对 URL 优先）。 */
 function ImageGroup({ ids, label }: { ids?: string; label: string }) {
-  const attachmentIds = ids?.split(',').map((id) => id.trim()).filter(Boolean) ?? []
-  if (!attachmentIds.length) return <Typography.Text type="secondary">暂无{label}</Typography.Text>
-  return <Image.PreviewGroup><Space wrap size={10}>{attachmentIds.map((id) => <Image key={id} src={attachmentUrl(id)} width={132} height={96} style={{ objectFit: 'cover' }} alt={label} />)}</Space></Image.PreviewGroup>
+  const urls = splitAttachmentUrls(ids)
+  if (!urls.length) return <Typography.Text type="secondary">暂无{label}</Typography.Text>
+  return <AttachmentThumbs values={urls} width={132} height={96} alt={label} />
 }
 
 export function IssueDetailDrawer({ issue, onClose }: { issue: Issue | null; onClose: () => void }) {

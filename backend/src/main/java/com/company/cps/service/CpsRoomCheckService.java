@@ -51,7 +51,7 @@ public class CpsRoomCheckService {
     private final CpsCheckItemMapper checkItemMapper;
     private final CpsInspectionPlanTaskMapper planTaskMapper;
     private final CpsRoomCheckJudgeClient judgeClient;
-    private final RustFsStorageService storage;
+    private final MinioStorageService storage;
 
     public CpsRoomCheckService(CpsRoomCheckRecordMapper recordMapper,
                                CpsRoomCheckRecordItemMapper itemMapper,
@@ -59,7 +59,7 @@ public class CpsRoomCheckService {
                                CpsCheckItemMapper checkItemMapper,
                                CpsInspectionPlanTaskMapper planTaskMapper,
                                CpsRoomCheckJudgeClient judgeClient,
-                               RustFsStorageService storage) {
+                               MinioStorageService storage) {
         this.recordMapper = recordMapper;
         this.itemMapper = itemMapper;
         this.roomMapper = roomMapper;
@@ -200,7 +200,7 @@ public class CpsRoomCheckService {
         return toResponse(requireRecord(recordId));
     }
 
-    /** 照片上传：关联 RustFS object_key（对齐 A1 附件机制），首张照片推进 IN_PROGRESS。 */
+    /** 照片上传：关联 MinIO object_key（对齐 A1 附件机制），首张照片推进 IN_PROGRESS。 */
     public CpsRoomCheckRecordResponse uploadPhoto(Long recordId, Long itemId, MultipartFile file, String empNo) {
         CpsRoomCheckRecord record = requireRecord(recordId);
         requireOwner(record, empNo);
@@ -219,7 +219,7 @@ public class CpsRoomCheckService {
         try {
             storage.put(objectKey, file.getBytes(), fileType);
         } catch (Exception error) {
-            throw new IllegalStateException("Unable to store room check photo in RustFS", error);
+            throw new IllegalStateException("Unable to store room check photo in MinIO", error);
         }
         itemMapper.updatePhoto(itemId, objectKey, fileName);
         if (CpsRoomCheckRecordStatus.PENDING.name().equals(record.getRecordStatus())) {

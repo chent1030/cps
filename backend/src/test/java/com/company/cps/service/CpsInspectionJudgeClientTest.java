@@ -87,6 +87,24 @@ class CpsInspectionJudgeClientTest {
     }
 
     @Test
+    void absolutePhotoUrlGoesToPhotoUrlsField() {
+        // C-04 新契约：绝对 URL → photo_urls，photo_object_keys 为空数组。
+        String url = "http://127.0.0.1:9000/cps-attachments/cps/abs.jpg";
+        server.expect(requestTo(URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().json("{\"photo_urls\":[\"" + url + "\"],"
+                        + "\"photo_object_keys\":[]}", false))
+                .andRespond(withSuccess("{\"status\":\"JUDGED\",\"verdict\":\"PASS\"}",
+                        MediaType.APPLICATION_JSON));
+
+        List<CpsInspectionJudgeClient.ItemJudge> results = client.judge(record(),
+                List.of(photoItem(6L, url)), 1);
+
+        assertEquals("PASS", results.get(0).outcome);
+        server.verify();
+    }
+
+    @Test
     void nonJudgedStatusDegradesToPending() {
         server.expect(requestTo(URL))
                 .andRespond(withSuccess("{\"status\":\"PENDING\"}", MediaType.APPLICATION_JSON));

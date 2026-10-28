@@ -6,22 +6,24 @@ import org.springframework.stereotype.Component;
 /**
  * 附件内容解析器（R-N1/P0 附件断点修复）。
  *
- * 背景：新附件一律走 RustFS object_key 存储（cps_issue_attachment.content 恒 NULL），
+ * 背景：新附件一律走 MinIO 存储（cps_issue_attachment.file_url 直接存公开绝对 URL，
+ * 历史数据为裸对象键 cps/xxx.jpg；content 列恒 NULL），
  * 而 CpsAgentFrameworkClient 旧逻辑对 content==null 静默跳过，导致 evidence 不再传 Python（线上无图巡检）。
  *
  * 解析规则：
  * 1. content 非空 → 直接返回（旧库 MEDIUMBLOB 存量数据的 base64 兼容路径）；
- * 2. content 为空且 file_url（object_key）非空 → 从 RustFS 按流读取（RustFsStorageService.read）；
+ * 2. content 为空且 file_url 非空 → 从 MinIO 读取（MinioStorageService.readFileUrl，
+ *    同时兼容绝对 URL 与历史裸对象键两种形态）；
  * 3. 两者皆空 → 返回 null（真正无内容的空附件，保持旧语义跳过）；
- * 4. RustFS 读取失败 → 抛 IllegalStateException 快速失败：
+ * 4. MinIO 读取失败 → 抛 IllegalStateException 快速失败：
  *    附件传递失败必须显式暴露，禁止静默降级为"无图巡检"（Phase 0 §⑦ 附件约定）。
  */
 @Component
 public class CpsAttachmentContentResolver {
 
-    private final RustFsStorageService storageService;
+    private final MinioStorageService storageService;
 
-    public CpsAttachmentContentResolver(RustFsStorageService storageService) {
+    public CpsAttachmentContentResolver(MinioStorageService storageService) {
         this.storageService = storageService;
     }
 
@@ -35,16 +37,16 @@ public class CpsAttachmentContentResolver {
         if (attachment.getContent() != null && attachment.getContent().length > 0) {
             return attachment.getContent();
         }
-        String objectKey = attachment.getFileUrl();
-        if (objectKey == null || objectKey.trim().isEmpty()) {
+        String fileUrl = attachment.getFileUrl();
+        if (fileUrl == null || fileUrl.trim().isEmpty()) {
             return null;
         }
         try {
-            return storageService.read(objectKey);
+            return storageService.readFileUrl(fileUrl);
         } catch (Exception exception) {
             throw new IllegalStateException(
                     "Unable to read attachment " + attachment.getId()
-                            + " from RustFS object '" + objectKey + "': " + exception.getMessage(),
+                            + " from MinIO object '" + fileUrl + "': " + exception.getMessage(),
                     exception
             );
         }
@@ -58,7 +60,7 @@ public class CpsAttachmentContentResolver {
         return new CpsAttachmentContentResolver(null) {
             @Override
             public byte[] resolve(CpsIssueAttachment attachment) {
-                throw new IllegalStateException("RustFS storage is not configured for attachment forwarding");
+                throw new IllegalStateException("MinIO storage is not configured for attachment forwarding");
             }
         };
     }

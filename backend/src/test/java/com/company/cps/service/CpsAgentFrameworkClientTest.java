@@ -24,7 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -57,27 +57,20 @@ class CpsAgentFrameworkClientTest {
     }
 
     @Test
-    void runtimeStatusSendsBearerWhenApiTokenConfigured() {
-        CpsAgentFrameworkProperties tokenProperties = new CpsAgentFrameworkProperties();
-        tokenProperties.setEnabled(true);
-        tokenProperties.setBaseUrl(BASE_URL);
-        tokenProperties.setTimeoutMs(2000);
-        tokenProperties.setApiToken(" dev-shared-key ");
-        CpsAgentFrameworkClient tokenClient =
-                new CpsAgentFrameworkClient(tokenProperties, contentResolver, restTemplate);
-
+    void runtimeStatusSendsNoAuthorizationHeader() {
+        // A：Java↔Python 内部 token 已删除，请求不应再带 Authorization。
         server.expect(requestTo(BASE_URL + "/cps/metrics"))
                 .andExpect(method(HttpMethod.GET))
-                .andExpect(header("Authorization", "Bearer dev-shared-key")) // trim 后发送
+                .andExpect(headerDoesNotExist("Authorization"))
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
-        Map<String, Object> status = tokenClient.runtimeStatus();
+        Map<String, Object> status = client.runtimeStatus();
         assertEquals("ONLINE", status.get("state"));
         server.verify();
     }
 
     @Test
-    void legacyCreateAndStartForwardsRustfsAttachmentAsEvidence() {
+    void legacyCreateAndStartForwardsMinioAttachmentAsEvidence() {
         CpsIssueAttachment attachment = new CpsIssueAttachment();
         attachment.setId(9L);
         attachment.setFileName("before.png");
@@ -85,7 +78,7 @@ class CpsAgentFrameworkClientTest {
         // P0 断点场景：content 为 NULL，仅 object_key
         attachment.setContent(null);
         attachment.setFileUrl("cps/before-9.png");
-        when(contentResolver.resolve(attachment)).thenReturn("rustfs-bytes".getBytes(StandardCharsets.UTF_8));
+        when(contentResolver.resolve(attachment)).thenReturn("minio-bytes".getBytes(StandardCharsets.UTF_8));
 
         server.expect(requestTo(BASE_URL + "/cps/inspections"))
                 .andExpect(method(HttpMethod.POST))
@@ -95,7 +88,7 @@ class CpsAgentFrameworkClientTest {
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(jsonPath("$.kind").value("before"))
                 .andExpect(jsonPath("$.content_base64")
-                        .value(Base64.getEncoder().encodeToString("rustfs-bytes".getBytes(StandardCharsets.UTF_8))))
+                        .value(Base64.getEncoder().encodeToString("minio-bytes".getBytes(StandardCharsets.UTF_8))))
                 .andRespond(withSuccess("{\"version\":2}", MediaType.APPLICATION_JSON));
         server.expect(requestTo(BASE_URL + "/cps/inspections/7/start"))
                 .andExpect(method(HttpMethod.POST))
@@ -113,7 +106,7 @@ class CpsAgentFrameworkClientTest {
         attachment.setId(9L);
         attachment.setFileUrl("cps/missing.png");
         attachment.setContent(null);
-        when(contentResolver.resolve(attachment)).thenThrow(new IllegalStateException("rustfs unavailable"));
+        when(contentResolver.resolve(attachment)).thenThrow(new IllegalStateException("minio unavailable"));
 
         server.expect(requestTo(BASE_URL + "/cps/inspections"))
                 .andRespond(withSuccess("{\"id\":7,\"version\":1}", MediaType.APPLICATION_JSON));
@@ -126,7 +119,7 @@ class CpsAgentFrameworkClientTest {
     @Test
     void triggerInitialReviewPostsFrozenContractPayloadWithObjectKeys() {
         // 波次7 J线（C7 冻结 schema，additionalProperties=false）：issue_id/submission_id/version_no 必填；
-        // 附件 AttachmentRef.object_key 优先（file_url 即 RustFS key），无 object_key 才回退 content_base64
+        // 附件 AttachmentRef.object_key 优先（file_url 即 MinIO key），无 object_key 才回退 content_base64
         CpsRectificationSubmission submission = submission();
         CpsIssue issue = issue();
         CpsIssueAttachment before = attachment(31L, "cps/before-1.png");
@@ -158,6 +151,30 @@ class CpsAgentFrameworkClientTest {
         String reviewTaskRef = client.triggerInitialReview(submission, issue,
                 Collections.singletonList(before), Collections.singletonList(after));
         assertEquals("rr-77", reviewTaskRef);
+        server.verify();
+    }
+
+    @Test
+    void triggerInitialReviewUsesUrlFieldForAbsoluteFileUrl() {
+        // C-01 新契约：file_url 已是 MinIO 绝对 URL → AttachmentRef.url；不再输出去 object_key。
+        String beforeUrl = "http://127.0.0.1:9000/cps-attachments/cps/before-1.png";
+        String afterUrl = "http://127.0.0.1:9000/cps-attachments/cps/after-1.png";
+        CpsIssueAttachment before = attachment(41L, beforeUrl);
+        CpsIssueAttachment after = attachment(42L, afterUrl);
+
+        server.expect(requestTo(BASE_URL + "/agent/rectifications"))
+                .andExpect(jsonPath("$.before_attachments[0].attachment_id").value("41"))
+                .andExpect(jsonPath("$.before_attachments[0].url").value(beforeUrl))
+                .andExpect(jsonPath("$.before_attachments[0].object_key").doesNotExist())
+                .andExpect(jsonPath("$.before_attachments[0].file_name").value("before-1.png"))
+                .andExpect(jsonPath("$.after_attachments[0].url").value(afterUrl))
+                .andExpect(jsonPath("$.after_attachments[0].object_key").doesNotExist())
+                .andExpect(jsonPath("$.after_attachments[0].content_base64").doesNotExist())
+                .andRespond(withSuccess("{\"review_task_ref\":\"rr-79\"}", MediaType.APPLICATION_JSON));
+
+        String reviewTaskRef = client.triggerInitialReview(submission(), issue(),
+                Collections.singletonList(before), Collections.singletonList(after));
+        assertEquals("rr-79", reviewTaskRef);
         server.verify();
     }
 

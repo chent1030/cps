@@ -26,13 +26,13 @@ public class CpsKnowledgeAdminService {
     private final CpsKnowledgeCaseMapper caseMapper;
     private final CpsKnowledgeCaseImageMapper imageMapper;
     private final KnowledgeVectorSyncService vectorSyncService;
-    private final RustFsStorageService storage;
+    private final MinioStorageService storage;
 
     public CpsKnowledgeAdminService(
             CpsKnowledgeCaseMapper caseMapper,
             CpsKnowledgeCaseImageMapper imageMapper,
             KnowledgeVectorSyncService vectorSyncService,
-            RustFsStorageService storage
+            MinioStorageService storage
     ) {
         this.caseMapper = caseMapper;
         this.imageMapper = imageMapper;

@@ -63,11 +63,12 @@ public class CpsIssueService {
     private final CpsRectificationTransferMapper transferMapper;
     private final CpsInitialReviewService initialReviewService;
     /**
-     * 用于把 attachment.fileUrl 从 RustFS object key 拼成可访问的完整 URL；
-     * setStorage 注入以避免改写既有 @Autowired 构造签名（m00655 起：CpsIssueService.getDetail 返回的附件 URL 是裸 key，
-     * 与 CpsRoomCheckService 行为不一致，详情页 / 管理端预览拼不出完整地址）。
+     * 用于把 attachment.fileUrl 归一成前端可访问的 URL：
+     * 已经是 http(s) 绝对 URL（新数据，MinIO 公开地址）原样返回；以 / 开头的相对路径原样返回；
+     * 历史裸对象键（cps/xxx.jpg）用 MinioStorageService.publicObjectUrl 拼成绝对地址。
+     * setStorage 注入以避免改写既有 @Autowired 构造签名。
      */
-    private RustFsStorageService storage;
+    private MinioStorageService storage;
     /**
      * Phase B1 巡检类型服务：用于校验 inspectionTypeCode 是否启用，并联动 resourceNo/extraData 必填。
      * 通过 setter 注入避免破坏既有构造签名（CpsIssueServiceTest 仍以 6 参数构造）。
@@ -126,10 +127,10 @@ public class CpsIssueService {
     }
 
     /**
-     * Spring 会在 @Autowired 构造注入后调用此 setter（构造链没接 RustFsStorageService 避免破坏既有测试/legacy 构造）。
+     * Spring 会在 @Autowired 构造注入后调用此 setter（构造链没接 MinioStorageService 避免破坏既有测试/legacy 构造）。
      */
     @Autowired
-    public void setStorage(RustFsStorageService storage) {
+    public void setStorage(MinioStorageService storage) {
         this.storage = storage;
     }
 
@@ -277,19 +278,13 @@ public class CpsIssueService {
         response.setIssue(issue);
         List<com.company.cps.domain.CpsIssueAttachment> issueAttachments = attachmentMapper.findByIssueAndStage(issueId, "ISSUE");
         List<com.company.cps.domain.CpsIssueAttachment> proofAttachments = attachmentMapper.findByIssueAndStage(issueId, "PROOF");
-        // attachment.fileUrl 存的是 RustFS object key（cps/xxx.jpg），详情接口要给前端拼可访问完整 URL。
-        // 行为对齐 CpsRoomCheckService.java:408 storage::publicObjectUrl；storage 不可用时回退原 key 不抛错。
-        if (storage != null) {
-            for (com.company.cps.domain.CpsIssueAttachment attachment : issueAttachments) {
-                if (attachment.getFileUrl() != null && !attachment.getFileUrl().isEmpty()) {
-                    attachment.setFileUrl(storage.publicObjectUrl(attachment.getFileUrl()));
-                }
-            }
-            for (com.company.cps.domain.CpsIssueAttachment attachment : proofAttachments) {
-                if (attachment.getFileUrl() != null && !attachment.getFileUrl().isEmpty()) {
-                    attachment.setFileUrl(storage.publicObjectUrl(attachment.getFileUrl()));
-                }
-            }
+        // 新数据 file_url 是 MinIO 绝对 URL；历史数据是裸对象键。详情接口统一归一成可访问完整 URL：
+        // 绝对 URL 与 / 开头的相对路径原样返回，裸对象键走 publicObjectUrl；storage 不可用时回退原值不抛错。
+        for (com.company.cps.domain.CpsIssueAttachment attachment : issueAttachments) {
+            attachment.setFileUrl(resolveAccessibleFileUrl(attachment.getFileUrl()));
+        }
+        for (com.company.cps.domain.CpsIssueAttachment attachment : proofAttachments) {
+            attachment.setFileUrl(resolveAccessibleFileUrl(attachment.getFileUrl()));
         }
         response.setIssueAttachments(issueAttachments);
         response.setProofAttachments(proofAttachments);
@@ -301,6 +296,18 @@ public class CpsIssueService {
                         : Collections.<CpsIssueAction>emptySet()
         );
         return response;
+    }
+
+    /** file_url 归一：绝对 URL/相对路径原样，历史裸对象键拼 MinIO 公开地址；storage 缺失时回退原值。 */
+    private String resolveAccessibleFileUrl(String fileUrl) {
+        if (fileUrl == null || fileUrl.trim().isEmpty()) {
+            return fileUrl;
+        }
+        String value = fileUrl.trim();
+        if (storage == null || MinioStorageService.isAbsoluteUrl(value) || value.startsWith("/")) {
+            return value;
+        }
+        return storage.publicObjectUrl(value);
     }
 
     public List<CpsIssueListItemResponse> list(String tab, int page, int pageSize, String currentEmpNo) {

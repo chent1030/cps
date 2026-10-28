@@ -9,6 +9,7 @@ import type { TableColumnProps } from '@arco-design/web-react'
 import { IconFilter, IconRefresh } from '@arco-design/web-react/icon'
 import { useState } from 'react'
 import { api } from '../api'
+import { InspectionItemPhotos } from '../components/AttachmentImages'
 import { useRemote } from '../hooks/useRemote'
 import { PageHead, StatePanel } from '../components/PageParts'
 import type { InspectionRecord, InspectionRecordItem } from '../types'
@@ -61,9 +62,7 @@ function RecordDetailDrawer({ recordId, onClose }: { recordId: number; onClose: 
               {r.passResult && <Tag color={resultColor[r.passResult] ?? 'gray'}>{resultLabel[r.passResult] ?? r.passResult}</Tag>}
               {r.textValue && <Typography.Text type="secondary" style={{ fontSize: 12, whiteSpace: 'pre-wrap' }}>文本：{r.textValue}</Typography.Text>}
               {(r.checkTypes ?? '').includes('PHOTO') && (
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  照片 {r.photoCount ?? 0}/{r.photoMinCount ?? 1} 张{r.photoFileName ? ` · ${r.photoFileName}` : ''}
-                </Typography.Text>
+                <InspectionItemPhotos item={r} width={56} height={42} />
               )}
             </Space>,
           },

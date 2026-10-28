@@ -15,16 +15,16 @@ import static org.mockito.Mockito.when;
 
 /**
  * R-N1/P0 修复核心：附件内容解析。
- * 新附件 content 恒 NULL（RustFS object_key）→ 必须按流读取，不再静默跳过。
+ * 新附件 content 恒 NULL，file_url 是 MinIO 绝对 URL 或历史裸对象键 → 必须按流读取，不再静默跳过。
  */
 class CpsAttachmentContentResolverTest {
 
-    private RustFsStorageService storageService;
+    private MinioStorageService storageService;
     private CpsAttachmentContentResolver resolver;
 
     @BeforeEach
     void setUp() {
-        storageService = mock(RustFsStorageService.class);
+        storageService = mock(MinioStorageService.class);
         resolver = new CpsAttachmentContentResolver(storageService);
     }
 
@@ -34,15 +34,27 @@ class CpsAttachmentContentResolverTest {
         byte[] content = "legacy-inline".getBytes("UTF-8");
         attachment.setContent(content);
         assertArrayEquals(content, resolver.resolve(attachment));
-        verify(storageService, org.mockito.Mockito.never()).read(anyString());
+        verify(storageService, org.mockito.Mockito.never()).readFileUrl(anyString());
     }
 
     @Test
-    void nullContentReadsFromRustFsByObjectKey() throws Exception {
+    void nullContentReadsFromMinIOByObjectKey() throws Exception {
         CpsIssueAttachment attachment = attachment(null, "cps/new-attachment.png");
-        byte[] bytes = "rustfs-content".getBytes("UTF-8");
-        when(storageService.read("cps/new-attachment.png")).thenReturn(bytes);
+        byte[] bytes = "minio-content".getBytes("UTF-8");
+        when(storageService.readFileUrl("cps/new-attachment.png")).thenReturn(bytes);
         assertArrayEquals(bytes, resolver.resolve(attachment));
+        verify(storageService).readFileUrl("cps/new-attachment.png");
+    }
+
+    @Test
+    void nullContentReadsFromMinIOByAbsoluteUrl() throws Exception {
+        // B7 新数据：cps_issue_attachment.file_url 直接存 MinIO 绝对 URL，读取端必须兼容。
+        String fileUrl = "http://127.0.0.1:9000/cps-attachments/cps/abs-attachment.png";
+        CpsIssueAttachment attachment = attachment(null, fileUrl);
+        byte[] bytes = "minio-absolute-url".getBytes("UTF-8");
+        when(storageService.readFileUrl(fileUrl)).thenReturn(bytes);
+        assertArrayEquals(bytes, resolver.resolve(attachment));
+        verify(storageService).readFileUrl(fileUrl);
     }
 
     @Test
@@ -52,12 +64,12 @@ class CpsAttachmentContentResolverTest {
     }
 
     @Test
-    void rustFsFailureFailsFastInsteadOfSilentSkip() throws Exception {
+    void minioFailureFailsFastInsteadOfSilentSkip() throws Exception {
         CpsIssueAttachment attachment = attachment(null, "cps/missing.png");
-        when(storageService.read("cps/missing.png")).thenThrow(new RuntimeException("rustfs down"));
+        when(storageService.readFileUrl("cps/missing.png")).thenThrow(new RuntimeException("minio down"));
         IllegalStateException exception = assertThrows(IllegalStateException.class,
                 () -> resolver.resolve(attachment));
-        assertEquals("Unable to read attachment 42 from RustFS object 'cps/missing.png': rustfs down",
+        assertEquals("Unable to read attachment 42 from MinIO object 'cps/missing.png': minio down",
                 exception.getMessage());
     }
 

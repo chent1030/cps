@@ -20,7 +20,7 @@ public class KnowledgeVectorSyncService {
     private final ImageEmbeddingClient embeddingClient;
     private final MilvusVectorService milvusVectorService;
     private final CpsAiProperties aiProperties;
-    private final RustFsStorageService storage;
+    private final MinioStorageService storage;
 
     public KnowledgeVectorSyncService(
             CpsKnowledgeCaseImageMapper imageMapper,
@@ -28,7 +28,7 @@ public class KnowledgeVectorSyncService {
             ImageEmbeddingClient embeddingClient,
             MilvusVectorService milvusVectorService,
             CpsAiProperties aiProperties,
-            RustFsStorageService storage
+            MinioStorageService storage
     ) {
         this.imageMapper = imageMapper;
         this.caseMapper = caseMapper;
@@ -94,7 +94,7 @@ public class KnowledgeVectorSyncService {
     }
 
     /**
-     * 新上传的知识库素材存储在 RustFS。读取其二进制并转为 Data URL，避免向量服务
+     * 新上传的知识库素材存储在 MinIO。读取其二进制并转为 Data URL，避免向量服务
      * 因无法访问对象存储内网地址而把 URL 当作无效图片。
      */
     private String imageInput(CpsKnowledgeCaseImage image) {
@@ -109,7 +109,7 @@ public class KnowledgeVectorSyncService {
             return "data:" + mediaType(image.getFileName()) + ";base64,"
                     + Base64.getEncoder().encodeToString(content);
         } catch (Exception exception) {
-            throw new IllegalStateException("knowledge material content is unavailable in RustFS", exception);
+            throw new IllegalStateException("knowledge material content is unavailable in MinIO", exception);
         }
     }
 

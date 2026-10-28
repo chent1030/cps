@@ -13,11 +13,11 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * F3 语音上传链路：multipart 音频 → RustFS object_key → 同步调 C-06 speech-to-text → 转写文本。
+ * F3 语音上传链路：multipart 音频 → MinIO object_key → 同步调 C-06 speech-to-text → 转写文本。
  *
  * 约定：
  * - field 白名单 = D-03 三字段 reason / short_term / long_term（转写仅回填表单，不作点检证据）。
- * - 原始音频无论转写成败均先落 RustFS（cps/speech/{日期}/{uuid}-{文件名}），保留周期待定（Python 侧只读不删）。
+ * - 原始音频无论转写成败均先落 MinIO（cps/speech/{日期}/{uuid}-{文件名}），保留周期待定（Python 侧只读不删）。
  * - C-06 未配置(enabled=false)/连接失败/超时/非 2xx ⇒ 降级返回 UNAVAILABLE + 降级文案，不抛异常；
  *   SKIPPED（如 ASR 配置缺失）返回空文本 + skip_reason 文案。移动端允许重试（attempt 递增）或手工输入。
  */
@@ -31,10 +31,10 @@ public class CpsSpeechService {
     static final String FALLBACK_SKIPPED = "语音转写已跳过";
 
     private final CpsSpeechProperties properties;
-    private final RustFsStorageService storage;
+    private final MinioStorageService storage;
     private final CpsSpeechTranscribeClient client;
 
-    public CpsSpeechService(CpsSpeechProperties properties, RustFsStorageService storage,
+    public CpsSpeechService(CpsSpeechProperties properties, MinioStorageService storage,
                             CpsSpeechTranscribeClient client) {
         this.properties = properties;
         this.storage = storage;
@@ -60,7 +60,7 @@ public class CpsSpeechService {
             throw new IllegalArgumentException("attempt must be >= 1");
         }
 
-        // 1) 原始音频先落 RustFS（同桶同鉴权，Python 内网按 object_key 取流）
+        // 1) 原始音频先落 MinIO（同桶同鉴权，Python 内网按 object_key 取流）
         String originalName = firstNonBlank(file.getOriginalFilename(), "voice.webm");
         String audioFormat = audioFormatOf(originalName);
         String safeName = originalName.replace('\\', '_').replace('/', '_');
@@ -70,7 +70,7 @@ public class CpsSpeechService {
             storage.put(objectKey, file.getBytes(),
                     firstNonBlank(file.getContentType(), "application/octet-stream"));
         } catch (Exception error) {
-            throw new IllegalStateException("Unable to store speech audio in RustFS", error);
+            throw new IllegalStateException("Unable to store speech audio in MinIO", error);
         }
 
         // 2) 同步调 C-06（超时可配，默认 240s 量级）；失败降级不抛异常

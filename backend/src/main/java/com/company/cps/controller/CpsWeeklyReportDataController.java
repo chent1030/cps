@@ -21,7 +21,7 @@ import java.util.Map;
  *   <li>window 参数可选；缺省按 §21.1.6 计算"上一完整自然周"窗口（东八区）</li>
  *   <li>视图 weekly_report_data_* 由 V20260927 提供，service 仅做窗口投影</li>
  *   <li>本端点不做权限校验——生产环境需在网关/反向代理层做内网 CIDR 校验
- *       （沿用 cps.callback.trusted-ips 思路）</li>
+ *       （应用内不再维护 IP 白名单/token）</li>
  * </ul>
  */
 @RestController

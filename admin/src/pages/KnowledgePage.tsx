@@ -1,8 +1,9 @@
-import { Button, Card, Form, Image, Input, Message, Modal, Pagination, Select, Space, Table, Typography, Upload } from '@arco-design/web-react'
+import { Button, Card, Form, Input, Message, Modal, Pagination, Select, Space, Table, Typography, Upload } from '@arco-design/web-react'
 import type { TableColumnProps } from '@arco-design/web-react'
 import { IconDownload, IconFilter, IconPlus, IconSync, IconUpload } from '@arco-design/web-react/icon'
 import { useEffect, useState } from 'react'
 import { api } from '../api'
+import { AttachmentThumbs } from '../components/AttachmentImages'
 import { Enabled, PageHead, StatePanel, Toggle } from '../components/PageParts'
 import { useRemote } from '../hooks/useRemote'
 import { errorMessage } from '../lib/presentation'
@@ -20,7 +21,7 @@ export function KnowledgePage() {
   const columns: TableColumnProps<KnowledgeCase>[] = [
     { title: '问题分类', width: 220, render: (_, item) => <><Typography.Text bold>{item.categoryL1Name || '-'}</Typography.Text><div><Typography.Text type="secondary">{item.categoryL2Name || '-'}</Typography.Text></div></> },
     { title: '状态', width: 90, render: (_, item) => <Enabled value={item.enabled} /> },
-    { title: '素材', width: 220, render: (_, item) => <Image.PreviewGroup><Space wrap>{(materials[item.id] || []).map((material) => <Image key={material.id} src={material.fileUrl} width={58} height={44} style={{ objectFit: 'cover' }} preview />)}</Space></Image.PreviewGroup> },
+    { title: '素材', width: 220, render: (_, item) => <AttachmentThumbs values={(materials[item.id] || []).map((material) => material.fileUrl)} width={58} height={44} alt="素材" /> },
     { title: '原因', width: 260, render: (_, item) => <div>{(materials[item.id] || []).map((material) => <Typography.Paragraph key={material.id} ellipsis={{ rows: 2 }} style={{ marginBottom: 4 }}>{material.reason || '-'}</Typography.Paragraph>)}</div> },
     { title: '措施', width: 260, render: (_, item) => <div>{(materials[item.id] || []).map((material) => <Typography.Paragraph key={material.id} ellipsis={{ rows: 2 }} style={{ marginBottom: 4 }}>{material.measure || '-'}</Typography.Paragraph>)}</div> },
     { title: '向量 ID', width: 220, render: (_, item) => <MaterialValues values={(materials[item.id] || []).map((material) => material.milvusVectorId || '-')} /> },

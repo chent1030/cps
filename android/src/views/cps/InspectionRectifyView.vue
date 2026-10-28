@@ -203,7 +203,7 @@ import { cpsApi } from '@/api/index'
 import { computed, reactive, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import type { CpsInspectionRecord, CpsInspectionType, CpsUploadedImage } from '@/types/cps'
-import { resolveAssetUrl, resolveUploadSources } from '@/utils/image'
+import { resolveAssetUrl, resolveUploadedPhotoUrl, resolveUploadSources } from '@/utils/image'
 
 /** 后端校验三要素各 ≥15 字 */
 const MIN_LEN = 15
@@ -301,7 +301,7 @@ const formHint = computed(() => {
 
 const canSubmit = computed(() => !formHint.value)
 
-/** 图片 src：后端存的是站内相对路径，显示前补成绝对地址 */
+/** 图片 src：绝对 URL 原样，历史 /api 代理路径补 base */
 const photoUrl = (url: string) => resolveAssetUrl(url)
 
 const onInput = (field: 'reason' | 'shortTermMeasure' | 'longTermMeasure', event: unknown) => {
@@ -338,7 +338,8 @@ const uploadPhotos = async (sources: ReturnType<typeof resolveUploadSources>) =>
     for (const source of sources) {
       if (photos.value.length >= MAX_PHOTOS) break
       const uploaded = await cpsApi.uploadCpsAttachment(source)
-      photos.value.push({ id: uploaded.id, url: uploaded.url, name: uploaded.name })
+      // MinIO 之后 url 是可直接访问的绝对地址，原样保存与回显；仅旧后端回退 /content 拼法。
+      photos.value.push({ id: uploaded.id, url: resolveUploadedPhotoUrl(uploaded), name: uploaded.name })
     }
   } catch (error) {
     uni.showToast({ title: error instanceof Error ? error.message : '照片上传失败', icon: 'none' })

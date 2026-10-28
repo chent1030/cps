@@ -40,7 +40,7 @@ public class CpsAiMatchService {
     private final CpsIssueAiMatchMapper matchMapper;
     private final ImageEmbeddingClient embeddingClient;
     private final MilvusVectorService milvusVectorService;
-    private final RustFsStorageService storage;
+    private final MinioStorageService storage;
 
     public CpsAiMatchService(
             CpsIssueAttachmentMapper attachmentMapper,
@@ -49,7 +49,7 @@ public class CpsAiMatchService {
             CpsIssueAiMatchMapper matchMapper,
             ImageEmbeddingClient embeddingClient,
             MilvusVectorService milvusVectorService,
-            RustFsStorageService storage
+            MinioStorageService storage
     ) {
         this.attachmentMapper = attachmentMapper;
         this.imageMapper = imageMapper;
@@ -69,9 +69,9 @@ public class CpsAiMatchService {
                 .orElseThrow(() -> new IllegalArgumentException("Attachment not found: " + request.getAttachmentId()));
         byte[] content;
         try {
-            content = storage.read(attachment.getFileUrl());
+            content = storage.readFileUrl(attachment.getFileUrl());
         } catch (Exception error) {
-            throw new IllegalStateException("Attachment content is unavailable in RustFS", error);
+            throw new IllegalStateException("Attachment content is unavailable in MinIO", error);
         }
         if (content == null || content.length == 0) {
             throw new IllegalStateException("Attachment content is unavailable for image analysis");

@@ -50,7 +50,7 @@ public class CpsRoomCheckController {
         return roomCheckService.getRecord(id, empNo);
     }
 
-    /** 照片提交（multipart，关联 RustFS object_key；重拍覆盖）。 */
+    /** 照片提交（multipart，关联 MinIO object_key；重拍覆盖）。 */
     @PostMapping("/records/{id}/items/{itemId}/photo")
     public CpsRoomCheckRecordResponse uploadPhoto(
             @PathVariable Long id,

@@ -11,13 +11,12 @@ import type { TableColumnProps } from '@arco-design/web-react'
 import { IconCheckCircle, IconRefresh, IconReply } from '@arco-design/web-react/icon'
 import { useState } from 'react'
 import { api, getAdminOperator } from '../api'
+import { AttachmentThumb, InspectionItemPhotos } from '../components/AttachmentImages'
 import { PageHead, StatePanel } from '../components/PageParts'
 import { useRemote } from '../hooks/useRemote'
+import { attachmentDisplayUrl } from '../lib/attachmentUrl'
 import { errorMessage } from '../lib/presentation'
 import type { InspectionRecord, InspectionRecordItem, InspectionRecordLog, InspectionRectifyAttachment } from '../types'
-
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
-const attachmentUrl = (id: number | string) => `${API_BASE}/cps/attachments/${id}/content`
 
 const recordStatusColor: Record<string, string> = {
   PENDING: 'gray', IN_PROGRESS: 'orange', PENDING_REVIEW: 'arcoblue', PENDING_RECTIFY: 'gold', JUDGED: 'green',
@@ -40,52 +39,17 @@ const person = (empNo?: string | null, empName?: string | null) => (empNo ? `${e
 const statusTag = (status?: string | null) => <Tag color={recordStatusColor[status ?? ''] ?? 'gray'}>{recordStatusLabel[status ?? ''] ?? status ?? '-'}</Tag>
 
 /**
- * 点检照片地址。
- * Android 上传后 photoObjectKey 保存的是 `/api/cps/attachments/{id}/content`（多张逗号分隔）；
- * 兼容历史对象键数据：无法直接组成图片 URL 时回退展示文件名/张数，不渲染坏图。
+ * 整改照片墙：优先绝对 URL（MinIO 直链），历史数据按附件 ID 回退 /content 代理路径；
+ * 加载失败的图片由 AttachmentThumb 丢弃，保留文件名说明。
  */
-function itemPhotoUrls(value?: string | null): string[] {
-  return (value ?? '')
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .flatMap((part) => {
-      if (/^(https?:)?\/\//i.test(part)) return [part]
-      // 兼容 Android 落库的 /api/cps/attachments/{id}/content：按当前 API base 重组，跨域部署也能取图。
-      const attachment = part.match(/\/cps\/attachments\/([^/]+)\/content\/?$/)
-      if (attachment) return [attachmentUrl(attachment[1])]
-      if (part.startsWith('/')) return [part]
-      if (/^\d+$/.test(part)) return [attachmentUrl(part)]
-      return []
-    })
-}
-
-function PhotoThumbs({ item }: { item: InspectionRecordItem }) {
-  const [broken, setBroken] = useState<Record<string, boolean>>({})
-  const all = itemPhotoUrls(item.photoObjectKey)
-  const urls = all.filter((url) => !broken[url])
-  const summary = `照片 ${item.photoCount ?? all.length}/${item.photoMinCount ?? 1} 张${item.photoFileName ? ` · ${item.photoFileName}` : ''}`
-  return <Space direction="vertical" size={4}>
-    {urls.length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-      {urls.map((url) => <img
-        key={url}
-        src={url}
-        alt={item.photoFileName || item.content || '点检照片'}
-        onError={() => setBroken((previous) => ({ ...previous, [url]: true }))}
-        style={{ width: 64, height: 48, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--border-subtle)', background: '#f5f8f7' }}
-      />)}
-    </div>}
-    <Typography.Text type="secondary" style={{ fontSize: 11 }}>{summary}</Typography.Text>
-  </Space>
-}
-
 function RectifyPhotoWall({ attachments }: { attachments: InspectionRectifyAttachment[] }) {
   return <Space wrap size={10}>
     {attachments.map((attachment) => <div key={attachment.id} style={{ width: 132 }}>
-      <img
-        src={attachmentUrl(attachment.id)}
+      <AttachmentThumb
+        value={attachmentDisplayUrl(attachment)}
+        width={132}
+        height={96}
         alt={attachment.fileName || `整改照片 #${attachment.id}`}
-        style={{ width: 132, height: 96, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border-subtle)', background: '#f5f8f7' }}
       />
       <div style={{ marginTop: 2, fontSize: 11, color: 'var(--color-text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {attachment.fileName || `附件 #${attachment.id}`}
@@ -263,7 +227,7 @@ function ReviewDetailDrawer({ recordId, onClose, onReviewed }: { recordId: numbe
             title: '照片',
             width: 160,
             render: (_, item) => (item.checkTypes ?? '').includes('PHOTO') || item.photoObjectKey
-              ? <PhotoThumbs item={item} />
+              ? <InspectionItemPhotos item={item} />
               : <Typography.Text type="secondary" style={{ fontSize: 12 }}>-</Typography.Text>,
           },
           {

@@ -19,7 +19,7 @@ import java.util.Map;
  *
  * 契约（波次5 Python 侧设计 docs/波次5-Python侧-F1F2C06设计.md）：
  * - 入参：submission_id / field（D-03 白名单 reason|short_term|long_term）/ attempt≥1 /
- *   audio_object_key（RustFS 对象键，Python 内网取流）/ audio_format（缺省后缀推断再 wav）；
+ *   audio_object_key（MinIO 对象键，Python 内网取流）/ audio_format（缺省后缀推断再 wav）；
  *   幂等键惯例 speech-{submissionId}-{field}-{attempt}。
  * - 响应：status=TRANSCRIBED（text 有值）/ SKIPPED（text=""，metadata.skip_reason 说明原因）；
  *   技术失败 502（不缓存，同幂等键可重试）。

@@ -1,5 +1,7 @@
 import { Button, Empty, Table, Tag, Typography } from '@arco-design/web-react'
 import type { TableColumnProps } from '@arco-design/web-react'
+import { AttachmentThumbs } from './AttachmentImages'
+import { splitAttachmentUrls } from '../lib/attachmentUrl'
 import { formatDate, statusLabel } from '../lib/presentation'
 import type { Issue, IssueStatus } from '../types'
 
@@ -21,7 +23,11 @@ const columns: TableColumnProps<Issue>[] = [
   { title: '问题图片', width: 150, render: (_, record) => <Thumbs ids={record.issueImageIds} /> }, { title: '整改图片', width: 150, render: (_, record) => <Thumbs ids={record.proofImageIds} /> },
 ]
 
-function Thumbs({ ids }: { ids?: string }) { if (!ids) return <Typography.Text type="secondary">-</Typography.Text>; return <div style={{ display: 'flex', gap: 5 }}>{ids.split(',').map((id) => <img key={id} src={`/api/cps/attachments/${id}/content`} alt="问题附件" style={{ width: 42, height: 34, objectFit: 'cover', borderRadius: 4 }} />)}</div> }
+function Thumbs({ ids }: { ids?: string }) {
+  const urls = splitAttachmentUrls(ids)
+  if (!urls.length) return <Typography.Text type="secondary">-</Typography.Text>
+  return <AttachmentThumbs values={urls} width={42} height={34} alt="问题附件" />
+}
 export function IssueTable({ records, loading = false, onDetail }: { records: Issue[]; loading?: boolean; onDetail?: (issue: Issue) => void }) {
   const displayColumns = onDetail ? [...columns, { title: '操作', width: 92, fixed: 'right' as const, render: (_: unknown, issue: Issue) => <Button type="text" size="small" onClick={() => onDetail(issue)}>详情</Button> }] : columns
   return <Table<Issue> rowKey="id" columns={displayColumns} data={records} loading={loading} scroll={{ x: onDetail ? 3472 : 3380 }} pagination={false} noDataElement={<Empty description="暂无问题记录" />} />

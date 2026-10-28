@@ -29,8 +29,6 @@ cps:
     base-url: http://127.0.0.1:8000/api/v1
     tenant-id: local-factory
     timeout-ms: 180000
-    # 跨网络共享密钥：非空时 Java→Python 全部请求带 Bearer（与 Python 侧 CPS_INTERNAL_API_KEY 配对；空=回环 internal_trust 免认证）
-    api-token: ${CPS_AGENT_FRAMEWORK_API_TOKEN:}
   room-check:
     # B3 辅房点检判定（Python C-04 /api/v1/agent/room-checks/judge，单item同步，模型推理240s量级）
     # 波次7 J线对齐：端口8010→8000、路径对齐 C7 冻结 schema、超时 240s（清单①⑧）；未起/超时降级 PENDING 不阻塞提交
@@ -55,12 +53,6 @@ cps:
     timeout-seconds: ${CPS_INITIAL_REVIEW_TIMEOUT_SECONDS:600}
     # C-01 投递给 Python 的回调地址（指向本服务 C-02 端点）
     callback-base-url: ${CPS_INITIAL_REVIEW_CALLBACK_BASE_URL:http://127.0.0.1:8080}
-  callback:
-    # C-02 来源校验：仅信 TCP 对端地址；本机联调可置 false 放行
-    trust-enabled: ${CPS_CALLBACK_TRUST_ENABLED:true}
-    trusted-ips: ${CPS_CALLBACK_TRUSTED_IPS:127.0.0.1,::1}
-    # 跨网络共享密钥：非空时接受 Bearer（与 Python 侧 env CPS_CALLBACK_SHARED_TOKEN 配对）；空=仅 IP 白名单
-    shared-token: ${CPS_CALLBACK_SHARED_TOKEN:}
   knowledge:
     vector:
       bootstrap-enabled: ${CPS_KNOWLEDGE_VECTOR_BOOTSTRAP_ENABLED:false}

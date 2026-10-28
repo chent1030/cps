@@ -28,7 +28,7 @@ class CpsKnowledgeAdminServiceTest {
     @Mock
     private KnowledgeVectorSyncService vectorSyncService;
     @Mock
-    private RustFsStorageService storage;
+    private MinioStorageService storage;
 
     private CpsKnowledgeAdminService service;
 

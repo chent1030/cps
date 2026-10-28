@@ -10,8 +10,6 @@ public class CpsAgentFrameworkProperties {
     private String baseUrl = "http://127.0.0.1:8000/api/v1";
     private String tenantId = "local-factory";
     private int timeoutMs = 180000;
-    /** 跨网络部署共享密钥：非空时所有请求带 Authorization: Bearer <token>（Python 侧 env CPS_INTERNAL_API_KEY / cps.yaml internal_api_key 配对）。 */
-    private String apiToken = "";
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -21,6 +19,4 @@ public class CpsAgentFrameworkProperties {
     public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public int getTimeoutMs() { return timeoutMs; }
     public void setTimeoutMs(int timeoutMs) { this.timeoutMs = timeoutMs; }
-    public String getApiToken() { return apiToken; }
-    public void setApiToken(String apiToken) { this.apiToken = apiToken; }
 }

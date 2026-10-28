@@ -1,28 +1,21 @@
 package com.company.cps.controller;
 
-import com.company.cps.config.CpsCallbackTrustProperties;
 import com.company.cps.dto.CpsInitialReviewCallbackRequest;
-import com.company.cps.service.CpsCallbackTrustService;
 import com.company.cps.service.CpsInitialReviewService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import javax.servlet.http.HttpServletRequest;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
  * C-02 初审结果回调接收端点。
  *
- * 安全模型（Phase0 §⑦ internal_trust）：仅校验对端 remoteAddr（不信任 X-Forwarded-For），
- * 可通过 cps.callback.trust-enabled=false 在本机联调时放行。
+ * 鉴权模型：与 Python agent 之间不再有 token / IP 白名单校验（用户要求只需配置后端地址与 agent 端地址），
+ * 回调来源的可信边界交给部署网络（内网 / 网关层）。
  * 幂等：重复回调不重复写结果（service 层结果唯一键 + 已有结果短路）。
  * 迟到结果：任务已 TAKEN_OVER 时仅置 LATE_RESULT 留痕，不覆盖裁决、不推进流程（PRD §28.4）。
  */
@@ -30,35 +23,14 @@ import java.util.Map;
 @RequestMapping("/api/callbacks")
 public class CpsInitialReviewCallbackController {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(CpsInitialReviewCallbackController.class);
-
     private final CpsInitialReviewService initialReviewService;
-    private final CpsCallbackTrustService callbackTrustService;
-    private final CpsCallbackTrustProperties trustProperties;
 
-    public CpsInitialReviewCallbackController(CpsInitialReviewService initialReviewService,
-                                              CpsCallbackTrustService callbackTrustService,
-                                              CpsCallbackTrustProperties trustProperties) {
+    public CpsInitialReviewCallbackController(CpsInitialReviewService initialReviewService) {
         this.initialReviewService = initialReviewService;
-        this.callbackTrustService = callbackTrustService;
-        this.trustProperties = trustProperties;
     }
 
     @PostMapping("/initial-review/result")
-    public ResponseEntity<Map<String, Object>> receiveResult(@RequestBody CpsInitialReviewCallbackRequest payload,
-                                                             @RequestHeader(value = "X-Forwarded-For", required = false) String forwardedFor,
-                                                             @RequestHeader(value = "Authorization", required = false) String authorization,
-                                                             HttpServletRequest request) {
-        String remoteAddr = request.getRemoteAddr();
-        // 显式忽略 X-Forwarded-For：内网直连模型下该头可伪造，仅取 TCP 对端地址；
-        // 跨网络部署时 Python 侧带 Bearer 共享密钥（IP 白名单 OR 密钥任一命中即放行）。
-        if (!callbackTrustService.isTrusted(remoteAddr, authorization)) {
-            LOGGER.warn("Rejected initial-review callback from untrusted address {} (forwarded-for ignored: {})",
-                    remoteAddr, forwardedFor);
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("error", "untrusted callback source");
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
-        }
+    public ResponseEntity<Map<String, Object>> receiveResult(@RequestBody CpsInitialReviewCallbackRequest payload) {
         Map<String, Object> outcome = initialReviewService.handleCallback(payload);
         return ResponseEntity.ok(outcome);
     }

@@ -88,6 +88,25 @@ class CpsRoomCheckJudgeClientTest {
     }
 
     @Test
+    void postsPhotoUrlsWhenFileUrlIsAbsolute() {
+        // C-04 新契约：file_url 已是 MinIO 绝对 URL → photo_urls，photo_object_keys 为空数组。
+        CpsRoomCheckRecordItem absolute = item(1, "C1");
+        String url = "http://127.0.0.1:9000/cps-attachments/cps/room-check/x-C1.jpg";
+        absolute.setPhotoObjectKey(url);
+        server.expect(requestTo(URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().json("{\"photo_urls\":[\"" + url + "\"],"
+                        + "\"photo_object_keys\":[]}", false))
+                .andRespond(withSuccess(
+                        "{\"status\":\"JUDGED\",\"verdict\":\"PASS\",\"reason\":\"ok\"}",
+                        MediaType.APPLICATION_JSON));
+        List<CpsRoomCheckJudgeClient.ItemJudge> judged =
+                client.judge(record(), List.of(absolute), 1);
+        assertEquals("PASS", judged.get(0).outcome);
+        server.verify();
+    }
+
+    @Test
     void parsesJudgedFailTypeMismatchAndUnjudgeable() {
         server.expect(requestTo(URL)).andRespond(withSuccess(
                 "{\"status\":\"JUDGED\",\"verdict\":\"FAIL\",\"reason\":\"地面有积水\"}",

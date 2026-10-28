@@ -46,9 +46,6 @@ cps:
     scan-initial-delay-ms: 600000
     timeout-seconds: 600
     callback-base-url: http://127.0.0.1:8080
-  callback:
-    trust-enabled: false  # 测试放开来源校验
-    trusted-ips: 127.0.0.1,::1
   knowledge:
     vector:
       bootstrap-enabled: false

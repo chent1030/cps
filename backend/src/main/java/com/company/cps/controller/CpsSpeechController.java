@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * F3/F4 语音上传与转写（mobile → Java → RustFS → Python C-06 speech-to-text，同步）。
+ * F3/F4 语音上传与转写（mobile → Java → MinIO → Python C-06 speech-to-text，同步）。
  *
  * multipart：file=音频，field=reason|short_term|long_term（D-03 三字段），
  * submissionId（缺省服务端派生）、attempt（同字段重录递增，缺省 1）。

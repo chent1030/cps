@@ -44,7 +44,7 @@ class CpsAiMatchServiceTest {
     @Mock
     private MilvusVectorService milvusVectorService;
     @Mock
-    private RustFsStorageService storage;
+    private MinioStorageService storage;
 
     private CpsAiMatchService service;
 
@@ -68,7 +68,7 @@ class CpsAiMatchServiceTest {
         attachment.setFileUrl("cps/issue.jpg");
         attachment.setFileType("image/jpeg");
         when(attachmentMapper.findById(501L)).thenReturn(Optional.of(attachment));
-        when(storage.read("cps/issue.jpg")).thenReturn(new byte[]{1, 2, 3});
+        when(storage.readFileUrl("cps/issue.jpg")).thenReturn(new byte[]{1, 2, 3});
         List<Float> vector = Arrays.asList(0.1f, 0.2f, 0.3f);
         when(embeddingClient.embedImage("data:image/jpeg;base64,AQID"))
                 .thenReturn(new ImageEmbeddingResult(vector, "siglip2", "v1", 3, "{}", "{}"));

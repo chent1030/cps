@@ -26,6 +26,7 @@ export interface CpsOption {
 
 export interface CpsAttachment {
   id: number
+  /** 绝对 URL 优先（MinIO 直链）；历史数据可能是 /api/cps/attachments/{id}/content 或裸对象键。 */
   fileUrl: string
   fileName: string
   fileType?: string
@@ -34,6 +35,7 @@ export interface CpsAttachment {
 
 export interface CpsUploadedImage {
   id: number
+  /** 上传接口返回的图片地址：绝对 URL 优先（MinIO）；旧后端为 /api 代理路径，前端按需补 base。 */
   url: string
   name: string
 }
@@ -252,6 +254,7 @@ export interface CpsInspectionRecordItem {
   deductScore: number
   passResult?: 'PASS' | 'FAIL' | string | null
   textValue?: string | null
+  /** 点检照片：逗号分隔的绝对 URL（MinIO）/ /api 代理路径 / 附件 ID；裸对象键无法解析时降级为张数。 */
   photoObjectKey?: string | null
   photoFileName?: string | null
   photoCount?: number
@@ -403,7 +406,9 @@ export interface CpsRoomCheckItem {
   photoCategory: string | null
   deductScore: number | null
   configVersion: number | null
+  /** 点检照片对象键：绝对 URL 优先；历史数据可能是 /api 代理路径或裸对象键。 */
   photoObjectKey: string | null
+  /** 点检照片展示地址：绝对 URL 优先（后端已按存储层 publicObjectUrl 转换）。 */
   photoUrl: string | null
   photoFileName: string | null
   judgeResult: CpsRoomCheckJudgeResult

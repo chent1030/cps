@@ -51,9 +51,9 @@ public class CpsAgentFrameworkClient {
 
     /**
      * R-N1/P0 修复：附件内容统一经 {@link CpsAttachmentContentResolver} 解析——
-     * 新附件（content 为 NULL，仅 RustFS object_key）按流读取转发，
+     * 新附件（content 为 NULL，file_url 为 MinIO 绝对 URL）按流读取转发，
      * 旧附件（content 非空）保留 base64 兼容路径；
-     * RustFS 读取失败快速失败，不再静默跳过（否则退化为无图巡检）。
+     * MinIO 读取失败快速失败，不再静默跳过（否则退化为无图巡检）。
      */
     public String createAndStart(Long issueId, String employeeNo, CpsIssueCreateRequest request, List<CpsIssueAttachment> attachments) {
         if (!properties.isEnabled()) return null;
@@ -97,8 +97,8 @@ public class CpsAgentFrameworkClient {
      * C-01：触发整改初审（事务提交后投递，POST {base}/agent/rectifications）。
      * 波次7 J线（C7 冻结 schema，additionalProperties=false）：必填 issue_id/submission_id/version_no；
      * 可选 reason/short_term_measure/long_term_measure/before_attachments/after_attachments/issue_snapshot。
-     * 附件走 AttachmentRef.object_key（cps_issue_attachment.file_url 即 RustFS object key，Python 自取流，
-     * 避免大图 base64 内联——联调清单④同口径）；幂等 task_ref 由 Python 派生（cps-rectify-{issue_id}-v{version_no}）；
+     * 附件走 AttachmentRef：file_url 为 MinIO 绝对 URL 时用 url 字段，历史裸对象键时用 object_key
+     * （Python 自取流，避免大图 base64 内联——联调清单④同口径）；幂等 task_ref 由 Python 派生（cps-rectify-{issue_id}-v{version_no}）；
      * 回调地址由 Python 配置（JavaCallbackConfig base_url + 固定 path），不经请求体传递。
      *
      * @return review_task_ref（Python 侧初审任务引用；client 禁用时返回 null 不投递）
@@ -149,8 +149,8 @@ public class CpsAgentFrameworkClient {
      * 派生幂等键 {@code cps-rectify-{issue_id}-v{version_no}} 与留档，不做跨表校验。version_no 取记录已提交轮次
      * （review_round），同一轮重复提交天然幂等。
      *
-     * @param beforeRefs  整改前图片引用（巡检项回传照片，object_key 形态，由调用方从 item 组装）
-     * @param afterImages 整改后图片附件行（cps_issue_attachment，走 object_key 或 base64 回退）
+     * @param beforeRefs  整改前图片引用（巡检项回传照片；绝对 URL 用 url 字段，裸对象键用 object_key，由调用方从 item 组装）
+     * @param afterImages 整改后图片附件行（cps_issue_attachment，走 url/object_key 或 base64 回退）
      * @return review_task_ref；client 禁用时返回 null 不投递
      */
     public String triggerInspectionRectifyReview(
@@ -198,8 +198,8 @@ public class CpsAgentFrameworkClient {
 
     /**
      * C-01 附件引用（AttachmentRef，additionalProperties=false）：
-     * 优先 object_key（file_url 即 RustFS object key，Python 侧自取流）；
-     * 无 object_key 的历史附件回退 content_base64（经 contentResolver 读流）。
+     * file_url 是 MinIO 绝对 URL → 用 url 字段；历史裸对象键 → 用 object_key 字段（老行为）；
+     * 两者都没有时回退 content_base64（经 contentResolver 读流）。
      */
     private List<Map<String, Object>> attachmentRefs(List<CpsIssueAttachment> images) {
         List<Map<String, Object>> payloads = new ArrayList<>();
@@ -210,7 +210,7 @@ public class CpsAgentFrameworkClient {
             item.put("attachment_id", image.getId() == null ? null : String.valueOf(image.getId()));
             item.put("file_name", image.getFileName());
             if (image.getFileUrl() != null && !image.getFileUrl().trim().isEmpty()) {
-                item.put("object_key", image.getFileUrl());
+                item.put(attachmentRefField(image.getFileUrl()), image.getFileUrl().trim());
             } else {
                 byte[] content = contentResolver.resolve(image);
                 if (content == null || content.length == 0) continue;
@@ -219,6 +219,14 @@ public class CpsAgentFrameworkClient {
             payloads.add(item);
         }
         return payloads;
+    }
+
+    /**
+     * C-01 附件引用字段名：file_url 已是绝对 URL（MinIO 公开地址）→ {@code url}；
+     * 历史裸对象键 → {@code object_key}。巡检整改 before_refs 复用同一判定。
+     */
+    public static String attachmentRefField(String fileUrl) {
+        return MinioStorageService.isAbsoluteUrl(fileUrl) ? "url" : "object_key";
     }
 
     /** C-03：查询 Python 侧初审执行状态（GET {base}/api/agent/rectifications/{ref}）；三态由 Java 判定。 */
@@ -291,7 +299,7 @@ public class CpsAgentFrameworkClient {
 
     /**
      * C-05/C-08：受控下载周报文件流。Python 契约：GET {base}/agent/weekly-reports/{run_id}/download
-     * （校验 internal_trust；run 需有归档产物）。Java 侧不做二次权限过滤（admin 端已在 controller 校验）。
+     * （run 需有归档产物）。Java 侧不做二次权限过滤（admin 端已在 controller 校验）。
      * 返回字节数组 + contentType；Java 写入 HttpServletResponse 流。
      */
     public WeeklyReportFile downloadWeeklyReportFile(String runId) {
@@ -355,11 +363,6 @@ public class CpsAgentFrameworkClient {
     private HttpHeaders headers() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        // 跨网络部署：配置了共享密钥则带 Bearer 头（Python principal 内部密钥分支）。
-        String token = properties.getApiToken();
-        if (token != null && !token.trim().isEmpty()) {
-            headers.setBearerAuth(token.trim());
-        }
         return headers;
     }
 
