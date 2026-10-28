@@ -1,4 +1,4 @@
-import type { AdminOperator, AdminAuditLog, AdminUser, AdminUserCreate, AdminUserResetPasswordResult, AdminUserUpdate, AgentRuntime, ApprovalAction, ApprovalDetail, ApprovalInstance, AreaPersonConfig, Category, CheckItem, DictEntry, DictType, InspectionArea, InspectionAreaRequest, InspectionPlan, InspectionPlanApproveResult, InspectionPlanRecordStatus, InspectionPlanRebuildResult, InspectionRecord, InspectionRecordDetail, InspectionType, InspectionTypeRequest, InventoryAlertEvent, InventoryItem, InventoryTxn, Issue, KnowledgeCase, KnowledgeMaterial, Overview, PageResult, Room, RoomCheckRecordDetail, RoomCheckRecordRow, RoomCheckRejudgeResult, RowsPage, TotalRows } from './types'
+import type { AdminOperator, AdminAuditLog, AdminUser, AdminUserCreate, AdminUserResetPasswordResult, AdminUserUpdate, AgentRuntime, ApprovalAction, ApprovalDetail, ApprovalInstance, AreaPersonConfig, Category, CheckItem, DictEntry, DictType, InspectionArea, InspectionAreaRequest, InspectionPlan, InspectionPlanApproveResult, InspectionPlanRecordStatus, InspectionPlanRebuildResult, InspectionRecord, InspectionRecordDetail, InspectionReviewDetail, InspectionType, InspectionTypeRequest, InventoryAlertEvent, InventoryItem, InventoryTxn, Issue, KnowledgeCase, KnowledgeMaterial, Overview, PageResult, Room, RoomCheckRecordDetail, RoomCheckRecordRow, RoomCheckRejudgeResult, RowsPage, TotalRows } from './types'
 
 const baseUrl = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
 
@@ -182,6 +182,22 @@ export const api = {
     draftContentJson: string
     draftBy?: string
   }) => request<InspectionPlan>('/cps/inspection-plans/apply-draft', { method: 'POST', body: JSON.stringify(body) }),
+  // ---- 巡检复核（CpsInspectionTaskController）：提交 → AI 初审 → web 复核 → 责任人整改 ----
+  /** 待复核记录（recordStatus=PENDING_REVIEW）；limit 默认 100，后端上限 200。 */
+  inspectionReviews: (limit = 100) => request<InspectionRecord[]>(`/cps/inspection-tasks/pending-review${query({ limit })}`),
+  /**
+   * 复核详情（/cps/inspection-tasks/{id}）。注意与 admin 侧 inspectionRecordDetail 区分：
+   * 本接口额外返回 logs / rectifyAttachments，且记录带 AI 初审与复核字段。
+   */
+  inspectionReviewDetail: (id: number) => request<InspectionReviewDetail>(`/cps/inspection-tasks/${id}`),
+  /** 复核：PASS → PENDING_RECTIFY（区域责任人整改）；RETURN → IN_PROGRESS（提交人修改重提）。 */
+  reviewInspectionRecord: (id: number, decision: 'PASS' | 'RETURN', opinion: string) => {
+    const operator = getAdminOperator()
+    return request<InspectionRecord>(`/cps/inspection-tasks/${id}/review`, {
+      method: 'POST',
+      body: JSON.stringify({ decision, opinion, empNo: operator?.empNo, empName: operator?.empName }),
+    })
+  },
   // ---- 辅房 / 点检项配置（B1/B2 /api/cps/admin/rooms|check-items）----
   rooms: (params?: { factory?: string; roomType?: string; enabled?: boolean }) => request<Room[]>(`/cps/admin/rooms${query(params ?? {})}`),  saveRoom: (body: Partial<Room>) => {
     const operator = getAdminOperator()

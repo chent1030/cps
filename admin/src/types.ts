@@ -581,7 +581,7 @@ export interface InspectionRecord {
   planId?: number | null
   checkEmpNo: string
   checkEmpName?: string | null
-  recordStatus: 'PENDING' | 'IN_PROGRESS' | 'AWAIT_CONFIRM' | 'JUDGED' | string
+  recordStatus: 'PENDING' | 'IN_PROGRESS' | 'AWAIT_CONFIRM' | 'PENDING_REVIEW' | 'PENDING_RECTIFY' | 'JUDGED' | string
   judgeStatus?: string | null
   score?: number | null
   startedAt?: string | null
@@ -589,6 +589,27 @@ export interface InspectionRecord {
   sourceRecordId?: number | null
   createdAt?: string
   updatedAt?: string
+  // ---- 非 CPS 巡检：AI 初审 / 人工复核 / 整改闭环（V20261028）----
+  aiOverall?: 'PASS' | 'PARTIAL' | 'PROBLEM' | 'NONE' | string | null
+  aiScore?: number | null
+  aiReason?: string | null
+  aiJudgedAt?: string | null
+  reviewRound?: number | null
+  reviewEmpNo?: string | null
+  reviewEmpName?: string | null
+  reviewOpinion?: string | null
+  reviewedAt?: string | null
+  rectifyEmpNo?: string | null
+  rectifyEmpName?: string | null
+  rectifyReason?: string | null
+  rectifyShortTerm?: string | null
+  rectifyLongTerm?: string | null
+  rectifyAttachmentIds?: string | null
+  rectifySubmittedAt?: string | null
+  rectifyAiOverall?: string | null
+  rectifyAiReason?: string | null
+  currentHandlerEmpNo?: string | null
+  currentHandlerEmpName?: string | null
 }
 
 export interface InspectionRecordItem {
@@ -618,4 +639,33 @@ export interface InspectionRecordItem {
 export interface InspectionRecordDetail {
   record: InspectionRecord
   items: InspectionRecordItem[]
+}
+
+/** 记录流转日志（CpsInspectionRecordLog），用于 web 复核页时间线。 */
+export interface InspectionRecordLog {
+  id: number
+  recordId: number
+  action: 'START' | 'SUBMIT' | 'REVIEW_PASS' | 'REVIEW_RETURN' | 'RECTIFY_SUBMIT' | string
+  fromStatus?: string | null
+  toStatus?: string | null
+  operatorEmpNo?: string | null
+  operatorEmpName?: string | null
+  comment?: string | null
+  createdAt?: string | null
+}
+
+/** 整改照片（cps_issue_attachment），图片地址 /api/cps/attachments/{id}/content。 */
+export interface InspectionRectifyAttachment {
+  id: number
+  fileUrl?: string | null
+  fileName?: string | null
+  fileType?: string | null
+}
+
+/** GET /api/cps/inspection-tasks/{id} 返回体。 */
+export interface InspectionReviewDetail {
+  record: InspectionRecord
+  items: InspectionRecordItem[]
+  logs: InspectionRecordLog[]
+  rectifyAttachments: InspectionRectifyAttachment[]
 }

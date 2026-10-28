@@ -13,6 +13,7 @@ export const PAGE_PERMISSIONS: { key: string; label: string }[] = [
   { key: 'overview', label: '巡检概览' },
   { key: 'issues', label: '问题管理' },
   { key: 'inspection-plans', label: '巡检计划' },
+  { key: 'inspection-reviews', label: '巡检复核' },
   { key: 'rooms', label: '辅房与点检项' },
   { key: 'room-check-records', label: '点检记录' },
   { key: 'dicts', label: '字典管理' },

@@ -8,6 +8,7 @@ import { InspectionTypesPage } from './pages/InspectionTypesPage'
 import { CategoriesPage } from './pages/CategoriesPage'
 import { IssuesPage } from './pages/IssuesPage'
 import { InspectionPlansPage } from './pages/InspectionPlansPage'
+import { InspectionReviewsPage } from './pages/InspectionReviewsPage'
 import { InventoryItemsPage } from './pages/inventory/Items'
 import { InventoryTransactionsPage } from './pages/inventory/Transactions'
 import { InventoryAlertsPage } from './pages/inventory/Alerts'
@@ -26,6 +27,7 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   '/overview': 'overview',
   '/issues': 'issues',
   '/inspection-plans': 'inspection-plans',
+  '/inspection-reviews': 'inspection-reviews',
   '/approvals': 'approvals',
   '/rooms': 'rooms',
   '/room-check-records': 'room-check-records',
@@ -76,6 +78,7 @@ export default function App() {
             <Route path="overview" element={<OverviewPage />} />
             <Route path="issues" element={<ProtectedRoute path="/issues"><IssuesPage /></ProtectedRoute>} />
             <Route path="inspection-plans" element={<ProtectedRoute path="/inspection-plans"><InspectionPlansPage /></ProtectedRoute>} />
+            <Route path="inspection-reviews" element={<ProtectedRoute path="/inspection-reviews"><InspectionReviewsPage /></ProtectedRoute>} />
             <Route path="approvals" element={<ProtectedRoute path="/approvals"><ApprovalCenterPage /></ProtectedRoute>} />
             <Route path="rooms" element={<ProtectedRoute path="/rooms"><RoomsPage /></ProtectedRoute>} />
             <Route path="room-check-records" element={<ProtectedRoute path="/room-check-records"><RoomCheckRecordsPage /></ProtectedRoute>} />

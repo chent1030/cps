@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { Avatar, Button, Layout, Menu, Space, Tag, Typography } from '@arco-design/web-react'
 import {
-  IconApps, IconBook, IconCalendarClock, IconCamera, IconCheck, IconDashboard,
+  IconApps, IconBook, IconCalendarClock, IconCamera, IconCheck, IconCheckCircle, IconDashboard,
   IconExclamationCircle, IconHistory, IconHome, IconLanguage, IconRefresh, IconSafe, IconSettings,
   IconStorage, IconUnorderedList, IconUser, IconUserGroup,
 } from '@arco-design/web-react/icon'
@@ -13,6 +13,7 @@ const navigation = [
   { path: '/overview', label: '巡检概览', icon: <IconDashboard /> },
   { path: '/issues', label: '问题管理', icon: <IconUnorderedList /> },
   { path: '/inspection-plans', label: '巡检计划', icon: <IconCalendarClock /> },
+  { path: '/inspection-reviews', label: '巡检复核', icon: <IconCheckCircle /> },
   { path: '/approvals', label: '审批中心', icon: <IconCheck />, superAdminOnly: true },
   { path: '/rooms', label: '巡检区域与点检项', icon: <IconHome /> },
   { path: '/room-check-records', label: '巡检记录', icon: <IconCamera /> },
