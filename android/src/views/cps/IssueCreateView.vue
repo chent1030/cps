@@ -456,28 +456,20 @@
 </template>
 
 <script setup lang="ts">
+import { cpsApi } from '@/api/index'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { inspectCpsImage, startVoiceRecording, stopVoiceRecording } from '@/api/cps/ai'
-import { createCpsIssue } from '@/api/cps/issue'
-import { getInspectionTypeCheckItems, listCpsInspectionTypes } from '@/api/cps/inspectionType'
-import { listInspectionAreas, startInspection } from '@/api/cps/inspectionTask'
-import { getCpsIssueDraft, saveCpsIssueDraft } from '@/api/cps/issueDraft'
-import {
-  getAreas,
-  getFactories,
-  getFeedbackHandler,
-  getLines,
-  getProcesses,
-  searchCpsEmployees,
-  type CpsEmployeeOption,
-} from '@/api/cps/master'
-import { uploadCpsAttachment, type CpsAttachmentUploadSource } from '@/api/cps/attachment'
+
+
+
+
+
+import type { CpsAttachmentUploadSource, CpsEmployeeOption } from '@/api/index'
 import type { CpsAiSuggestionPayload, CpsCheckItemInfo, CpsInspectionArea, CpsInspectionType, CpsIssueCheckResult, CpsIssueDraftData, CpsOption, CpsUploadedImage } from '@/types/cps'
 import { resolveAssetUrl, resolveUploadSources, toImageUrl } from '@/utils/image'
 
 // 新建问题表单状态：只存在于当前页面实例，**不写任何本地缓存**（不做草稿暂存/回填）。
-// 从「我的草稿」进入时，由 restoreDraft 通过接口 getCpsIssueDraft 拉取后回填。
+// 从「我的草稿」进入时，由 restoreDraft 通过接口 cpsApi.getCpsIssueDraft 拉取后回填。
 interface CreateDraftState {
   location: { factory: string; area: string; line: string; process: string }
   images: CpsUploadedImage[]
@@ -579,7 +571,7 @@ const openAreaPicker = async (t: CpsInspectionType) => {
   areaPickerOpen.value = true
   areaPickerLoading.value = true
   try {
-    areaOptions.value = await listInspectionAreas(t.code)
+    areaOptions.value = await cpsApi.listInspectionAreas(t.code)
   } catch (error) {
     uni.showToast({ title: error instanceof Error ? error.message : '加载巡检区域失败', icon: 'none' })
   } finally {
@@ -592,7 +584,7 @@ const startZonedInspection = async (area: CpsInspectionArea) => {
   if (!t || areaPickerStarting.value !== null) return
   areaPickerStarting.value = area.id
   try {
-    const record = await startInspection({ typeCode: t.code, areaId: area.id })
+    const record = await cpsApi.startInspection({ typeCode: t.code, areaId: area.id })
     areaPickerOpen.value = false
     uni.redirectTo({ url: `/views/cps/InspectionExecuteView?recordId=${record.id}` })
   } catch (error) {
@@ -635,7 +627,7 @@ const checkItemsDone = computed(
 const loadTypeCheckItems = async (code: string) => {
   checkItemsLoading.value = true
   try {
-    typeCheckItems.value = await getInspectionTypeCheckItems(code)
+    typeCheckItems.value = await cpsApi.getInspectionTypeCheckItems(code)
   } catch {
     typeCheckItems.value = []
   } finally {
@@ -661,7 +653,7 @@ const uploadCheckPhotos = async (itemCode: string, sources: CpsAttachmentUploadS
   try {
     const current = [...(checkEntries.value[itemCode]?.photos ?? [])]
     for (const source of sources) {
-      const uploaded = await uploadCpsAttachment(source)
+      const uploaded = await cpsApi.uploadCpsAttachment(source)
       current.push({ id: uploaded.id, url: uploaded.url, name: uploaded.name })
     }
     setCheckField(itemCode, 'photos', current)
@@ -740,7 +732,7 @@ const onSelectInspectionType = async (code: string) => {
     if (startingCustom.value) return
     startingCustom.value = code
     try {
-      const record = await startInspection({ typeCode: code })
+      const record = await cpsApi.startInspection({ typeCode: code })
       uni.redirectTo({ url: `/views/cps/InspectionExecuteView?recordId=${record.id}` })
     } catch (error) {
       uni.showToast({ title: error instanceof Error ? error.message : '开始巡检失败（请确认该类型已配置点检项）', icon: 'none' })
@@ -776,7 +768,7 @@ const loadInspectionTypes = async () => {
   if (draft.inspectionTypes.length || inspectionTypesLoading.value) return
   inspectionTypesLoading.value = true
   try {
-    const list: CpsInspectionType[] = await listCpsInspectionTypes()
+    const list: CpsInspectionType[] = await cpsApi.listCpsInspectionTypes()
     // Phase C/D：全量列出后端返回的可用类型（含分区域类型，如辅房点检）
     // 内置 CPS巡检（builtin=1）排在最前
     draft.inspectionTypes = list.sort(
@@ -904,7 +896,7 @@ watch(
       feedbackCandidates.value = []
       return
     }
-    const handler = await getFeedbackHandler({
+    const handler = await cpsApi.getFeedbackHandler({
       factory: value.factory,
       area: value.area,
       line: value.line,
@@ -918,18 +910,18 @@ watch(
 
 const onSelectFactory = async (factory: string) => {
   draft.location = { factory, area: '', line: '', process: '' }
-  draft.areas = await getAreas(factory)
+  draft.areas = await cpsApi.getAreas(factory)
   draft.lines = []
   draft.processes = []
 }
 const onSelectArea = async (area: string) => {
   draft.location = { ...draft.location, area, line: '', process: '' }
-  draft.lines = await getLines(draft.location.factory, area)
-  draft.processes = await getProcesses(draft.location.factory, area)
+  draft.lines = await cpsApi.getLines(draft.location.factory, area)
+  draft.processes = await cpsApi.getProcesses(draft.location.factory, area)
 }
 const onSelectLine = async (line: string) => {
   draft.location = { ...draft.location, line, process: '' }
-  draft.processes = await getProcesses(draft.location.factory, draft.location.area, line || undefined)
+  draft.processes = await cpsApi.getProcesses(draft.location.factory, draft.location.area, line || undefined)
 }
 const onSelectProcess = (process: string) => {
   draft.location = { ...draft.location, process }
@@ -940,7 +932,7 @@ const onSearchFeedback = async () => {
   if (!kw || feedbackSearching.value) return
   feedbackSearching.value = true
   try {
-    feedbackSearchResults.value = await searchCpsEmployees(kw)
+    feedbackSearchResults.value = await cpsApi.searchCpsEmployees(kw)
     feedbackSearched.value = true
   } finally {
     feedbackSearching.value = false
@@ -971,7 +963,7 @@ const uploadDraftImages = async (sources: CpsAttachmentUploadSource[]) => {
   try {
     for (const source of sources) {
       const shouldInspectFirst = draft.images.length === 0
-      const uploaded = await uploadCpsAttachment(source)
+      const uploaded = await cpsApi.uploadCpsAttachment(source)
       draft.images = [...draft.images, uploaded]
       // 直接使用后端返回的 /api/cps/attachments/{id}/content 路径作为预览地址，
       // 免掉 base64 转换与 /api/cps/attachments/base64 接口（已下线）。
@@ -1043,7 +1035,7 @@ const onFirstImageReady = async (fileId: number) => {
   inspecting.value = true
   try {
     // 创建阶段仅保存 AI 识别结果，分类由反馈回复节点确认/修正
-    draft.aiSuggestion = await inspectCpsImage(fileId)
+    draft.aiSuggestion = await cpsApi.inspectCpsImage(fileId)
   } finally {
     inspecting.value = false
   }
@@ -1059,7 +1051,7 @@ const onVoiceClick = async () => {
     recording.value = false
     transcribing.value = true
     try {
-      const text = await stopVoiceRecording()
+      const text = await cpsApi.stopVoiceRecording()
       if (text.trim()) {
         draft.description = [draft.description.trim(), text.trim()].filter(Boolean).join('\n')
       } else {
@@ -1074,7 +1066,7 @@ const onVoiceClick = async () => {
   }
   // 未录音 → 开始
   if (transcribing.value) return
-  const started = startVoiceRecording()
+  const started = cpsApi.startVoiceRecording()
   if (!started) {
     uni.showToast({ title: '当前环境不支持语音录入', icon: 'none' })
     return
@@ -1123,7 +1115,7 @@ const saveDraft = async () => {
   savingDraft.value = true
   try {
     const snapshot = serializeDraft()
-    const saved = await saveCpsIssueDraft({
+    const saved = await cpsApi.saveCpsIssueDraft({
       id: draft.draftId,
       inspectionTypeCode: snapshot.inspectionTypeCode,
       factory: snapshot.location.factory || undefined,
@@ -1142,7 +1134,7 @@ const saveDraft = async () => {
 /** 从服务端草稿恢复整份表单。 */
 const restoreDraft = async (id: number) => {
   try {
-    const remote = await getCpsIssueDraft(id)
+    const remote = await cpsApi.getCpsIssueDraft(id)
     let data: CpsIssueDraftData
     try {
       data = JSON.parse(remote.draftData) as CpsIssueDraftData
@@ -1174,10 +1166,10 @@ const restoreDraft = async (id: number) => {
       if (results) hydrateCheckResults(results)
     }
     if (draft.location.factory) {
-      draft.areas = await getAreas(draft.location.factory)
+      draft.areas = await cpsApi.getAreas(draft.location.factory)
       if (draft.location.area) {
-        draft.lines = await getLines(draft.location.factory, draft.location.area)
-        draft.processes = await getProcesses(draft.location.factory, draft.location.area)
+        draft.lines = await cpsApi.getLines(draft.location.factory, draft.location.area)
+        draft.processes = await cpsApi.getProcesses(draft.location.factory, draft.location.area)
       }
     }
     uni.showToast({ title: `已恢复草稿 #${remote.id}，继续填写`, icon: 'success' })
@@ -1193,7 +1185,7 @@ const submit = async () => {
     // Phase D2：点检项填写结果并入 extraData（与管理端类型配置联动）
     const extraPayload: Record<string, unknown> = { ...draft.extraData }
     if (typeCheckItems.value.length) extraPayload.checkResults = collectCheckResults()
-    const result = await createCpsIssue({
+    const result = await cpsApi.createCpsIssue({
       factory: draft.location.factory,
       area: draft.location.area,
       line: draft.location.line,
@@ -1224,7 +1216,7 @@ const submit = async () => {
 
 onMounted(async () => {
   if (!draft.factories.length) {
-    draft.factories = await getFactories()
+    draft.factories = await cpsApi.getFactories()
   }
   await loadInspectionTypes()
   // 从列表再次进入「新建问题」时，始终回到第一步重新选类型；

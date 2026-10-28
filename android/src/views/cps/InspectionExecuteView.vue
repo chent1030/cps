@@ -159,15 +159,12 @@
 </template>
 
 <script setup lang="ts">
+import { cpsApi } from '@/api/index'
 import { computed, reactive, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 
-import { uploadCpsAttachment } from '@/api/cps/attachment'
-import {
-  getInspectionRecord,
-  saveInspectionItemResult,
-  submitInspection,
-} from '@/api/cps/inspectionTask'
+
+
 import type { CpsInspectionRecord, CpsInspectionRecordItem } from '@/types/cps'
 import { resolveAssetUrl, resolveUploadSources } from '@/utils/image'
 
@@ -267,7 +264,7 @@ const load = async () => {
   if (!recordId.value) return
   loading.value = true
   try {
-    const detail = await getInspectionRecord(recordId.value)
+    const detail = await cpsApi.getInspectionRecord(recordId.value)
     record.value = detail.record
     items.value = detail.items
   } catch (error) {
@@ -297,7 +294,7 @@ const uploadItemPhotos = async (
   try {
     const current = [...photoList(item)]
     for (const source of sources) {
-      const uploaded = await uploadCpsAttachment(source)
+      const uploaded = await cpsApi.uploadCpsAttachment(source)
       current.push({ url: uploaded.url, name: uploaded.name })
     }
     local[item.id] = { ...local[item.id], photos: current }
@@ -376,7 +373,7 @@ const persistItem = async (item: CpsInspectionRecordItem) => {
   savingItem.value = item.id
   try {
     const photos = photoList(item)
-    await saveInspectionItemResult(item.id, {
+    await cpsApi.saveInspectionItemResult(item.id, {
       passResult: (local[item.id]?.passResult ?? item.passResult ?? null) as 'PASS' | 'FAIL' | null,
       textValue: local[item.id]?.textValue ?? item.textValue ?? null,
       photoObjectKey: photos.length ? photos.map((p) => p.url).join(',') : null,
@@ -412,7 +409,7 @@ const submit = async () => {
   }
   submitting.value = true
   try {
-    const result = await submitInspection(record.value.id)
+    const result = await cpsApi.submitInspection(record.value.id)
     record.value = result
     uni.showToast({ title: `提交成功，得分 ${result.score ?? '-'}`, icon: 'success' })
   } catch (error) {

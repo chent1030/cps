@@ -560,12 +560,12 @@
 </template>
 
 <script setup lang="ts">
+import { cpsApi } from '@/api/index'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 
-import { executeCpsIssueAction, getCpsIssueDetail } from '@/api/cps/issue'
-import { getCategories, searchCpsEmployees, type CpsEmployeeOption, type CpsOption } from '@/api/cps/master'
-import { uploadCpsAttachment, type CpsAttachmentUploadSource } from '@/api/cps/attachment'
+
+import type { CpsAttachmentUploadSource, CpsEmployeeOption, CpsOption } from '@/api/index'
 import { loadAttachmentImageSources, resolveAssetUrl, resolveUploadSources, toImageUrl } from '@/utils/image'
 import { statusMeta, issueLocation as formatLocation, issueCategory as formatCategory, personLabel as formatPersonLabel } from '@/utils/format'
 import { resolveDefaultPersons, type ActionPersonField } from '@/utils/personDefault'
@@ -865,12 +865,12 @@ const applyDefaultPersons = () => {
 // 分类选项加载
 const loadLevel1Categories = async () => {
   if (!level1Categories.value.length) {
-    level1Categories.value = await getCategories()
+    level1Categories.value = await cpsApi.getCategories()
   }
 }
 
 const loadLevel2Categories = async (parentId: number | null) => {
-  level2Categories.value = parentId ? await getCategories(parentId) : []
+  level2Categories.value = parentId ? await cpsApi.getCategories(parentId) : []
 }
 
 const onSelectCategoryL1 = async (categoryL1Id: number) => {
@@ -885,7 +885,7 @@ const onSelectCategoryL2 = (categoryL2Id: number) => {
 
 const load = async () => {
   if (!issueId.value) return
-  const response = (await getCpsIssueDetail(issueId.value)) as CpsIssueDetailApiResponse & Partial<CpsIssueDetail>
+  const response = (await cpsApi.getCpsIssueDetail(issueId.value)) as CpsIssueDetailApiResponse & Partial<CpsIssueDetail>
   detail.value = normalizeIssueDetail(response)
   proofImages.value = (detail.value.proofAttachments ?? []).map((item) => ({
     id: item.id,
@@ -918,7 +918,7 @@ const onSearchPeople = async () => {
   if (!kw || personSearching.value) return
   personSearching.value = true
   try {
-    personSearchResults.value = await searchCpsEmployees(kw)
+    personSearchResults.value = await cpsApi.searchCpsEmployees(kw)
     personSearched.value = true
   } finally {
     personSearching.value = false
@@ -988,7 +988,7 @@ const runAction = async (action: CpsIssueAction) => {
   }
   actionLoading.value = action
   try {
-    await executeCpsIssueAction(issueId.value, buildActionPayload(action))
+    await cpsApi.executeCpsIssueAction(issueId.value, buildActionPayload(action))
     uni.showToast({ title: action === 'TRANSFER' ? '已转办' : '操作成功', icon: 'success' })
     await load()
   } catch (error) {
@@ -1047,7 +1047,7 @@ const uploadProofImages = async (sources: CpsAttachmentUploadSource[]) => {
   proofUploading.value = true
   try {
     for (const source of sources) {
-      const uploaded = await uploadCpsAttachment(source)
+      const uploaded = await cpsApi.uploadCpsAttachment(source)
       proofImages.value = [...proofImages.value, uploaded]
       // 同步加载预览源
       const previewSources = await loadAttachmentImageSources([{ id: uploaded.id, fileUrl: uploaded.url, fileName: uploaded.name }])

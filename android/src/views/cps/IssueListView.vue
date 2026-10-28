@@ -122,12 +122,13 @@
 </template>
 
 <script setup lang="ts">
+import { cpsApi } from '@/api/index'
 import { computed, ref, watch } from 'vue'
 
-import { listCpsIssues, getCpsIssueCounts } from '@/api/cps/issue'
-import { deleteCpsIssueDraft, listMyCpsIssueDrafts } from '@/api/cps/issueDraft'
-import { listCpsInspectionTypes } from '@/api/cps/inspectionType'
-import { listMyInProgressInspections } from '@/api/cps/inspectionTask'
+
+
+
+
 import type {
   CpsInspectionRecord,
   CpsInspectionType,
@@ -178,7 +179,7 @@ const load = async (force = false) => {
   }
   loading.value = true
   try {
-    const result = await listCpsIssues({ tab: tab.value, page: 1, pageSize: 50 })
+    const result = await cpsApi.listCpsIssues({ tab: tab.value, page: 1, pageSize: 50 })
     items.value = result
     listCache.set(tab.value, result)
   } catch (error) {
@@ -228,7 +229,7 @@ const currentLoading = computed(() => {
 
 const loadCounts = async () => {
   try {
-    counts.value = await getCpsIssueCounts()
+    counts.value = await cpsApi.getCpsIssueCounts()
   } catch {
     // 角标拉取失败不影响列表，静默忽略
   }
@@ -237,7 +238,7 @@ const loadCounts = async () => {
 const loadDrafts = async () => {
   draftsLoading.value = true
   try {
-    drafts.value = await listMyCpsIssueDrafts()
+    drafts.value = await cpsApi.listMyCpsIssueDrafts()
   } catch {
     // 草稿拉取失败不打扰主列表，静默忽略
   } finally {
@@ -248,10 +249,10 @@ const loadDrafts = async () => {
 const loadRecords = async () => {
   recordsLoading.value = true
   try {
-    records.value = await listMyInProgressInspections()
+    records.value = await cpsApi.listMyInProgressInspections()
     if (records.value.length && !typeOptions.value.length) {
       try {
-        typeOptions.value = await listCpsInspectionTypes()
+        typeOptions.value = await cpsApi.listCpsInspectionTypes()
       } catch {
         // 类型名拿不到时回退显示编码
       }
@@ -303,7 +304,7 @@ onShow(() => {
 
 const removeDraft = async (id: number) => {
   try {
-    await deleteCpsIssueDraft(id)
+    await cpsApi.deleteCpsIssueDraft(id)
     uni.showToast({ title: '草稿已删除', icon: 'success' })
     await loadDrafts()
   } catch (error) {
