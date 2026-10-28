@@ -1041,39 +1041,76 @@ const onFirstImageReady = async (fileId: number) => {
   }
 }
 
-// 语音输入：点击开始录音，再点停止 → 停止录音 → 上传录音 → 回填后端返回的文本
+// ---------- 语音输入：Android 系统录音 → 停止后上传转写 ----------
 const recording = ref(false)
 const transcribing = ref(false)
+let voiceRecorderReady = false
+
+const getVoiceRecorder = () => uni.getRecorderManager()
+
+/** 开始录音（调用 Android 系统录音） */
+const startVoice = () => {
+  const recorder = getVoiceRecorder()
+  if (!voiceRecorderReady) {
+    // 录音结束：拿到录音文件 → 上传后端 → 回填识别文本
+    recorder.onStop((result) => {
+      recording.value = false
+      const filePath = result?.tempFilePath
+      if (!filePath) {
+        transcribing.value = false
+        uni.showToast({ title: '没有取到录音文件', icon: 'none' })
+        return
+      }
+      cpsApi.transcribeVoice(filePath).then(
+        (text) => {
+          transcribing.value = false
+          if (text && text.trim()) {
+            draft.description = [draft.description.trim(), text.trim()].filter(Boolean).join('\n')
+          } else {
+            uni.showToast({ title: '未识别到语音内容', icon: 'none' })
+          }
+        },
+        (error: unknown) => {
+          transcribing.value = false
+          uni.showToast({ title: error instanceof Error ? error.message : '语音识别失败', icon: 'none' })
+        },
+      )
+    })
+    recorder.onError((error) => {
+      recording.value = false
+      transcribing.value = false
+      uni.showToast({ title: error?.errMsg || '录音失败', icon: 'none' })
+    })
+    voiceRecorderReady = true
+  }
+  recorder.start({
+    duration: 120000, // 最长 2 分钟
+    format: 'aac',
+    sampleRate: 16000,
+    numberOfChannels: 1,
+    encodeBitRate: 48000,
+  })
+  recording.value = true
+}
+
+/** 停止录音：停止后由 onStop 里上传并回填文本 */
+const stopVoice = () => {
+  transcribing.value = true
+  getVoiceRecorder().stop()
+}
 
 const onVoiceClick = () => {
-  // 正在录音 → 停止录音，上传后回填文本
   if (recording.value) {
-    recording.value = false
-    transcribing.value = true
-    cpsApi.stopVoiceRecording(
-      (text) => {
-        transcribing.value = false
-        if (text.trim()) {
-          draft.description = [draft.description.trim(), text.trim()].filter(Boolean).join('\n')
-        } else {
-          uni.showToast({ title: '未识别到语音内容', icon: 'none' })
-        }
-      },
-      (message) => {
-        transcribing.value = false
-        uni.showToast({ title: message, icon: 'none' })
-      },
-    )
+    stopVoice()
     return
   }
-  // 未录音 → 开始录音
   if (transcribing.value) return
-  cpsApi.startVoiceRecording()
-  if (!cpsApi.isVoiceRecording()) {
-    uni.showToast({ title: '当前环境不支持语音录入', icon: 'none' })
-    return
+  try {
+    startVoice()
+  } catch (error) {
+    recording.value = false
+    uni.showToast({ title: error instanceof Error ? error.message : '录音启动失败', icon: 'none' })
   }
-  recording.value = true
 }
 
 // ============================================================

@@ -56,10 +56,7 @@ export const cpsApi = {
   // ---------- 附件 / AI / 语音 ----------
   uploadCpsAttachment: attachment.uploadCpsAttachment,
   inspectCpsImage: ai.inspectCpsImage,
-  startVoiceRecording: ai.startVoiceRecording,
-  stopVoiceRecording: ai.stopVoiceRecording,
-  uploadVoiceForText: ai.uploadVoiceForText,
-  isVoiceRecording: ai.isVoiceRecording,
+  transcribeVoice: ai.transcribeVoice,
   transcribeSpeech: speech.transcribeSpeech,
 }
 
