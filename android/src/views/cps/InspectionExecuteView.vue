@@ -288,31 +288,13 @@ const onTextChange = (item: CpsInspectionRecordItem, value: string) => {
 }
 
 /** uni 相册/拍照选择：返回可上传的源（File 或临时路径），用户取消时返回空数组 */
-const pickPhotoSources = (count: number) =>
-  new Promise<ReturnType<typeof resolveUploadSources>>((resolve, reject) => {
-    uni.chooseImage({
-      count,
-      sourceType: ['camera', 'album'],
-      success: (result) => resolve(resolveUploadSources(result)),
-      fail: (err) => {
-        if (/cancel/i.test(String(err?.errMsg ?? ''))) {
-          resolve([])
-          return
-        }
-        reject(err)
-      },
-    })
-  })
-
-const onPhotoPick = async (event: unknown) => {
-  const dataset = readDataset(event)
-  const item = items.value.find((record) => record.id === Number(dataset.itemId ?? 0))
-  if (!item) return
-  uni.showToast({ title: '正在打开相机…', icon: 'none', duration: 800 })
+const uploadItemPhotos = async (
+  item: CpsInspectionRecordItem,
+  sources: ReturnType<typeof resolveUploadSources>,
+) => {
+  if (!sources.length) return
+  uploadingItem.value = item.id
   try {
-    const sources = await pickPhotoSources(9)
-    if (!sources.length) return
-    uploadingItem.value = item.id
     const current = [...photoList(item)]
     for (const source of sources) {
       const uploaded = await uploadCpsAttachment(source)
@@ -325,6 +307,26 @@ const onPhotoPick = async (event: unknown) => {
   } finally {
     uploadingItem.value = null
   }
+}
+
+// 拍照/选图：直接用 uni 原生 uni.chooseImage（App 端会调起系统相机/相册）
+const onPhotoPick = (event: unknown) => {
+  const dataset = readDataset(event)
+  const item = items.value.find((record) => record.id === Number(dataset.itemId ?? 0))
+  if (!item) return
+  uni.chooseImage({
+    count: 9,
+    sizeType: ['compressed'],
+    sourceType: ['camera', 'album'],
+    success: (result) => {
+      void uploadItemPhotos(item, resolveUploadSources(result))
+    },
+    fail: (err) => {
+      const message = String((err as { errMsg?: string } | undefined)?.errMsg ?? '')
+      if (/cancel/i.test(message)) return
+      uni.showToast({ title: message || '拍照失败', icon: 'none' })
+    },
+  })
 }
 
 const removePhoto = async (item: CpsInspectionRecordItem, index: number) => {

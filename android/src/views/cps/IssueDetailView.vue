@@ -1071,7 +1071,6 @@ const chooseProofImages = () => {
     uni.showToast({ title: '当前环境不支持拍照/选图', icon: 'none' })
     return
   }
-  uni.showToast({ title: '正在打开相机…', icon: 'none', duration: 800 })
   uni.chooseImage({
     count: remaining,
     sourceType: ['camera', 'album'],

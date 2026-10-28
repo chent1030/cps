@@ -643,42 +643,22 @@ const loadTypeCheckItems = async (code: string) => {
   }
 }
 
-/** 调起 uni 图片选择（拍照 / 相册），返回可上传的源 */
-const chooseUploadSources = (count: number) =>
-  new Promise<CpsAttachmentUploadSource[]>((resolve, reject) => {
-    if (typeof uni === 'undefined' || typeof uni.chooseImage !== 'function') {
-      reject(new Error('当前环境不支持拍照/选图'))
-      return
-    }
-    uni.chooseImage({
-      count,
-      sizeType: ['compressed'],
-      sourceType: ['camera', 'album'],
-      success: (result) => resolve(resolveUploadSources(result)),
-      fail: (err) => {
-        const message = String((err as { errMsg?: string } | undefined)?.errMsg ?? '')
-        // 用户主动取消不算失败
-        if (/cancel/i.test(message)) {
-          resolve([])
-          return
-        }
-        reject(new Error(message || '拍照/选图失败'))
-      },
-    })
-  })
+// 拍照/选图：直接用 uni 原生 uni.chooseImage（App 端会调起系统相机/相册）
+const PHOTO_SOURCE_TYPES: Array<'camera' | 'album'> = ['camera', 'album']
+
+const onChooseImageFail = (err: unknown, fallback: string) => {
+  const message = String((err as { errMsg?: string } | undefined)?.errMsg ?? '')
+  // 用户主动取消不算失败
+  if (/cancel/i.test(message)) return
+  uni.showToast({ title: message || fallback, icon: 'none' })
+}
 
 /** 点检项照片的显示地址：后端存的是站内相对路径，显示前补成绝对地址 */
 const checkPhotoUrl = (entry: { url: string }) => resolveAssetUrl(entry.url)
 
-const onCheckPhotoPick = async (event: unknown) => {
-  const dataset = ((event as { currentTarget?: { dataset?: Record<string, unknown> } } | undefined)?.currentTarget
-    ?.dataset ?? {}) as { code?: string }
-  const itemCode = String(dataset.code ?? '')
-  if (!itemCode) return
-  uni.showToast({ title: '正在打开相机…', icon: 'none', duration: 800 })
+const uploadCheckPhotos = async (itemCode: string, sources: CpsAttachmentUploadSource[]) => {
+  if (!sources.length) return
   try {
-    const sources = await chooseUploadSources(9)
-    if (!sources.length) return
     const current = [...(checkEntries.value[itemCode]?.photos ?? [])]
     for (const source of sources) {
       const uploaded = await uploadCpsAttachment(source)
@@ -688,6 +668,22 @@ const onCheckPhotoPick = async (event: unknown) => {
   } catch (error) {
     uni.showToast({ title: error instanceof Error ? error.message : '照片上传失败', icon: 'none' })
   }
+}
+
+const onCheckPhotoPick = (event: unknown) => {
+  const dataset = ((event as { currentTarget?: { dataset?: Record<string, unknown> } } | undefined)?.currentTarget
+    ?.dataset ?? {}) as { code?: string }
+  const itemCode = String(dataset.code ?? '')
+  if (!itemCode) return
+  uni.chooseImage({
+    count: 9,
+    sizeType: ['compressed'],
+    sourceType: PHOTO_SOURCE_TYPES,
+    success: (result) => {
+      void uploadCheckPhotos(itemCode, resolveUploadSources(result))
+    },
+    fail: (err) => onChooseImageFail(err, '拍照失败'),
+  })
 }
 
 const removeCheckPhoto = (itemCode: string, index: number) => {
@@ -968,18 +964,11 @@ watch(feedbackPickerOpen, (v) => {
   }
 })
 
-// 图片上传：uni.chooseImage 逐张串行上传，保持选择顺序（首张仍触发 AI 识别）
-const pickImages = async () => {
-  const remaining = Math.max(5 - draft.images.length, 0)
-  if (!remaining) {
-    uni.showToast({ title: '最多上传 5 张照片', icon: 'none' })
-    return
-  }
-  uni.showToast({ title: '正在打开相机…', icon: 'none', duration: 800 })
+// 图片上传：uni.chooseImage 选完立即逐张串行上传，保持选择顺序（首张仍触发 AI 识别）
+const uploadDraftImages = async (sources: CpsAttachmentUploadSource[]) => {
+  if (!sources.length) return
   uploading.value = true
   try {
-    const sources = await chooseUploadSources(remaining)
-    if (!sources.length) return
     for (const source of sources) {
       const shouldInspectFirst = draft.images.length === 0
       const uploaded = await uploadCpsAttachment(source)
@@ -996,6 +985,23 @@ const pickImages = async () => {
   } finally {
     uploading.value = false
   }
+}
+
+const pickImages = () => {
+  const remaining = Math.max(5 - draft.images.length, 0)
+  if (!remaining) {
+    uni.showToast({ title: '最多上传 5 张照片', icon: 'none' })
+    return
+  }
+  uni.chooseImage({
+    count: remaining,
+    sizeType: ['compressed'],
+    sourceType: PHOTO_SOURCE_TYPES,
+    success: (result) => {
+      void uploadDraftImages(resolveUploadSources(result))
+    },
+    fail: (err) => onChooseImageFail(err, '拍照/选图失败'),
+  })
 }
 
 const onRemoveImage = (index: number) => {
