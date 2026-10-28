@@ -40,121 +40,89 @@ export const inspectCpsImage = async (sourceAttachmentId: number): Promise<CpsAi
 }
 
 // ============================================================
-// 语音输入（uni 原生录音器 uni.getRecorderManager）
-// 交互：点一次 = 开始录音；再点一次 = 停止录音，停止后把录音文件送去转写，返回文字。
-// 转写接口暂未接入（先留空），接入时只需要实现文件末尾的 transcribeAudio()。
+// 语音输入
+//   点击「语音输入」→ 调用 Android 系统录音（uni.getRecorderManager）
+//   再点「停止录音」→ 停止录音，把录音文件上传后端，后端返回识别文本
+// 上传那一步（uploadVoiceForText）留空，由你自己实现。
 // ============================================================
 
-/** 后端契约（待接入）：POST /api/cps/ai/transcribe，multipart 字段名 audio，返回 { text: string }。 */
-const TRANSCRIBE_PATH = '/api/cps/ai/transcribe'
-
-interface RecorderStopResult {
-  tempFilePath?: string
-  duration?: number
-  fileSize?: number
-}
-
-/** 只声明用得到的几个方法，避免依赖平台类型定义缺失。 */
+/** 只声明用得到的几个方法。 */
 interface RecorderManagerLike {
   start: (options: Record<string, unknown>) => void
   stop: () => void
-  onStop: (handler: (result: RecorderStopResult) => void) => void
+  onStop: (handler: (result: { tempFilePath?: string }) => void) => void
   onError: (handler: (error: { errMsg?: string }) => void) => void
 }
 
 let recorder: RecorderManagerLike | null = null
-let recording = false
-let handleStop: ((result: RecorderStopResult) => void) | null = null
-let handleError: ((error: Error) => void) | null = null
+let recordingFlag = false
+/** 停止录音后的回调：识别成功的文本 / 失败原因 */
+let onTranscribed: ((text: string) => void) | null = null
+let onTranscribeFailed: ((message: string) => void) | null = null
 
-/** 录音器是全局单例，onStop/onError 只注册一次。 */
-const ensureRecorder = (): RecorderManagerLike => {
+const getRecorder = (): RecorderManagerLike => {
   if (recorder) return recorder
   const manager = uni.getRecorderManager() as unknown as RecorderManagerLike
+  // 录音结束：拿到录音临时文件，交给后端识别
   manager.onStop((result) => {
-    recording = false
-    const done = handleStop
-    handleStop = null
-    handleError = null
-    done?.(result)
+    recordingFlag = false
+    const filePath = result?.tempFilePath
+    if (!filePath) {
+      onTranscribeFailed?.('没有取到录音文件')
+      return
+    }
+    uploadVoiceForText(filePath).then(
+      (text) => onTranscribed?.(text),
+      (error: unknown) => onTranscribeFailed?.(error instanceof Error ? error.message : '语音识别失败'),
+    )
   })
   manager.onError((error) => {
-    recording = false
-    const fail = handleError
-    handleStop = null
-    handleError = null
-    fail?.(new Error(error?.errMsg || '录音失败'))
+    recordingFlag = false
+    onTranscribeFailed?.(error?.errMsg || '录音失败')
   })
   recorder = manager
   return recorder
 }
 
-/** 开始录音：true=已在录音；当前环境不支持或重复点击返回 false。 */
-export const startVoiceRecording = (): boolean => {
-  if (recording) return false
-  if (typeof uni === 'undefined' || typeof uni.getRecorderManager !== 'function') return false
-  try {
-    ensureRecorder().start({
-      duration: 120000,
-      format: 'aac',
-      sampleRate: 16000,
-      numberOfChannels: 1,
-      encodeBitRate: 48000,
-    })
-    recording = true
-    return true
-  } catch {
-    return false
+/** 点击开始录音：调用 Android 系统录音。 */
+export const startVoiceRecording = () => {
+  if (recordingFlag) return
+  getRecorder().start({
+    duration: 120000, // 最长 2 分钟
+    format: 'aac',
+    sampleRate: 16000,
+    numberOfChannels: 1,
+    encodeBitRate: 48000,
+  })
+  recordingFlag = true
+}
+
+/** 点击停止录音：停止录音 → 上传录音 → 回调后端返回的文本。 */
+export const stopVoiceRecording = (onText: (text: string) => void, onError: (message: string) => void) => {
+  if (!recordingFlag) {
+    onError('当前没有在录音')
+    return
   }
+  onTranscribed = onText
+  onTranscribeFailed = onError
+  getRecorder().stop()
 }
 
 /** 是否正在录音。 */
-export const isVoiceRecording = () => recording
-
-/** 停止录音 → 上传录音文件转写 → 返回识别文字。 */
-export const stopVoiceRecording = (): Promise<string> =>
-  new Promise<string>((resolve, reject) => {
-    if (!recorder || !recording) {
-      reject(new Error('当前没有在录音'))
-      return
-    }
-    handleStop = (result) => {
-      const filePath = result?.tempFilePath
-      if (!filePath) {
-        reject(new Error('没有取到录音文件'))
-        return
-      }
-      transcribeAudio(filePath).then(resolve, reject)
-    }
-    handleError = reject
-    try {
-      recorder.stop()
-    } catch (error) {
-      recording = false
-      handleStop = null
-      handleError = null
-      reject(error instanceof Error ? error : new Error('停止录音失败'))
-    }
-  })
+export const isVoiceRecording = () => recordingFlag
 
 /**
- * 语音转写：把录音文件上传到后端，返回识别出的文字。
+ * =========== 待你实现：上传录音，返回后端识别的文本 ===========
  *
- * TODO 待接入（按后端最终约定实现即可，页面逻辑无需改动）：
- *   const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
- *   uni.uploadFile({
- *     url: `${API_BASE}${TRANSCRIBE_PATH}`,
- *     filePath,
- *     name: 'audio',
- *     success: (res) => resolve((JSON.parse(res.data) as { text?: string }).text ?? ''),
- *     fail: (err) => reject(new Error(err?.errMsg || '语音转写失败')),
- *   })
+ * filePath 是 Android 录好的临时文件路径（例如 file:///storage/.../xxx.aac），
+ * 在这里调用后端的上传接口，把识别的文本 return 出来即可，例如：
  *
- * 现在先返回空字符串：录音链路（开始/停止/拿到临时文件）可以正常验证，
- * 页面会提示「未识别到语音内容」。
+ *   const res = await uni.uploadFile({ url: `${API_BASE}/api/xxx`, filePath, name: 'audio' })
+ *   return JSON.parse(res.data).text
+ *
+ * 现在先抛错，页面会提示「语音识别接口未实现」。
  */
-const transcribeAudio = async (filePath: string): Promise<string> => {
-  void TRANSCRIBE_PATH
+export const uploadVoiceForText = async (filePath: string): Promise<string> => {
   void filePath
-  return ''
+  throw new Error('语音识别接口未实现')
 }

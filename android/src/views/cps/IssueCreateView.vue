@@ -1041,33 +1041,35 @@ const onFirstImageReady = async (fileId: number) => {
   }
 }
 
-// 语音输入：点击开始录音、再点击结束并转写
+// 语音输入：点击开始录音，再点停止 → 停止录音 → 上传录音 → 回填后端返回的文本
 const recording = ref(false)
 const transcribing = ref(false)
 
-const onVoiceClick = async () => {
-  // 正在录音 → 结束并转写
+const onVoiceClick = () => {
+  // 正在录音 → 停止录音，上传后回填文本
   if (recording.value) {
     recording.value = false
     transcribing.value = true
-    try {
-      const text = await cpsApi.stopVoiceRecording()
-      if (text.trim()) {
-        draft.description = [draft.description.trim(), text.trim()].filter(Boolean).join('\n')
-      } else {
-        uni.showToast({ title: '未识别到语音内容', icon: 'none' })
-      }
-    } catch (error) {
-      uni.showToast({ title: error instanceof Error ? error.message : '语音识别失败', icon: 'none' })
-    } finally {
-      transcribing.value = false
-    }
+    cpsApi.stopVoiceRecording(
+      (text) => {
+        transcribing.value = false
+        if (text.trim()) {
+          draft.description = [draft.description.trim(), text.trim()].filter(Boolean).join('\n')
+        } else {
+          uni.showToast({ title: '未识别到语音内容', icon: 'none' })
+        }
+      },
+      (message) => {
+        transcribing.value = false
+        uni.showToast({ title: message, icon: 'none' })
+      },
+    )
     return
   }
-  // 未录音 → 开始
+  // 未录音 → 开始录音
   if (transcribing.value) return
-  const started = cpsApi.startVoiceRecording()
-  if (!started) {
+  cpsApi.startVoiceRecording()
+  if (!cpsApi.isVoiceRecording()) {
     uni.showToast({ title: '当前环境不支持语音录入', icon: 'none' })
     return
   }

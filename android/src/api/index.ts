@@ -58,6 +58,7 @@ export const cpsApi = {
   inspectCpsImage: ai.inspectCpsImage,
   startVoiceRecording: ai.startVoiceRecording,
   stopVoiceRecording: ai.stopVoiceRecording,
+  uploadVoiceForText: ai.uploadVoiceForText,
   isVoiceRecording: ai.isVoiceRecording,
   transcribeSpeech: speech.transcribeSpeech,
 }
