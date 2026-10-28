@@ -421,9 +421,9 @@
 
                   <template v-if="showReviewFields">
                     <view class="u-field">
-                      <text class="u-field__label">审核意见</text>
+                      <text class="u-field__label">审核</text>
                       <view class="u-field__control">
-                        <textarea v-model="actionForm.reviewOpinion" class="u-textarea" :maxlength="-1" auto-height placeholder="填写审核意见" />
+                        <text class="u-field__hint">{{ webOnlyReviewText }}</text>
                       </view>
                     </view>
                   </template>
@@ -624,7 +624,6 @@ const actionForm = ref({
   proofEmpNo: '',
   reviewerEmpNo: '',
   rectifyRemark: '',
-  reviewOpinion: '',
   targetEmpNo: '',
   comment: '',
   categoryL1Id: null as number | null,
@@ -700,6 +699,11 @@ const proofEmptyText = computed(() => {
   return isV2Flow.value ? '复核照片在「提交整改」时上传' : '复核照片在「待传图」节点由上传人提交'
 })
 const showReviewFields = computed(() => detail.value?.status === 'PENDING_REVIEW')
+// 审核动作只在 web 审批中心发生（产品约束）：Android 端只提示，不出现「审核通过/审核退回」按钮
+const WEB_ONLY_ACTIONS: CpsIssueAction[] = ['REVIEW_CLOSE', 'REVIEW_REJECT']
+const webOnlyReviewText = computed(
+  () => '本单已进入待审核。审核通过/退回在 Web 端「审批中心」完成，App 端不可操作。',
+)
 // 后端按「当前办理人 + 状态」给出可执行动作；空数组就是不可操作，不再本地兜底，
 // 否则非办理人也会看到按钮，点下去会被后端拒绝（"Current employee is not issue handler"）。
 const workflowActions = computed<CpsIssueAction[]>(() => detail.value?.availableActions ?? [])
@@ -707,8 +711,9 @@ const currentEmpNo = import.meta.env.VITE_CPS_EMP_NO ?? '61016968'
 const noActionText = computed(() => {
   if (!detail.value) return '当前节点没有可执行的操作'
   if (detail.value.status === 'CLOSED') return '本单已关闭'
-  if (detail.value.status === 'PENDING_AI_REVIEW') return 'AI 初审中，完成后流转到人工审核'
+  if (detail.value.status === 'PENDING_AI_REVIEW') return 'AI 初审中，完成后流转到人工审核（Web 审批中心）'
   if (detail.value.status === 'PENDING_REVIEWER_CONFIG') return '结果已出但缺少审核员，等待管理员配置'
+  if (detail.value.status === 'PENDING_REVIEW') return '待审核：请在 Web 端「审批中心」完成审核'
   if (detail.value.currentHandlerEmpNo && detail.value.currentHandlerEmpNo !== currentEmpNo) {
     return `当前处理人是 ${detail.value.currentHandlerEmpNo}，你无法执行操作`
   }
@@ -716,7 +721,11 @@ const noActionText = computed(() => {
 })
 // 转办独立成模式：开启后只填转办目标，常规操作项不再展示
 const transferAvailable = computed(() => workflowActions.value.includes('TRANSFER'))
-const normalActions = computed<CpsIssueAction[]>(() => workflowActions.value.filter((action) => action !== 'TRANSFER'))
+const normalActions = computed<CpsIssueAction[]>(() =>
+  workflowActions.value.filter(
+    (action) => action !== 'TRANSFER' && !WEB_ONLY_ACTIONS.includes(action),
+  ),
+)
 const showAnyActionFields = computed(
   () =>
     showFeedbackFields.value ||
@@ -832,7 +841,6 @@ const resetActionForm = () => {
     proofEmpNo: '',
     reviewerEmpNo: '',
     rectifyRemark: '',
-    reviewOpinion: '',
     targetEmpNo: '',
     comment: '',
     categoryL1Id: null,
@@ -986,7 +994,6 @@ const buildActionPayload = (action: CpsIssueAction) => {
     reviewerEmpNo: actionForm.value.reviewerEmpNo || undefined,
     reviewerEmpName: personName(actionForm.value.reviewerEmpNo),
     rectifyRemark: actionForm.value.rectifyRemark || undefined,
-    reviewOpinion: actionForm.value.reviewOpinion || undefined,
     shortTermMeasure: actionForm.value.shortTermMeasure || undefined,
     longTermMeasure: actionForm.value.longTermMeasure || undefined,
     proofAttachmentIds:

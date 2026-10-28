@@ -79,6 +79,9 @@ public class CpsIssueService {
      */
     private CpsIssueDraftService issueDraftService;
 
+    /** 审核搬到 web 后，PENDING_REVIEW 的办理权落在审批中心实例上（setter 注入，可为空）。 */
+    private CpsIssueReviewApprovalService reviewApprovalService;
+
     public CpsIssueService(
             CpsIssueMapper issueMapper,
             CpsIssueAttachmentMapper attachmentMapper,
@@ -138,6 +141,16 @@ public class CpsIssueService {
     @Autowired
     public void setIssueDraftService(CpsIssueDraftService issueDraftService) {
         this.issueDraftService = issueDraftService;
+    }
+
+    /**
+     * 审核搬到 web 审批中心后，问题单进入 PENDING_REVIEW 由审批实例承载办理权。
+     * 走 setter 可选注入，避免构造链循环依赖（审批桥反向依赖本服务裁决问题单）。
+     */
+    @Autowired(required = false)
+    public void setReviewApprovalService(
+            @org.springframework.context.annotation.Lazy CpsIssueReviewApprovalService reviewApprovalService) {
+        this.reviewApprovalService = reviewApprovalService;
     }
 
     @Transactional
@@ -572,6 +585,9 @@ public class CpsIssueService {
         requireUpdatedRows(issueMapper.updateWorkflowFields(issue), issue.getId());
         insertFlowLog(issue.getId(), fromStatus, toStatus, CpsIssueAction.REVIEWER_REASSIGN, operatorEmpNo,
                 oldReviewer, reviewer, reason.trim());
+        if (toStatus == CpsIssueStatus.PENDING_REVIEW) {
+            openReviewApproval(issue);
+        }
         return new CpsIssueActionResponse(
                 issue.getId(),
                 issue.getStatus(),
@@ -861,6 +877,22 @@ public class CpsIssueService {
         Long firstAttachmentId = issueAttachmentIds.get(0);
         if (!Objects.equals(request.getSourceAttachmentId(), firstAttachmentId)) {
             throw new IllegalArgumentException("sourceAttachmentId must match first issue attachment id");
+        }
+    }
+
+    /**
+     * 问题单进入待审核后同步审批中心实例（web 办理）；失败不阻断业务流转，只记日志。
+     */
+    private void openReviewApproval(CpsIssue issue) {
+        CpsIssueReviewApprovalService bridge = this.reviewApprovalService;
+        if (bridge == null) {
+            return;
+        }
+        try {
+            bridge.ensurePendingApproval(issue, null);
+        } catch (RuntimeException exception) {
+            log.warn("Open review approval instance failed: issueId={} reason={}",
+                    issue.getId(), exception.getMessage());
         }
     }
 

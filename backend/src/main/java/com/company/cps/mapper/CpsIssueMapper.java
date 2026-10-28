@@ -31,6 +31,11 @@ public interface CpsIssueMapper {
                                       @Param("limit") int limit);
 
     /**
+     * 按状态取问题单（审批中心补建历史待审核单用），按 id 升序，limit 防爆。
+     */
+    List<CpsIssue> findByStatus(@Param("status") CpsIssueStatus status, @Param("limit") int limit);
+
+    /**
      * 更新问题流程相关字段，包括状态、处理人、原因措施、审核意见和关闭时间。
      *
      * <p>A2 乐观锁（AC-24）：WHERE 追加 lock_version CAS 校验并自增；

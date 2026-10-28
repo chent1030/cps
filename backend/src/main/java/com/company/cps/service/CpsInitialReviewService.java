@@ -26,6 +26,9 @@ import com.company.cps.mapper.CpsIssueMapper;
 import com.company.cps.mapper.CpsRectificationSubmissionMapper;
 import com.company.cps.mapper.CpsReviewAdjudicationMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +61,7 @@ public class CpsInitialReviewService {
     /** 重试退避上限（防配置错误把提交线程 sleep 过久）。 */
     static final int MAX_BACKOFF_MS = 30_000;
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final Logger log = LoggerFactory.getLogger(CpsInitialReviewService.class);
 
     private final CpsInitialReviewTaskMapper taskMapper;
     private final CpsInitialReviewResultMapper resultMapper;
@@ -73,6 +77,12 @@ public class CpsInitialReviewService {
     private final CpsInitialReviewConfigMapper configMapper;
     private final CpsInitialReviewEventMapper eventMapper;
     private final CpsReviewAdjudicationMapper adjudicationMapper;
+
+    /**
+     * 问题整改审核 → web 审批中心的桥。用 setter 可选注入：单测直接 new 本服务时不接审批中心，
+     * 生产由 Spring 注入；未注入时问题单照旧进 PENDING_REVIEW（审批中心侧可后续补建）。
+     */
+    private CpsIssueReviewApprovalService reviewApprovalService;
 
     public CpsInitialReviewService(
             CpsInitialReviewTaskMapper taskMapper,
@@ -104,6 +114,11 @@ public class CpsInitialReviewService {
         this.configMapper = configMapper;
         this.eventMapper = eventMapper;
         this.adjudicationMapper = adjudicationMapper;
+    }
+
+    @Autowired(required = false)
+    public void setReviewApprovalService(CpsIssueReviewApprovalService reviewApprovalService) {
+        this.reviewApprovalService = reviewApprovalService;
     }
 
     /**
@@ -533,6 +548,92 @@ public class CpsInitialReviewService {
     }
 
     /**
+     * 审批中心展示用 AI 初审意见摘要：overall + 逐项检查结论（一句话，写进审批实例快照）。
+     * 无任务/无结果时也返回可读文案，避免审批人看到空值。
+     */
+    public String aiOpinionSummary(Long issueId, Integer versionNo) {
+        CpsInitialReviewTask task = taskMapper.findByIssueAndVersion(issueId, versionNo);
+        if (task == null) {
+            return "未触发 AI 初审";
+        }
+        CpsInitialReviewResult result = resultMapper.findByTaskId(task.getId());
+        if (result == null) {
+            return "AI 初审未出结果（任务状态 " + task.getStatus().name() + "），可按经验人工复核";
+        }
+        StringBuilder summary = new StringBuilder(overallLabel(result.getOverall()));
+        List<CpsInitialReviewItem> items = itemMapper.findByTaskId(task.getId());
+        if (items != null && !items.isEmpty()) {
+            summary.append("；");
+            for (int i = 0; i < items.size(); i++) {
+                CpsInitialReviewItem item = items.get(i);
+                if (i > 0) {
+                    summary.append("，");
+                }
+                summary.append(checkTypeLabel(item.getCheckType()))
+                        .append(item.getFieldName() == null || item.getFieldName().isBlank()
+                                ? "" : "(" + item.getFieldName() + ")")
+                        .append('=')
+                        .append(verdictLabel(item.getVerdict()));
+            }
+        }
+        return summary.toString();
+    }
+
+    private String overallLabel(String overall) {
+        if (overall == null || overall.isBlank()) {
+            return "AI 初审已出结果";
+        }
+        switch (overall) {
+            case "PASS":
+                return "AI 初审通过";
+            case "PARTIAL":
+                return "AI 初审部分通过（需人工确认）";
+            case "PROBLEM":
+                return "AI 初审发现问题";
+            default:
+                return "AI 初审结论 " + overall;
+        }
+    }
+
+    private String checkTypeLabel(String checkType) {
+        if (checkType == null) {
+            return "检查项";
+        }
+        switch (checkType) {
+            case "TEXT_VALIDITY":
+                return "文本有效性";
+            case "TEXT_LENGTH":
+                return "文本字数";
+            case "PUNCTUATION_RATIO":
+                return "标点占比";
+            case "MEASURE_SIMILARITY":
+                return "长短措施雷同";
+            case "IMAGE_COMPARE":
+                return "整改前后图对比";
+            default:
+                return checkType;
+        }
+    }
+
+    private String verdictLabel(String verdict) {
+        if (verdict == null) {
+            return "-";
+        }
+        switch (verdict) {
+            case "PASS":
+                return "通过";
+            case "FAIL":
+                return "不通过";
+            case "WARN":
+                return "需关注";
+            case "SKIPPED":
+                return "未出具";
+            default:
+                return verdict;
+        }
+    }
+
+    /**
      * 裁决留痕（issue 终态写回由 CpsIssueService.adjudicate 先行完成，本方法同事务落裁决行+事件）。
      * uk(issue_id,version_no) 兜底：并发重复裁决返回既有记录（幂等）。
      */
@@ -693,6 +794,29 @@ public class CpsInitialReviewService {
                 CpsIssueStatus.PENDING_REVIEW, LocalDateTime.now());
         insertFlowLog(issue.getId(), issue.getStatus(), CpsIssueStatus.PENDING_REVIEW,
                 action, issue.getCurrentHandlerEmpNo(), reviewerEmpNo, comment);
+        openReviewApproval(issue.getId());
+    }
+
+    /**
+     * 进入待审核时同步一条 web 审批中心实例（用户 2026-10-28 拍板：审核动作只在 web 端发生）。
+     * 审批中心不可用时只记日志：问题单仍停在 PENDING_REVIEW，由 web 侧后续补建，不反向阻塞业务流程。
+     */
+    private void openReviewApproval(Long issueId) {
+        CpsIssueReviewApprovalService bridge = this.reviewApprovalService;
+        if (bridge == null) {
+            return;
+        }
+        try {
+            CpsIssue refreshed = issueMapper.findById(issueId).orElse(null);
+            if (refreshed == null) {
+                return;
+            }
+            bridge.ensurePendingApproval(refreshed,
+                    aiOpinionSummary(issueId, refreshed.getCurrentSubmissionVersion()));
+        } catch (RuntimeException exception) {
+            log.warn("Open review approval instance failed: issueId={} reason={}",
+                    issueId, exception.getMessage());
+        }
     }
 
     private CpsInitialReviewResult buildResult(CpsInitialReviewTask task, CpsInitialReviewCallbackRequest request,
