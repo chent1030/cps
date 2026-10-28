@@ -675,9 +675,10 @@ const onCheckPhotoPick = async (event: unknown) => {
     ?.dataset ?? {}) as { code?: string }
   const itemCode = String(dataset.code ?? '')
   if (!itemCode) return
-  const sources = await chooseUploadSources(9)
-  if (!sources.length) return
+  uni.showToast({ title: '正在打开相机…', icon: 'none', duration: 800 })
   try {
+    const sources = await chooseUploadSources(9)
+    if (!sources.length) return
     const current = [...(checkEntries.value[itemCode]?.photos ?? [])]
     for (const source of sources) {
       const uploaded = await uploadCpsAttachment(source)
@@ -974,10 +975,11 @@ const pickImages = async () => {
     uni.showToast({ title: '最多上传 5 张照片', icon: 'none' })
     return
   }
-  const sources = await chooseUploadSources(remaining)
-  if (!sources.length) return
+  uni.showToast({ title: '正在打开相机…', icon: 'none', duration: 800 })
   uploading.value = true
   try {
+    const sources = await chooseUploadSources(remaining)
+    if (!sources.length) return
     for (const source of sources) {
       const shouldInspectFirst = draft.images.length === 0
       const uploaded = await uploadCpsAttachment(source)

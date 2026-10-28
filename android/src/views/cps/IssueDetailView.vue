@@ -327,10 +327,16 @@
                       <text class="u-field__label">复核照片<text class="u-field__req">*</text></text>
                       <view class="u-field__control">
                         <view class="cps-uploader">
-                          <view v-if="proofImages.length < 5" class="cps-uploader__trigger" hover-class="u-tap" @click="chooseProofImages">
+                          <button
+                              v-if="proofImages.length < 5"
+                              class="cps-uploader__trigger"
+                              hover-class="u-tap"
+                              :disabled="proofUploading"
+                              @click="chooseProofImages"
+                          >
                             <text class="cps-uploader__plus">+</text>
                             <text class="cps-uploader__text">{{ proofUploading ? '上传中' : '上传整改照片' }}</text>
-                          </view>
+                          </button>
                           <view class="cps-uploader__grid">
                             <view
                               v-for="(image, index) in proofImages"
@@ -384,10 +390,16 @@
                       <view class="u-field__control">
                         <!-- 复核照片（整改凭证）上传：仅「待传图」节点可用，最多 5 张 -->
                         <view class="cps-uploader">
-                          <view v-if="proofImages.length < 5" class="cps-uploader__trigger" hover-class="u-tap" @click="chooseProofImages">
+                          <button
+                              v-if="proofImages.length < 5"
+                              class="cps-uploader__trigger"
+                              hover-class="u-tap"
+                              :disabled="proofUploading"
+                              @click="chooseProofImages"
+                          >
                             <text class="cps-uploader__plus">+</text>
                             <text class="cps-uploader__text">{{ proofUploading ? '上传中' : '上传整改图片' }}</text>
-                          </view>
+                          </button>
                           <view class="cps-uploader__grid">
                             <view
                               v-for="(image, index) in proofImages"
@@ -1055,6 +1067,11 @@ const chooseProofImages = () => {
     uni.showToast({ title: '最多上传 5 张照片', icon: 'none' })
     return
   }
+  if (typeof uni === 'undefined' || typeof uni.chooseImage !== 'function') {
+    uni.showToast({ title: '当前环境不支持拍照/选图', icon: 'none' })
+    return
+  }
+  uni.showToast({ title: '正在打开相机…', icon: 'none', duration: 800 })
   uni.chooseImage({
     count: remaining,
     sourceType: ['camera', 'album'],
