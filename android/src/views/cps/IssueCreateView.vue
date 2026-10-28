@@ -138,25 +138,6 @@
 
       <!-- 右列：类型指示 + 动态字段 + 位置 + 派发 -->
       <view class="cps-create-layout__col">
-        <!-- 当前巡检类型（第一步已选，可切换） -->
-        <view class="u-card cps-card cps-card--pad-x">
-          <view class="cps-type-active">
-            <view class="cps-type-active__info">
-              <text class="cps-type-active__label">当前巡检类型</text>
-              <view class="cps-type-active__name">
-                <text class="cps-type-active__value">{{ activeTypeName || draft.inspectionTypeCode }}</text>
-                <text class="cps-type-active__code">{{ draft.inspectionTypeCode }}</text>
-              </view>
-            </view>
-            <button class="u-btn u-btn--ghost u-btn--sm" @click="switchType">切换类型</button>
-          </view>
-        </view>
-
-        <!-- Phase D2：类型配置联动 —— 巡检内容说明 -->
-        <view v-if="activeTypeContent" class="u-card cps-card cps-card--pad-sm">
-          <text class="cps-type-content-banner"><text class="cps-type-content-banner__label">巡检内容：</text>{{ activeTypeContent }}</text>
-        </view>
-
         <!-- Phase D2：类型配置联动 —— 点检项填写（管理端「直挂点检项」配置驱动） -->
         <view v-if="typeCheckItems.length || checkItemsLoading" class="u-card cps-card">
           <view class="cps-card-title">
@@ -285,14 +266,6 @@
         <view v-if="inspecting" class="u-alert u-alert--info">
           <text class="u-alert__icon">ℹ</text>
           <text class="u-alert__text">AI 正在识别首张图片，请稍候</text>
-        </view>
-
-        <view v-if="aiSuggestionSummary" class="u-card cps-card cps-create-ai">
-          <view class="cps-card-title">
-            <text class="cps-card-title__main">原因措施</text>
-            <text class="cps-pill cps-pill--blue">可修改</text>
-          </view>
-          <text class="cps-create-ai__pre">{{ aiSuggestionSummary }}</text>
         </view>
 
         <view class="u-card cps-card">
