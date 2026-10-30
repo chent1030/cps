@@ -133,12 +133,18 @@
             <view class="cps-photo-grid">
               <view
                 v-for="(photo, index) in photos"
-                :key="photo.id"
+                :key="photoKey(photo, index)"
                 class="cps-photo-tile"
                 hover-class="u-tap"
-                @click="previewPhoto(index)"
+                @click="onPhotoTap(index)"
               >
-                <image class="cps-photo__img" :src="photoUrl(photo.url)" mode="aspectFill" />
+                <image
+                  class="cps-photo__img"
+                  :src="photoDisplayUrl(photo)"
+                  mode="aspectFill"
+                />
+                <text v-if="photo.uploading" class="cps-photo-fail">上传中…</text>
+                <text v-else-if="photo.failed" class="cps-photo-fail cps-photo-fail--retry">上传失败，点击重试</text>
                 <text class="cps-photo-del" @click.stop="removePhoto(index)">×</text>
               </view>
               <button
@@ -188,17 +194,26 @@
 import { cpsApi } from '@/api/index'
 import { computed, reactive, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import type { CpsInspectionRecord, CpsInspectionType, CpsUploadedImage } from '@/types/cps'
-import { resolveAssetUrl, resolveUploadedPhotoUrl, resolveUploadSources } from '@/utils/image'
+import type { CpsInspectionRecord, CpsInspectionType, CpsPhotoEntry } from '@/types/cps'
+import {
+  mergePhotoLocalPaths,
+  normalizeArray,
+  photoDisplayUrl,
+  photoPreviewUrls,
+  resolveAttachmentUrl,
+  resolveUploadedPhotoUrl,
+  resolveUploadSources,
+} from '@/utils/image'
 
 const recordId = ref<number>(0)
 const loading = ref(false)
 const submitting = ref(false)
-const uploading = ref(false)
+const uploading = computed(() => photos.value.some((photo) => photo.uploading))
 
 const record = ref<CpsInspectionRecord | null>(null)
 const typeOptions = ref<CpsInspectionType[]>([])
-const photos = ref<CpsUploadedImage[]>([])
+// 本地临时路径优先：选图后立即渲染，上传成功只回填附件 id，不覆盖 localPath
+const photos = ref<CpsPhotoEntry[]>([])
 
 const form = reactive({
   reason: '',
@@ -272,13 +287,40 @@ const formHint = computed(() => {
   if (!form.shortTermMeasure.trim()) return '请填写短期措施'
   if (!form.longTermMeasure.trim()) return '请填写长期措施'
   if (!photos.value.length) return '请至少上传 1 张整改照片'
+  if (uploading.value) return '照片上传中，请稍候'
+  if (photos.value.some((photo) => photo.failed)) return '有照片上传失败，请点击重试或删除'
   return ''
 })
 
 const canSubmit = computed(() => !formHint.value)
 
-/** 图片 src：绝对 URL 原样，历史 /api 代理路径补 base */
-const photoUrl = (url: string) => resolveAssetUrl(url)
+const photoKey = (photo: CpsPhotoEntry, index: number) => photo.uid || String(photo.id ?? `local-${index}`)
+
+/** 上传：本地临时路径先渲染，成功只回填附件 id/服务端地址（保留 localPath） */
+const uploadEntries = async (entries: CpsPhotoEntry[]) => {
+  for (const entry of entries) {
+    const patch = (next: Partial<CpsPhotoEntry>) => {
+      const index = photos.value.findIndex((photo) => photo.uid && photo.uid === entry.uid)
+      if (index >= 0) photos.value[index] = { ...photos.value[index], ...next }
+    }
+    try {
+      const source = entry.source
+      if (!source) throw new Error('本地图片不可用，请重新选择')
+      const uploaded = await cpsApi.uploadCpsAttachment(source)
+      patch({
+        id: uploaded.id,
+        url: resolveUploadedPhotoUrl(uploaded),
+        name: uploaded.name || entry.name,
+        uploading: false,
+        failed: false,
+        source: undefined,
+      })
+    } catch (error) {
+      patch({ uploading: false, failed: true })
+      uni.showToast({ title: error instanceof Error ? error.message : '照片上传失败', icon: 'none' })
+    }
+  }
+}
 
 const onInput = (field: 'reason' | 'shortTermMeasure' | 'longTermMeasure', event: unknown) => {
   const detail = event as
@@ -287,50 +329,58 @@ const onInput = (field: 'reason' | 'shortTermMeasure' | 'longTermMeasure', event
   form[field] = String(detail?.detail?.value ?? detail?.target?.value ?? '')
 }
 
-const previewPhoto = (index: number) => {
-  const urls = photos.value.map((photo) => resolveAssetUrl(photo.url)).filter(Boolean)
+const onPhotoTap = (index: number) => {
+  const photo = photos.value[index]
+  if (!photo) return
+  if (photo.failed) {
+    void retryPhoto(index)
+    return
+  }
+  const urls = photoPreviewUrls(photos.value)
   if (!urls.length) {
     uni.showToast({ title: '图片还没加载出来', icon: 'none' })
     return
   }
   const current = Math.min(Math.max(index, 0), urls.length - 1)
-  uni.previewImage({
-    urls,
-    current,
-    indicator: 'number',
-    loop: true,
-    fail: () => uni.showToast({ title: '图片打不开，检查图片地址配置', icon: 'none' }),
-  })
+  uni.previewImage({ urls, current, indicator: 'number', loop: true })
+}
+
+const retryPhoto = async (index: number) => {
+  const photo = photos.value[index]
+  if (!photo || photo.uploading) return
+  if (!photo.source) {
+    uni.showToast({ title: '本地图片已失效，请删除后重新选择', icon: 'none' })
+    return
+  }
+  photos.value[index] = { ...photo, uploading: true, failed: false }
+  await uploadEntries([photos.value[index]])
 }
 
 const removePhoto = (index: number) => {
   photos.value.splice(index, 1)
 }
 
-const uploadPhotos = async (sources: ReturnType<typeof resolveUploadSources>) => {
-  if (!sources.length) return
-  uploading.value = true
-  try {
-    for (const source of sources) {
-      const uploaded = await cpsApi.uploadCpsAttachment(source)
-      // MinIO 上传后 url 是可直接访问的绝对地址，原样保存与回显。
-      photos.value.push({ id: uploaded.id, url: resolveUploadedPhotoUrl(uploaded), name: uploaded.name })
-    }
-  } catch (error) {
-    uni.showToast({ title: error instanceof Error ? error.message : '照片上传失败', icon: 'none' })
-  } finally {
-    uploading.value = false
-  }
-}
-
-// 拍照/选图：uni 原生 chooseImage（App 端调起系统相机/相册）
+// 拍照/选图：uni 原生 chooseImage（App 端调起系统相机/相册），选完立即用本地路径渲染
 const pickPhotos = () => {
   uni.chooseImage({
     count: 9,
     sizeType: ['compressed'],
     sourceType: ['camera', 'album'],
     success: (result) => {
-      void uploadPhotos(resolveUploadSources(result))
+      const paths = normalizeArray(result.tempFilePaths)
+      const sources = resolveUploadSources(result)
+      const entries: CpsPhotoEntry[] = paths.map((path, index) => ({
+        uid: `photo-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+        id: null,
+        localPath: String(path || ''),
+        url: '',
+        name: `照片${photos.value.length + index + 1}`,
+        uploading: true,
+        failed: false,
+        source: sources[index],
+      }))
+      photos.value = [...photos.value, ...entries]
+      void uploadEntries(entries)
     },
     fail: (err) => {
       const message = String((err as { errMsg?: string } | undefined)?.errMsg ?? '')
@@ -346,6 +396,14 @@ const load = async () => {
   try {
     const detail = await cpsApi.getInspectionRecord(recordId.value)
     record.value = detail.record
+    // 历史整改照片走附件内容代理回显；刷新前已选的本地照片按附件 id 合并回来
+    const serverPhotos: CpsPhotoEntry[] = (detail.rectifyAttachments ?? []).map((attachment) => ({
+      id: attachment.id,
+      localPath: '',
+      url: resolveAttachmentUrl(attachment),
+      name: attachment.fileName || `照片${attachment.id}`,
+    }))
+    photos.value = mergePhotoLocalPaths(serverPhotos, photos.value)
   } catch (error) {
     uni.showToast({ title: error instanceof Error ? error.message : '加载巡检记录失败', icon: 'none' })
   } finally {
@@ -382,7 +440,7 @@ const submit = async () => {
       reason: form.reason.trim(),
       shortTermMeasure: form.shortTermMeasure.trim(),
       longTermMeasure: form.longTermMeasure.trim(),
-      attachmentIds: photos.value.map((photo) => photo.id),
+      attachmentIds: photos.value.map((photo) => photo.id).filter((id): id is number => id != null),
     })
     record.value = result
     uni.showToast({ title: '整改已提交，流程结束', icon: 'success', duration: 1500 })
@@ -801,6 +859,24 @@ uni-textarea {
   background: #e2e8f0;
 }
 .cps-photo__img { width: 100%; height: 100%; }
+
+.cps-photo-fail {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.cps-photo-fail--retry {
+  background: rgba(220, 38, 38, 0.86);
+}
+
 .cps-photo-del {
   position: absolute;
   top: 4px;

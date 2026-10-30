@@ -5,6 +5,7 @@ import type {
   CpsIssueListItem,
   CpsIssueStatus,
   CpsIssueTab,
+  CpsMyInspectionTask,
   CpsOption,
   CpsUploadedImage,
 } from '@/types/cps'
@@ -188,6 +189,41 @@ const mockRectifyRecord: CpsInspectionRecord = {
 
 const inspectionRectifyRecords: CpsInspectionRecord[] = [mockRectifyRecord]
 
+// 「我的任务」mock：计划派发（target_emp_no=我）的 PENDING/IN_PROGRESS 任务
+const myInspectionTasks: CpsMyInspectionTask[] = [
+  {
+    taskId: 9001,
+    planId: 900,
+    planTitle: 'Mock 月度 CPS 巡检计划',
+    typeCode: 'CPS_INSPECTION',
+    typeName: 'CPS巡检',
+    zoneFlag: 0,
+    title: '10 月 CPS 巡检',
+    targetEmpNo: '61016968',
+    targetEmpName: '陈涛',
+    scheduledAt: '2026-10-30 09:00:00',
+    frequency: 'MONTHLY',
+    acceptanceCriteria: '覆盖 3 个区域、至少 1 张现场照片',
+    evidenceRequirement: '每项至少 1 张照片',
+    taskStatus: 'PENDING',
+  },
+  {
+    taskId: 9002,
+    planId: 900,
+    planTitle: 'Mock 辅房点检计划',
+    typeCode: 'ROOM_CHECK',
+    typeName: '辅房点检',
+    zoneFlag: 1,
+    title: '辅房点检（分区域）',
+    targetEmpNo: '61016968',
+    targetEmpName: '陈涛',
+    scheduledAt: '2026-10-30 14:00:00',
+    frequency: 'WEEKLY',
+    coverageAreaCodes: 'AREA-MOCK-01',
+    taskStatus: 'IN_PROGRESS',
+  },
+]
+
 const num = (value: QueryValue) => {
   return Number(value ?? 0)
 }
@@ -249,6 +285,19 @@ export const getCpsMockResponse = <T>({ method, path, params, body }: MockReques
   if (method === 'POST' && path === '/api/cps/issues') return { issueId: 999 } as T
   if (method === 'POST' && /^\/api\/cps\/issues\/\d+\/actions$/.test(path)) {
     return { issueId: Number(path.split('/')[4]), status: 'PENDING_RECTIFY' as CpsIssueStatus, currentHandlerEmpNo: 'E10023' } as T
+  }
+  if (method === 'GET' && path === '/api/cps/inspection-tasks/my-tasks') return myInspectionTasks as T
+  if (method === 'POST' && path === '/api/cps/inspection-tasks/start') {
+    const payload = jsonBody(body)
+    return {
+      ...inspectionRectifyRecords[0],
+      id: 9101,
+      typeCode: String(payload.typeCode ?? 'CPS_INSPECTION'),
+      recordStatus: 'IN_PROGRESS',
+      planTaskId: payload.planTaskId ?? null,
+      planId: payload.planId ?? null,
+      startedAt: '2026-10-30 09:05:00',
+    } as T
   }
   if (method === 'GET' && path === '/api/cps/inspection-tasks/my-rectify') return inspectionRectifyRecords as T
   if (method === 'GET' && /^\/api\/cps\/inspection-tasks\/\d+$/.test(path)) {

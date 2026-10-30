@@ -5,6 +5,7 @@ import type {
   CpsInspectionRecordDetail,
   CpsInspectionRecordItem,
   CpsInspectionRectifyPayload,
+  CpsMyInspectionTask,
 } from '@/types/cps'
 
 /**
@@ -23,8 +24,16 @@ export const listInspectionAreas = (typeCode: string) => {
   })
 }
 
-/** 开始执行：生成记录 + 点检项明细快照（分区域类型必带 areaId） */
-export const startInspection = (payload: { typeCode: string; areaId?: number | null; planTaskId?: number | null }) => {
+/**
+ * 开始执行：生成记录 + 点检项明细快照（分区域类型必带 areaId）。
+ * 计划任务派发来的执行需带 planTaskId/planId，后端会把任务 PENDING→IN_PROGRESS 并在归档后判定完成。
+ */
+export const startInspection = (payload: {
+  typeCode: string
+  areaId?: number | null
+  planTaskId?: number | null
+  planId?: number | null
+}) => {
   return request.post<CpsInspectionRecord>('/api/cps/inspection-tasks/start', {
     ...payload,
     empNo: EMP_NO,
@@ -60,6 +69,16 @@ export const submitInspection = (recordId: number) => {
 export const listMyInProgressInspections = () => {
   return request.get<CpsInspectionRecord[]>('/api/cps/inspection-tasks/my-in-progress', {
     params: { empNo: EMP_NO },
+  })
+}
+
+/**
+ * 我的巡检任务：计划派发（target_emp_no=我）且 PENDING/IN_PROGRESS 的任务。
+ * 后端：CpsInspectionTaskController#myTasks → cps_inspection_plan_task。
+ */
+export const listMyTasks = (empNo: string = EMP_NO) => {
+  return request.get<CpsMyInspectionTask[]>('/api/cps/inspection-tasks/my-tasks', {
+    params: { empNo },
   })
 }
 

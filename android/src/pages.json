@@ -29,6 +29,12 @@
       "style": {
         "navigationBarTitleText": "巡检整改"
       }
+    },
+    {
+      "path": "views/cps/MyTasksView",
+      "style": {
+        "navigationBarTitleText": "我的任务"
+      }
     }
   ],
   "globalStyle": {

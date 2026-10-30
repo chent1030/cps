@@ -882,6 +882,23 @@ watch(
   },
 )
 
+/**
+ * 工序/拉线选项去重：后端 /master/processes 按拉线聚合时可能返回重复 value
+ * （同一 factory/area/process 命中多条配置），重复 key 会让 v-for 只有一个节点可点击。
+ * 这里按 value 首次出现去重，保证 key 唯一；未选拉线时展示去重后的全量集合。
+ */
+const dedupeOptions = (options: CpsOption[] | undefined | null): CpsOption[] => {
+  const seen = new Set<string>()
+  const result: CpsOption[] = []
+  for (const option of options ?? []) {
+    const key = String(option.value ?? '').trim()
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    result.push(option)
+  }
+  return result
+}
+
 const onSelectFactory = async (factory: string) => {
   draft.location = { factory, area: '', line: '', process: '' }
   draft.areas = await cpsApi.getAreas(factory)
@@ -890,12 +907,14 @@ const onSelectFactory = async (factory: string) => {
 }
 const onSelectArea = async (area: string) => {
   draft.location = { ...draft.location, area, line: '', process: '' }
-  draft.lines = await cpsApi.getLines(draft.location.factory, area)
-  draft.processes = await cpsApi.getProcesses(draft.location.factory, area)
+  draft.lines = dedupeOptions(await cpsApi.getLines(draft.location.factory, area))
+  draft.processes = dedupeOptions(await cpsApi.getProcesses(draft.location.factory, area))
 }
 const onSelectLine = async (line: string) => {
   draft.location = { ...draft.location, line, process: '' }
-  draft.processes = await cpsApi.getProcesses(draft.location.factory, draft.location.area, line || undefined)
+  draft.processes = dedupeOptions(
+    await cpsApi.getProcesses(draft.location.factory, draft.location.area, line || undefined),
+  )
 }
 const onSelectProcess = (process: string) => {
   draft.location = { ...draft.location, process }
@@ -1172,8 +1191,8 @@ const restoreDraft = async (id: number) => {
     if (draft.location.factory) {
       draft.areas = await cpsApi.getAreas(draft.location.factory)
       if (draft.location.area) {
-        draft.lines = await cpsApi.getLines(draft.location.factory, draft.location.area)
-        draft.processes = await cpsApi.getProcesses(draft.location.factory, draft.location.area)
+        draft.lines = dedupeOptions(await cpsApi.getLines(draft.location.factory, draft.location.area))
+        draft.processes = dedupeOptions(await cpsApi.getProcesses(draft.location.factory, draft.location.area))
       }
     }
     uni.showToast({ title: `已恢复草稿 #${remote.id}，继续填写`, icon: 'success' })

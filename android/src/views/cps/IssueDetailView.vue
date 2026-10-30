@@ -106,7 +106,13 @@
                   :data-list="'issue'"
                   :data-index="index"
                 >
-                  <image class="cps-photo-tile__img" mode="aspectFill" :src="attachmentImageSources[image.id] || ''" />
+                  <image
+                    class="cps-photo-tile__img"
+                    mode="aspectFill"
+                    :src="attachmentSrc(image)"
+                    @error="markImageFailed(image.id)"
+                  />
+                  <text v-if="failedImageIds[image.id]" class="cps-photo-tile__fail">图片加载失败</text>
                   <text class="cps-photo-tile__index">{{ index + 1 }}/{{ detail.issueAttachments.length }}</text>
                 </view>
               </view>
@@ -135,7 +141,13 @@
                   :data-list="'proof'"
                   :data-index="index"
                 >
-                  <image class="cps-photo-tile__img" mode="aspectFill" :src="attachmentImageSources[image.id] || ''" />
+                  <image
+                    class="cps-photo-tile__img"
+                    mode="aspectFill"
+                    :src="attachmentSrc(image)"
+                    @error="markImageFailed(image.id)"
+                  />
+                  <text v-if="failedImageIds[image.id]" class="cps-photo-tile__fail">图片加载失败</text>
                   <text class="cps-photo-tile__index">{{ index + 1 }}/{{ detail.proofAttachments.length }}</text>
                 </view>
               </view>
@@ -328,30 +340,36 @@
                       <view class="u-field__control">
                         <view class="cps-uploader">
                           <button
-                              v-if="proofImages.length < 5"
+                              v-if="rectifyPhotos.length < 5"
                               class="cps-uploader__trigger"
                               hover-class="u-tap"
-                              :disabled="proofUploading"
-                              @click="chooseProofImages"
+                              :disabled="actionPhotoUploading"
+                              @click="chooseActionPhotos('rectify')"
                           >
                             <text class="cps-uploader__plus">+</text>
-                            <text class="cps-uploader__text">{{ proofUploading ? '上传中' : '上传整改照片' }}</text>
+                            <text class="cps-uploader__text">{{ actionPhotoUploading ? '上传中' : '上传整改照片' }}</text>
                           </button>
                           <view class="cps-uploader__grid">
                             <view
-                              v-for="(image, index) in proofImages"
-                              :key="image.id"
+                              v-for="(photo, index) in rectifyPhotos"
+                              :key="photoKey(photo, index)"
                               class="cps-uploader__item"
                               hover-class="u-tap"
-                              @click="onUploadPhotoTap" :data-index="index"
+                              @click="onActionPhotoTap('rectify', index)"
                             >
-                              <image class="cps-uploader__img" mode="aspectFill" :src="attachmentImageSources[image.id] || ''" />
-                              <text v-if="!proofUploading" class="cps-uploader__delete" @click.stop="removeProofImage(index)">×</text>
+                              <image
+                                class="cps-uploader__img"
+                                mode="aspectFill"
+                                :src="photoDisplayUrl(photo)"
+                              />
+                              <text v-if="photo.uploading" class="cps-uploader__state">上传中…</text>
+                              <text v-else-if="photo.failed" class="cps-uploader__state cps-uploader__state--fail">上传失败，点击重试</text>
+                              <text v-if="!photo.uploading" class="cps-uploader__delete" @click.stop="removeActionPhoto('rectify', index)">×</text>
                               <text class="cps-uploader__index">{{ index + 1 }}</text>
                             </view>
                           </view>
                         </view>
-                        <text class="cps-uploader__hint">至少 1 张、最多 5 张；提交整改后版本锁定</text>
+                        <text class="cps-uploader__hint">至少 1 张、最多 5 张；选图后立即可预览，提交整改后版本锁定</text>
                       </view>
                     </view>
                   </template>
@@ -391,30 +409,36 @@
                         <!-- 复核照片（整改凭证）上传：仅「待传图」节点可用，最多 5 张 -->
                         <view class="cps-uploader">
                           <button
-                              v-if="proofImages.length < 5"
+                              v-if="proofPhotos.length < 5"
                               class="cps-uploader__trigger"
                               hover-class="u-tap"
-                              :disabled="proofUploading"
-                              @click="chooseProofImages"
+                              :disabled="actionPhotoUploading"
+                              @click="chooseActionPhotos('proof')"
                           >
                             <text class="cps-uploader__plus">+</text>
-                            <text class="cps-uploader__text">{{ proofUploading ? '上传中' : '上传整改图片' }}</text>
+                            <text class="cps-uploader__text">{{ actionPhotoUploading ? '上传中' : '上传整改图片' }}</text>
                           </button>
                           <view class="cps-uploader__grid">
                             <view
-                              v-for="(image, index) in proofImages"
-                              :key="image.id"
+                              v-for="(photo, index) in proofPhotos"
+                              :key="photoKey(photo, index)"
                               class="cps-uploader__item"
                               hover-class="u-tap"
-                              @click="onUploadPhotoTap" :data-index="index"
+                              @click="onActionPhotoTap('proof', index)"
                             >
-                              <image class="cps-uploader__img" mode="aspectFill" :src="attachmentImageSources[image.id] || ''" />
-                              <text v-if="!proofUploading" class="cps-uploader__delete" @click.stop="removeProofImage(index)">×</text>
+                              <image
+                                class="cps-uploader__img"
+                                mode="aspectFill"
+                                :src="photoDisplayUrl(photo)"
+                              />
+                              <text v-if="photo.uploading" class="cps-uploader__state">上传中…</text>
+                              <text v-else-if="photo.failed" class="cps-uploader__state cps-uploader__state--fail">上传失败，点击重试</text>
+                              <text v-if="!photo.uploading" class="cps-uploader__delete" @click.stop="removeActionPhoto('proof', index)">×</text>
                               <text class="cps-uploader__index">{{ index + 1 }}</text>
                             </view>
                           </view>
                         </view>
-                        <text class="cps-uploader__hint">最多上传 5 张</text>
+                        <text class="cps-uploader__hint">最多上传 5 张；选图后立即可预览</text>
                       </view>
                     </view>
                   </template>
@@ -565,8 +589,18 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 
 
-import type { CpsAttachmentUploadSource, CpsEmployeeOption, CpsOption } from '@/api/index'
-import { loadAttachmentImageSources, resolveAssetUrl, resolveUploadedPhotoUrl, resolveUploadSources, toImageUrl } from '@/utils/image'
+import type { CpsEmployeeOption, CpsOption } from '@/api/index'
+import {
+  loadAttachmentImageSources,
+  mergePhotoLocalPaths,
+  normalizeArray,
+  photoDisplayUrl,
+  photoPreviewUrls,
+  resolveAssetUrl,
+  resolveAttachmentUrl,
+  resolveUploadedPhotoUrl,
+  resolveUploadSources,
+} from '@/utils/image'
 import { statusMeta, issueLocation as formatLocation, issueCategory as formatCategory, personLabel as formatPersonLabel } from '@/utils/format'
 import { resolveDefaultPersons, type ActionPersonField } from '@/utils/personDefault'
 import type {
@@ -574,7 +608,7 @@ import type {
   CpsIssueAction,
   CpsIssueDetail,
   CpsIssueStatus,
-  CpsUploadedImage,
+  CpsPhotoEntry,
 } from '@/types/cps'
 
 interface DetailStatusMeta {
@@ -595,9 +629,48 @@ interface CpsIssueDetailApiResponse {
 
 const detail = ref<CpsIssueDetail | null>(null)
 const issueId = ref<number>(0)
-const proofImages = ref<CpsUploadedImage[]>([])
-const proofUploading = ref(false)
+// 两个上传区各自维护照片，避免互相覆盖：
+// - rectifyPhotos：V2 待整改节点「整改照片」（随 SUBMIT_RECTIFICATION / SAVE_DRAFT 提交）
+// - proofPhotos：PENDING_UPLOAD_PROOF 节点「复核照片」（随 UPLOAD_PROOF 提交）
+const rectifyPhotos = ref<CpsPhotoEntry[]>([])
+const proofPhotos = ref<CpsPhotoEntry[]>([])
+// 图片加载失败占位：attachmentId → true（历史附件只读展示）
+const failedImageIds = ref<Record<number, boolean>>({})
 const attachmentImageSources = ref<Record<number, string>>({})
+
+type ActionPhotoList = 'rectify' | 'proof'
+const actionPhotoLists: Record<ActionPhotoList, typeof rectifyPhotos> = {
+  rectify: rectifyPhotos,
+  proof: proofPhotos,
+}
+
+// 当前状态对应的照片列表（两节点互斥，同一时刻只会展示一个上传区）
+const activeActionPhotos = computed<CpsPhotoEntry[]>(() =>
+  showRectifyV2Fields.value ? rectifyPhotos.value : proofPhotos.value,
+)
+const actionPhotoUploading = computed(() =>
+  [...rectifyPhotos.value, ...proofPhotos.value].some((photo) => photo.uploading),
+)
+const actionPhotoFailed = computed(() =>
+  [...rectifyPhotos.value, ...proofPhotos.value].some((photo) => photo.failed),
+)
+
+const photoKey = (photo: CpsPhotoEntry, index: number) => photo.uid || String(photo.id ?? `local-${index}`)
+
+/**
+ * 历史附件缩略图地址：优先附件内容代理 /api/cps/attachments/{id}/content（后端转出 MinIO 字节），
+ * 只在附件没有 id 的历史数据上回退原始 url。
+ */
+const attachmentSrc = (attachment: { id: number; fileUrl?: string | null; url?: string | null }) => {
+  if (!attachment || !attachment.id) return ''
+  return attachmentImageSources.value[attachment.id] || resolveAttachmentUrl(attachment)
+}
+
+// 图片加载失败时记录占位，避免反复请求坏地址
+const markImageFailed = (id: number) => {
+  failedImageIds.value = { ...failedImageIds.value, [id]: true }
+}
+
 const selectedPeople = ref<Record<string, CpsEmployeeOption>>({})
 const defaultAppliedFields = ref<Set<ActionPersonField>>(new Set())
 // 转办模式开关 + 正在提交的动作
@@ -932,11 +1005,18 @@ const load = async () => {
   if (!issueId.value) return
   const response = (await cpsApi.getCpsIssueDetail(issueId.value)) as CpsIssueDetailApiResponse & Partial<CpsIssueDetail>
   detail.value = normalizeIssueDetail(response)
-  proofImages.value = (detail.value.proofAttachments ?? []).map((item) => ({
+  // 历史附件（服务端返回）只作为刷新/回显兜底；本地已选照片的临时路径按附件 id 合并回来
+  const serverPhotos: CpsPhotoEntry[] = (detail.value.proofAttachments ?? []).map((item) => ({
     id: item.id,
-    url: item.fileUrl,
+    localPath: '',
+    url: resolveAttachmentUrl(item),
     name: item.fileName,
   }))
+  if (showRectifyV2Fields.value) {
+    rectifyPhotos.value = mergePhotoLocalPaths(serverPhotos, rectifyPhotos.value)
+  } else {
+    proofPhotos.value = mergePhotoLocalPaths(serverPhotos, proofPhotos.value)
+  }
   attachmentImageSources.value = {}
   const sources = await loadAttachmentImageSources([...detail.value.issueAttachments, ...detail.value.proofAttachments])
   attachmentImageSources.value = sources
@@ -998,7 +1078,7 @@ const buildActionPayload = (action: CpsIssueAction) => {
     longTermMeasure: actionForm.value.longTermMeasure || undefined,
     proofAttachmentIds:
       action === 'UPLOAD_PROOF' || action === 'SUBMIT_RECTIFICATION' || action === 'SAVE_DRAFT'
-        ? proofImages.value.map((image) => image.id)
+        ? activeActionPhotos.value.map((photo) => photo.id).filter((id): id is number => id != null)
         : undefined,
     targetEmpNo: actionForm.value.targetEmpNo || undefined,
     targetEmpName: personName(actionForm.value.targetEmpNo),
@@ -1019,7 +1099,7 @@ const runAction = async (action: CpsIssueAction) => {
     uni.showToast({ title: '请选择责任员工', icon: 'none' })
     return
   }
-  if (action === 'UPLOAD_PROOF' && !proofImages.value.length) {
+  if (action === 'UPLOAD_PROOF' && !proofPhotos.value.length) {
     uni.showToast({ title: '请先上传至少 1 张复核照片', icon: 'none' })
     return
   }
@@ -1029,7 +1109,11 @@ const runAction = async (action: CpsIssueAction) => {
     if (!actionForm.value.shortTermMeasure.trim()) return void uni.showToast({ title: '请填写短期措施', icon: 'none' })
     if (!actionForm.value.longTermMeasure.trim()) return void uni.showToast({ title: '请填写长期措施', icon: 'none' })
     if (!actionForm.value.responsibleEmpNo) return void uni.showToast({ title: '请选择责任员工', icon: 'none' })
-    if (!proofImages.value.length) return void uni.showToast({ title: '请先上传至少 1 张复核照片', icon: 'none' })
+    if (!rectifyPhotos.value.length) return void uni.showToast({ title: '请先上传至少 1 张复核照片', icon: 'none' })
+  }
+  if (action === 'UPLOAD_PROOF' || action === 'SUBMIT_RECTIFICATION' || action === 'SAVE_DRAFT') {
+    if (actionPhotoUploading.value) return void uni.showToast({ title: '照片上传中，请稍候', icon: 'none' })
+    if (actionPhotoFailed.value) return void uni.showToast({ title: '有照片上传失败，请点击重试或删除', icon: 'none' })
   }
   actionLoading.value = action
   try {
@@ -1077,39 +1161,41 @@ const onPhotoTap = (event: unknown) => {
   const current = detail.value
   if (!current) return
   const attachments = dataset.list === 'proof' ? current.proofAttachments : current.issueAttachments
-  previewImages(attachments.map((item) => toImageUrl(item)), Number(dataset.index ?? 0))
+  previewImages(attachments.map((item) => resolveAttachmentUrl(item)), Number(dataset.index ?? 0))
 }
 
-// 整改阶段刚上传、还没刷新详情的照片
-const onUploadPhotoTap = (event: unknown) => {
-  const dataset = readDataset(event)
-  previewImages(proofImages.value.map((item) => item.url), Number(dataset.index ?? 0))
-}
-
-// 整改照片上传（内联）
-const uploadProofImages = async (sources: CpsAttachmentUploadSource[]) => {
-  if (!sources.length) return
-  proofUploading.value = true
-  try {
-    for (const source of sources) {
-      const uploaded = await cpsApi.uploadCpsAttachment(source)
-      // MinIO 之后返回绝对 URL，原样保存与预览；仅旧后端回退 /content 拼法。
-      const photoUrl = resolveUploadedPhotoUrl(uploaded)
-      proofImages.value = [...proofImages.value, { ...uploaded, url: photoUrl }]
-      // 同步加载预览源
-      const previewSources = await loadAttachmentImageSources([{ id: uploaded.id, fileUrl: photoUrl, fileName: uploaded.name }])
-      attachmentImageSources.value = { ...attachmentImageSources.value, ...previewSources }
+// 待提交照片：本地临时路径优先，上传成功只回填附件 id/服务端地址，不覆盖本地路径
+const uploadActionPhotos = async (list: ActionPhotoList, entries: CpsPhotoEntry[]) => {
+  const target = actionPhotoLists[list]
+  for (const entry of entries) {
+    const patch = (next: Partial<CpsPhotoEntry>) => {
+      const index = target.value.findIndex((item) => item.uid && item.uid === entry.uid)
+      if (index >= 0) target.value[index] = { ...target.value[index], ...next }
     }
-  } catch (error) {
-    uni.showToast({ title: error instanceof Error ? error.message : '照片上传失败', icon: 'none' })
-  } finally {
-    proofUploading.value = false
+    try {
+      const source = entry.source
+      if (!source) throw new Error('本地图片不可用，请重新选择')
+      const uploaded = await cpsApi.uploadCpsAttachment(source)
+      patch({
+        id: uploaded.id,
+        url: resolveUploadedPhotoUrl(uploaded),
+        name: uploaded.name || entry.name,
+        uploading: false,
+        failed: false,
+        source: undefined,
+      })
+    } catch (error) {
+      // 上传失败保留本地图，允许点击重试或删除
+      patch({ uploading: false, failed: true })
+      uni.showToast({ title: error instanceof Error ? error.message : '照片上传失败', icon: 'none' })
+    }
   }
 }
 
-const chooseProofImages = () => {
-  const remaining = Math.max(5 - proofImages.value.length, 0)
-  if (proofUploading.value) return
+const chooseActionPhotos = (list: ActionPhotoList) => {
+  const target = actionPhotoLists[list]
+  const remaining = Math.max(5 - target.value.length, 0)
+  if (actionPhotoUploading.value) return
   if (!remaining) {
     uni.showToast({ title: '最多上传 5 张照片', icon: 'none' })
     return
@@ -1120,9 +1206,24 @@ const chooseProofImages = () => {
   }
   uni.chooseImage({
     count: remaining,
+    sizeType: ['compressed'],
     sourceType: ['camera', 'album'],
     success: (result) => {
-      void uploadProofImages(resolveUploadSources(result))
+      // 选图成功后立刻用本地临时路径渲染，不等上传完成
+      const paths = normalizeArray(result.tempFilePaths)
+      const sources = resolveUploadSources(result)
+      const entries: CpsPhotoEntry[] = paths.map((path, index) => ({
+        uid: `photo-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+        id: null,
+        localPath: String(path || ''),
+        url: '',
+        name: `照片${target.value.length + index + 1}`,
+        uploading: true,
+        failed: false,
+        source: sources[index],
+      }))
+      target.value = [...target.value, ...entries]
+      void uploadActionPhotos(list, entries)
     },
     fail: (err) => {
       const message = String((err as { errMsg?: string } | undefined)?.errMsg ?? '')
@@ -1132,8 +1233,31 @@ const chooseProofImages = () => {
   })
 }
 
-const removeProofImage = (index: number) => {
-  proofImages.value = proofImages.value.filter((_, i) => i !== index)
+const onActionPhotoTap = (list: ActionPhotoList, index: number) => {
+  const photos = actionPhotoLists[list].value
+  const photo = photos[index]
+  if (!photo) return
+  if (photo.failed) {
+    void retryActionPhoto(list, index)
+    return
+  }
+  previewImages(photoPreviewUrls(photos), index)
+}
+
+const retryActionPhoto = async (list: ActionPhotoList, index: number) => {
+  const target = actionPhotoLists[list]
+  const photo = target.value[index]
+  if (!photo || photo.uploading) return
+  if (!photo.source) {
+    uni.showToast({ title: '本地图片已失效，请删除后重新选择', icon: 'none' })
+    return
+  }
+  target.value[index] = { ...photo, uploading: true, failed: false }
+  await uploadActionPhotos(list, [target.value[index]])
+}
+
+const removeActionPhoto = (list: ActionPhotoList, index: number) => {
+  actionPhotoLists[list].value = actionPhotoLists[list].value.filter((_, i) => i !== index)
 }
 
 onLoad((query?: Record<string, string | string[] | undefined>) => {
@@ -1971,6 +2095,21 @@ checkbox .wx-checkbox-input {
   height: 100%;
 }
 
+/* 图片加载失败占位（代理地址不可用时不再显示空白图） */
+.cps-photo-tile__fail,
+.cps-uploader__fail {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .cps-photo-tile__index {
   position: absolute;
   right: 6px;
@@ -2129,6 +2268,27 @@ checkbox .wx-checkbox-input {
 .cps-uploader__img {
   width: 100%;
   height: 100%;
+}
+
+.cps-uploader__fail {
+  z-index: 1;
+}
+
+.cps-uploader__state {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 4px 6px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: #fff;
+  background: rgba(15, 23, 42, 0.62);
+  text-align: center;
+}
+
+.cps-uploader__state--fail {
+  background: rgba(220, 38, 38, 0.86);
 }
 
 .cps-uploader__delete {

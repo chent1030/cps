@@ -9,7 +9,14 @@
           <text class="cps-hero__stat">超时 {{ overdueCount }}</text>
         </view>
       </view>
-      <button class="u-btn u-btn--primary cps-hero__action" @click="navigateToCreate">＋ 新建问题</button>
+      <view class="cps-hero__actions">
+        <view class="cps-task-entry" hover-class="u-tap" @click="navigateToMyTasks">
+          <text class="cps-task-entry__icon">📋</text>
+          <text class="cps-task-entry__label">我的任务</text>
+          <text v-if="taskCount > 0" class="u-badge cps-task-entry__badge">{{ taskCount > 99 ? '99+' : taskCount }}</text>
+        </view>
+        <button class="u-btn u-btn--primary cps-hero__action" @click="navigateToCreate">＋ 新建问题</button>
+      </view>
     </view>
 
     <view class="u-card u-card--pad-none cps-tabs-card">
@@ -89,26 +96,27 @@
       </view>
     </view>
 
-    <!-- 待整改：web 端复核通过后转入 PENDING_RECTIFY，进入整改页提交 -->
+    <!-- 待整改：巡检记录（PENDING_RECTIFY）+ 问题单（PENDING_RECTIFY，当前办理人=我）并集 -->
     <view v-else-if="tab === 'rectify'" class="cps-inline-list">
-      <view v-if="!rectifyRecords.length && !rectifyLoading" class="u-empty">
+      <view v-if="!rectifyItems.length && !rectifyLoading" class="u-empty">
         <text class="u-empty__icon">📝</text>
-        <text class="u-empty__text">暂无待整改的巡检——web 端复核通过后会出现在这里</text>
+        <text class="u-empty__text">暂无待整改——巡检复核通过或问题单转入待整改后会出现在这里</text>
       </view>
-      <view v-for="r in rectifyRecords" :key="r.id" class="cps-inline-list__item">
+      <view v-for="entry in rectifyItems" :key="entry.key" class="cps-inline-list__item">
         <view class="cps-inline-list__info">
-          <text class="cps-inline-list__title">
-            {{ typeLabel(r.typeCode) }}<text v-if="r.areaName"> · {{ r.areaName }}</text>
-          </text>
-          <text class="cps-inline-list__time">
-            复核通过 {{ formatRecordTime(r.reviewedAt) }}<text v-if="r.score != null"> · 得分 {{ r.score }}</text>
-          </text>
-          <text v-if="r.reviewOpinion" class="cps-inline-list__time cps-inline-list__opinion">
-            复核意见：{{ r.reviewOpinion }}
+          <view class="cps-inline-list__headline">
+            <text class="cps-pill" :class="entry.source === 'record' ? 'cps-pill--blue' : 'cps-pill--orange'">
+              {{ entry.source === 'record' ? '巡检整改' : '问题整改' }}
+            </text>
+            <text class="cps-inline-list__title">{{ entry.title }}</text>
+          </view>
+          <text class="cps-inline-list__time">{{ entry.meta }}</text>
+          <text v-if="entry.opinion" class="cps-inline-list__time cps-inline-list__opinion">
+            {{ entry.source === 'record' ? '复核意见' : '问题描述' }}：{{ entry.opinion }}
           </text>
         </view>
         <view class="cps-inline-list__actions">
-          <button class="u-btn u-btn--primary u-btn--sm" @click="openRectify(r.id)">去整改</button>
+          <button class="u-btn u-btn--primary u-btn--sm" @click="openRectifyEntry(entry)">去整改</button>
         </view>
       </view>
     </view>
@@ -179,6 +187,7 @@ import type {
   CpsIssueDraft,
   CpsIssueListItem,
   CpsIssueTab,
+  CpsMyInspectionTask,
 } from '@/types/cps'
 import { statusMeta, issueLocation, issueCategory } from '@/utils/format'
 import { useListCacheStore } from '@/store/listCache'
@@ -267,11 +276,52 @@ const recordCount = computed(() => records.value.length)
 const typeOptions = ref<CpsInspectionType[]>([])
 
 // ============================================================
-// 待整改分组：web 端复核通过后转入 PENDING_RECTIFY 的巡检记录
+// 待整改分组：巡检记录（PENDING_RECTIFY）+ 问题单（PENDING_RECTIFY，当前办理人=我）
+// 后端 my-rectify 只查 cps_inspection_record；问题单链路产生的待整改只能从
+// issues?tab=todo 的大列表里按 status 过滤（列表接口不支持 status 参数）。
 // ============================================================
 const rectifyLoading = ref(false)
 const rectifyRecords = ref<CpsInspectionRecord[]>([])
-const rectifyCount = computed(() => rectifyRecords.value.length)
+const rectifyIssues = ref<CpsIssueListItem[]>([])
+const rectifyCount = computed(() => rectifyRecords.value.length + rectifyIssues.value.length)
+
+interface RectifyEntry {
+  key: string
+  source: 'record' | 'issue'
+  id: number
+  title: string
+  meta: string
+  opinion?: string | null
+}
+
+const rectifyItems = computed<RectifyEntry[]>(() => {
+  const entries: RectifyEntry[] = rectifyRecords.value.map((r) => ({
+    key: `record-${r.id}`,
+    source: 'record',
+    id: r.id,
+    title: `${typeLabel(r.typeCode)}${r.areaName ? ` · ${r.areaName}` : ''}`,
+    meta: `复核通过 ${formatRecordTime(r.reviewedAt)}${r.score != null ? ` · 得分 ${r.score}` : ''}`,
+    opinion: r.reviewOpinion,
+  }))
+  for (const issue of rectifyIssues.value) {
+    entries.push({
+      key: `issue-${issue.id}`,
+      source: 'issue',
+      id: issue.id,
+      title: issueTypeName(issue) || `问题 #${issue.id}`,
+      meta: `${issueLocation(issue)} · 提交 ${formatRecordTime(issue.submitTime)}`,
+      opinion: issue.description,
+    })
+  }
+  return entries
+})
+
+// ============================================================
+// 我的巡检任务：计划派发（target_emp_no=我）且 PENDING/IN_PROGRESS
+// ============================================================
+const myTasksLoading = ref(false)
+const myTasks = ref<CpsMyInspectionTask[]>([])
+const taskCount = computed(() => myTasks.value.length)
 
 const typeLabel = (code: string) => typeOptions.value.find((t) => t.code === code)?.name ?? code
 
@@ -383,11 +433,28 @@ const loadRecords = async () => {
   }
 }
 
+/**
+ * 问题单待整改：列表接口不支持 status 过滤（todo = 当前办理人=我 且非 CLOSED），
+ * 只能在返回结果里按 PENDING_RECTIFY 过滤；分页拉取避免待办超过一页时漏数据。
+ */
+const fetchRectifyIssues = async () => {
+  const matched: CpsIssueListItem[] = []
+  for (let page = 1; page <= 5; page += 1) {
+    const list = await cpsApi.listCpsIssues({ tab: 'todo', page, pageSize: 100 })
+    matched.push(...list.filter((issue) => issue.status === 'PENDING_RECTIFY'))
+    if (list.length < 100) break
+  }
+  return matched
+}
+
 const loadRectify = async () => {
   rectifyLoading.value = true
   try {
-    rectifyRecords.value = await cpsApi.myRectify()
-    if (rectifyRecords.value.length && !typeOptions.value.length) {
+    // 两路并行：巡检记录待整改 + 问题单待整改（问题单从 tab=todo 结果里按状态过滤）
+    const [recordResult, issueResult] = await Promise.allSettled([cpsApi.myRectify(), fetchRectifyIssues()])
+    rectifyRecords.value = recordResult.status === 'fulfilled' ? recordResult.value : []
+    rectifyIssues.value = issueResult.status === 'fulfilled' ? issueResult.value : []
+    if (rectifyCount.value && !typeOptions.value.length) {
       try {
         typeOptions.value = await cpsApi.listCpsInspectionTypes()
       } catch {
@@ -401,6 +468,21 @@ const loadRectify = async () => {
   }
 }
 
+const loadMyTasks = async () => {
+  myTasksLoading.value = true
+  try {
+    myTasks.value = await cpsApi.listMyTasks()
+  } catch {
+    // 任务拉取失败不打扰主列表，静默忽略
+  } finally {
+    myTasksLoading.value = false
+  }
+}
+
+const navigateToMyTasks = () => {
+  uni.navigateTo({ url: '/views/cps/MyTasksView' })
+}
+
 const restoreDraft = (id: number) => {
   uni.navigateTo({ url: `/views/cps/IssueCreateView?draftId=${id}` })
 }
@@ -409,8 +491,12 @@ const resumeRecord = (id: number) => {
   uni.navigateTo({ url: `/views/cps/InspectionExecuteView?recordId=${id}` })
 }
 
-const openRectify = (id: number) => {
-  uni.navigateTo({ url: `/views/cps/InspectionRectifyView?recordId=${id}` })
+const openRectifyEntry = (entry: RectifyEntry) => {
+  if (entry.source === 'record') {
+    uni.navigateTo({ url: `/views/cps/InspectionRectifyView?recordId=${entry.id}` })
+  } else {
+    uni.navigateTo({ url: `/views/cps/IssueDetailView?id=${entry.id}` })
+  }
 }
 
 // App 端（app-vue）里 uni-view 的默认布局与 scoped 样式的命中都不稳定，
@@ -466,6 +552,7 @@ onShow(() => {
   void loadDrafts()
   void loadRecords()
   void loadRectify()
+  void loadMyTasks()
   void loadCounts()
 })
 
@@ -934,6 +1021,46 @@ checkbox .wx-checkbox-input {
   color: var(--cps-teal-deep) !important;
   border: none !important;
   font-weight: 800 !important;
+}
+
+.cps-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  align-self: center;
+}
+
+/* 「我的任务」入口：计划派发到本人的巡检任务 */
+.cps-task-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cps-task-entry__icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.cps-task-entry__badge {
+  background: var(--cps-orange);
+  color: #fff;
+}
+
+.cps-inline-list__headline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 /* 页签内联列表（我的草稿 / 执行中） */

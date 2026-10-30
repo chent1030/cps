@@ -271,6 +271,52 @@ export interface CpsInspectionRecordDetail {
   rectifyAttachments?: CpsAttachment[]
 }
 
+/**
+ * 我的分配巡检任务（GET /api/cps/inspection-tasks/my-tasks）。
+ * 来源 cps_inspection_plan_task 中 target_emp_no=当前用户且 task_status 为 PENDING/IN_PROGRESS 的任务，
+ * 供 Android「我的任务」列表渲染与一键开始执行。
+ */
+export interface CpsMyInspectionTask {
+  taskId: number
+  planId?: number | null
+  planTitle?: string | null
+  typeCode: string
+  /** 巡检类型名称；历史枚举类型（INSPECT_*）不在类型表时后端回退为编码 */
+  typeName?: string | null
+  /** 1=分区域（需先选区域开始），0=点检项直挂类型 */
+  zoneFlag?: number | null
+  title?: string | null
+  targetEmpNo?: string | null
+  targetEmpName?: string | null
+  scheduledAt?: string | null
+  frequency?: string | null
+  acceptanceCriteria?: string | null
+  evidenceRequirement?: string | null
+  /** 覆盖区域编码，逗号分隔（仅分区域任务） */
+  coverageAreaCodes?: string | null
+  /** PENDING / IN_PROGRESS */
+  taskStatus?: string | null
+}
+
+/**
+ * 页面内照片条目：选图后立刻用本地临时路径渲染，上传成功只回填 id/url，不覆盖 localPath。
+ * - localPath：uni.chooseImage 返回的 tempFilePaths（或 H5 blob URL），只在当前页面生命周期有效
+ * - url：上传成功后的服务端地址（MinIO 绝对地址）或历史附件的代理地址，作为刷新/回显兜底
+ * - failed：上传失败，保留本地图并允许重试/删除
+ */
+export interface CpsPhotoEntry {
+  /** 页面内唯一键（本地图片在上传完成前没有附件 id） */
+  uid?: string
+  id: number | null
+  localPath: string
+  url: string
+  name: string
+  uploading?: boolean
+  failed?: boolean
+  /** 重试上传用的原始源（H5 File 或 App 临时路径），不参与渲染 */
+  source?: File | string
+}
+
 /** 非 CPS 巡检整改提交（原因分析 / 短期措施 / 长期措施 + 整改照片附件 ID）。 */
 export interface CpsInspectionRectifyPayload {
   reason: string

@@ -7,8 +7,8 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 export type CpsAttachmentUploadSource = File | string
 
 /**
- * 上传附件，返回 { id, url, name }。MinIO 之后 url 是可直接访问的绝对地址，
- * 视图层用 resolveUploadedPhotoUrl 落库（绝对 URL 优先，仅旧后端返回 id 时回退 /content）。
+ * 上传附件，返回 { id, url, name }。url 是后端可直接访问的 MinIO 绝对地址。
+ * 页面展示优先用本地临时路径（photoDisplayUrl），落库用 resolveUploadedPhotoStorageUrl。
  */
 export const uploadCpsAttachment = (source: CpsAttachmentUploadSource) => {
   if (typeof source === 'string') {
