@@ -672,4 +672,107 @@ class CpsInspectionPlanServiceTest {
         assertThrows(IllegalArgumentException.class, () -> service.rebuildTasks(67L, "  "));
         verify(taskMapper, never()).findExistingTaskTypes(anyLong());
     }
+
+    // B2/B3：快照中文 key、状态中文化、包装形态草稿解析、任务图片提取；planType 缺省 MANUAL。
+    @Test
+    void applyDraftSnapshotUsesChineseKeysAndSupportsWrappedDraft() {
+        CpsInspectionPlanRequest r = baseDraft(null);
+        r.setPlanType(null);
+        r.setDraftContentJson("{\"draft_content_json\":{\"tasks\":[{\"inspectionTypeCode\":\"ROOM_CHECK\","
+                + "\"title\":\"辅房点检\",\"targetEmpNo\":\"61016968\",\"targetEmpName\":\"陈涛\","
+                + "\"frequency\":\"WEEKLY\",\"acceptanceCriteria\":\"全部点检项合格\","
+                + "\"evidenceRequirement\":\"现场拍照\",\"coverageAreaCodes\":\"JX-01,JX-02\","
+                + "\"images\":[\"http://127.0.0.1:9000/cps-attachments/cps/a.jpg\"]}]}}");
+        when(planMapper.insert(any(CpsInspectionPlan.class))).thenAnswer(inv -> {
+            CpsInspectionPlan p = inv.getArgument(0);
+            p.setId(102L);
+            return 1;
+        });
+        when(planMapper.findById(102L)).thenReturn(plan(102L, null,
+                CpsInspectionPlanStatus.PENDING_REVIEW, 0, 1));
+
+        service.applyDraft(r);
+
+        ArgumentCaptor<CpsInspectionPlan> planCaptor = ArgumentCaptor.forClass(CpsInspectionPlan.class);
+        verify(planMapper).insert(planCaptor.capture());
+        assertEquals("MANUAL", planCaptor.getValue().getPlanType());
+        verify(agentClient, never()).requestInspectionPlanDraft(anyString(), anyString(), anyString(), any(), any(), any());
+
+        ArgumentCaptor<Object> snapCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(approvalService).ensureInstance(anyString(), anyLong(), anyString(), any(),
+                any(), any(), any(), snapCaptor.capture());
+        Map<?, ?> snap = (Map<?, ?>) snapCaptor.getValue();
+        assertTrue(snap.containsKey("计划ID"));
+        assertTrue(snap.containsKey("计划标题"));
+        assertTrue(snap.containsKey("巡检任务"));
+        assertFalse(snap.containsKey("planType"));
+        assertFalse(snap.containsKey("draftContentJson"));
+        assertEquals("待审批", snap.get("状态"));
+        List<?> tasks = (List<?>) snap.get("巡检任务");
+        assertEquals(1, tasks.size());
+        Map<?, ?> task = (Map<?, ?>) tasks.get(0);
+        assertEquals("ROOM_CHECK", task.get("巡检类型"));
+        assertEquals("辅房点检", task.get("标题"));
+        assertEquals("陈涛(61016968)", task.get("责任人"));
+        assertEquals("WEEKLY", task.get("频次"));
+        assertEquals("JX-01,JX-02", task.get("覆盖区域"));
+        assertEquals(1, ((List<?>) task.get("图片")).size());
+    }
+
+    @Test
+    void applyDraftSnapshotReturnsEmptyTasksWhenDraftInvalid() {
+        CpsInspectionPlanRequest r = baseDraft(null);
+        r.setPlanType("SPECIAL");
+        r.setDraftContentJson("not-a-json");
+        when(planMapper.insert(any(CpsInspectionPlan.class))).thenAnswer(inv -> {
+            CpsInspectionPlan p = inv.getArgument(0);
+            p.setId(103L);
+            return 1;
+        });
+        when(planMapper.findById(103L)).thenReturn(plan(103L, null,
+                CpsInspectionPlanStatus.PENDING_REVIEW, 0, 1));
+
+        service.applyDraft(r);
+
+        ArgumentCaptor<Object> snapCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(approvalService).ensureInstance(anyString(), anyLong(), anyString(), any(),
+                any(), any(), any(), snapCaptor.capture());
+        Map<?, ?> snap = (Map<?, ?>) snapCaptor.getValue();
+        List<?> tasks = (List<?>) snap.get("巡检任务");
+        assertNotNull(tasks);
+        assertTrue(tasks.isEmpty());
+    }
+
+    // B6：草稿 targetEmpNo 缺失时建单回退拟稿人；包装形态 + ROOM_CHECK 类型任务可解析。
+    @Test
+    void approveFallsBackToDraftByWhenTaskTargetMissing() {
+        long planId = 31L;
+        String draft = "{\"draft_content_json\":{\"tasks\":[{\"inspectionTypeCode\":\"ROOM_CHECK\","
+                + "\"title\":\"辅房点检\",\"frequency\":\"WEEKLY\"}]}}";
+        CpsInspectionPlan pending = plan(planId, "x", CpsInspectionPlanStatus.PENDING_REVIEW, 0, 1);
+        pending.setDraftBy("E200001");
+        pending.setDraftContentJson(draft);
+        CpsInspectionPlan approved = plan(planId, "x", CpsInspectionPlanStatus.APPROVED, 1, 1);
+        approved.setDraftBy("E200001");
+        approved.setDraftContentJson(draft);
+        when(planMapper.findById(planId)).thenReturn(pending, approved, approved);
+        when(planMapper.approveCas(any(CpsInspectionPlan.class))).thenReturn(1);
+        when(taskMapper.findExistingTaskTypes(planId)).thenReturn(Collections.emptyList());
+
+        CpsInspectionPlanApproveRequest req = new CpsInspectionPlanApproveRequest();
+        req.setApprover("E10001");
+        req.setApproverName("张三");
+        req.setLockVersion(0);
+
+        service.approve(planId, req);
+
+        ArgumentCaptor<CpsInspectionPlanTask> taskCaptor = ArgumentCaptor.forClass(CpsInspectionPlanTask.class);
+        verify(taskMapper).insert(taskCaptor.capture());
+        CpsInspectionPlanTask created = taskCaptor.getValue();
+        assertEquals("ROOM_CHECK", created.getTaskType());
+        assertEquals("E200001", created.getTargetEmpNo());
+        assertEquals("辅房点检", created.getTitle());
+        assertEquals("WEEKLY", created.getFrequency());
+        assertEquals("PENDING", created.getTaskStatus());
+    }
 }

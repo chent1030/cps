@@ -3,6 +3,7 @@ package com.catlbattery.app.service.cps;
 import com.catlbattery.domain.entity.cps.CpsIssue;
 import com.catlbattery.domain.entity.cps.CpsIssueStatus;
 import com.catlbattery.domain.entity.cps.CpsRectificationSubmission;
+import com.catlbattery.infra.mapper.cps.CpsIssueAttachmentMapper;
 import com.catlbattery.infra.mapper.cps.CpsIssueMapper;
 import com.catlbattery.infra.mapper.cps.CpsRectificationSubmissionMapper;
 import java.time.LocalDateTime;
@@ -46,13 +47,16 @@ class CpsIssueReviewApprovalServiceTest {
     @Mock
     private CpsIssueMapper issueMapper;
     @Mock
+    private CpsIssueAttachmentMapper attachmentMapper;
+    @Mock
     private CpsIssueService issueService;
 
     private CpsIssueReviewApprovalService service;
 
     @BeforeEach
     void setUp() {
-        service = new CpsIssueReviewApprovalService(approvalService, submissionMapper, issueMapper);
+        service = new CpsIssueReviewApprovalService(approvalService, submissionMapper, issueMapper,
+                attachmentMapper, new com.fasterxml.jackson.databind.ObjectMapper());
         service.setIssueService(issueService);
     }
 
@@ -80,6 +84,56 @@ class CpsIssueReviewApprovalServiceTest {
         assertEquals("原因：温度高", snapshot.get("原因分析"));
         assertEquals("责任员工(Resp01)", snapshot.get("责任员工"));
         assertEquals("2 张", snapshot.get("整改照片"));
+    }
+
+    @Test
+    void snapshotCarriesRectificationImagesFromJsonAttachmentIds() {
+        CpsIssue issue = pendingReviewIssue();
+        CpsRectificationSubmission submission = submissionOf(issue.getId(), 2);
+        // 真实数据形态：CpsIssueService 写入 JSON {"before":[...],"after":[...]}
+        submission.setAttachmentIds("{\"before\":[8],\"after\":[9,10]}");
+        when(submissionMapper.findByIssueAndVersion(issue.getId(), 2)).thenReturn(submission);
+        when(approvalService.ensureInstance(anyString(), anyLong(), anyString(), anyString(), anyString(),
+                any(), any(), any())).thenReturn(78L);
+        when(attachmentMapper.findById(9L)).thenReturn(Optional.of(attachmentOf(
+                9L, "http://127.0.0.1:9000/cps-attachments/cps/proof.jpg")));
+        when(attachmentMapper.findById(10L)).thenReturn(Optional.empty());
+
+        assertEquals(78L, service.ensurePendingApproval(issue, null));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> snapshotCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(approvalService).ensureInstance(anyString(), anyLong(), anyString(), anyString(), anyString(),
+                any(), any(), snapshotCaptor.capture());
+        Map<String, Object> snapshot = snapshotCaptor.getValue();
+        assertEquals("3 张", snapshot.get("整改照片"));
+        @SuppressWarnings("unchecked")
+        java.util.List<Map<String, Object>> images =
+                (java.util.List<Map<String, Object>>) snapshot.get("整改图片");
+        assertEquals(3, images.size());
+        assertEquals(8L, images.get(0).get("id"));
+        assertEquals("/api/cps/attachments/8/content", images.get(0).get("url"));
+        assertEquals("http://127.0.0.1:9000/cps-attachments/cps/proof.jpg", images.get(1).get("url"));
+        assertEquals("/api/cps/attachments/10/content", images.get(2).get("url"));
+    }
+
+    @Test
+    void snapshotReturnsEmptyImagesWhenAttachmentIdsMissing() {
+        CpsIssue issue = pendingReviewIssue();
+        CpsRectificationSubmission submission = submissionOf(issue.getId(), 2);
+        submission.setAttachmentIds(null);
+        when(submissionMapper.findByIssueAndVersion(issue.getId(), 2)).thenReturn(submission);
+        when(approvalService.ensureInstance(anyString(), anyLong(), anyString(), anyString(), anyString(),
+                any(), any(), any())).thenReturn(79L);
+
+        assertEquals(79L, service.ensurePendingApproval(issue, null));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> snapshotCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(approvalService).ensureInstance(anyString(), anyLong(), anyString(), anyString(), anyString(),
+                any(), any(), snapshotCaptor.capture());
+        assertEquals("0 张", snapshotCaptor.getValue().get("整改照片"));
+        assertTrue(((java.util.List<?>) snapshotCaptor.getValue().get("整改图片")).isEmpty());
     }
 
     @Test
@@ -165,7 +219,8 @@ class CpsIssueReviewApprovalServiceTest {
 
     @Test
     void handleDecisionSkipsWhenIssueServiceNotWired() {
-        CpsIssueReviewApprovalService bare = new CpsIssueReviewApprovalService(approvalService, submissionMapper, issueMapper);
+        CpsIssueReviewApprovalService bare = new CpsIssueReviewApprovalService(approvalService, submissionMapper,
+                issueMapper, attachmentMapper, new com.fasterxml.jackson.databind.ObjectMapper());
 
         assertFalse(bare.handleDecision(31L, true, "ok", "90001", "审批人"));
         verifyNoInteractions(submissionMapper, issueService);
@@ -187,6 +242,14 @@ class CpsIssueReviewApprovalServiceTest {
         issue.setArea("A 区");
         issue.setCreatorEmpName("上报人");
         return issue;
+    }
+
+    private com.catlbattery.domain.entity.cps.CpsIssueAttachment attachmentOf(Long id, String url) {
+        com.catlbattery.domain.entity.cps.CpsIssueAttachment attachment =
+                new com.catlbattery.domain.entity.cps.CpsIssueAttachment();
+        attachment.setId(id);
+        attachment.setFileUrl(url);
+        return attachment;
     }
 
     private CpsRectificationSubmission submissionOf(Long issueId, int versionNo) {

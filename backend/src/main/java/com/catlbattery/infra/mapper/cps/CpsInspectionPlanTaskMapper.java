@@ -38,4 +38,10 @@ public interface CpsInspectionPlanTaskMapper {
 
     /** B3：执行推进/完成回写计划任务状态（PENDING→IN_PROGRESS→COMPLETED）。 */
     int updateTaskStatus(@Param("id") Long id, @Param("taskStatus") String taskStatus);
+
+    /** B6 只读诊断：任务总数 */
+    long countAllTasks();
+
+    /** B6 只读诊断：target_emp_no 为空（任何人的 my-tasks 都看不到）的任务数 */
+    long countTasksWithoutTarget();
 }

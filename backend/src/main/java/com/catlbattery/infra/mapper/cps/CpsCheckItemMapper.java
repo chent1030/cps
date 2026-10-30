@@ -25,4 +25,9 @@ public interface CpsCheckItemMapper {
     int update(CpsCheckItem item);
 
     int setEnabled(@Param("id") Long id, @Param("enabled") Boolean enabled, @Param("updatedBy") String updatedBy);
+
+    /** B8：点检项被引用总数（区域/房型/类型 check_item_ids + 历史执行记录等） */
+    long countReferences(@Param("id") Long id, @Param("itemCode") String itemCode);
+
+    int deleteById(@Param("id") Long id);
 }

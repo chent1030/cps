@@ -98,4 +98,13 @@
         SET task_status = #{taskStatus}
         WHERE id = #{id} AND task_status != 'CANCELLED'
     </update>
+    <select id="countAllTasks" resultType="long">
+        SELECT COUNT(1) FROM cps_inspection_plan_task
+    </select>
+
+    <select id="countTasksWithoutTarget" resultType="long">
+        SELECT COUNT(1) FROM cps_inspection_plan_task
+        WHERE target_emp_no IS NULL OR TRIM(target_emp_no) = ''
+    </select>
+
 </mapper>

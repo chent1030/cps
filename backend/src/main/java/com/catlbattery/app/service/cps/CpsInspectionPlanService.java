@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -73,14 +74,20 @@ public class CpsInspectionPlanService {
      */
     @Transactional
     public CpsInspectionPlan applyDraft(CpsInspectionPlanRequest request) {
-        requireText(request.getPlanType(), "planType");
+        // B3：前端已移除「计划类型」字段；保留字段兼容 DB NOT NULL 与 uk_cps_plan_source_run 唯一键。
+        String planType = request.getPlanType();
+        if (planType == null || planType.trim().isEmpty()) {
+            planType = "MANUAL";
+        } else {
+            planType = planType.trim();
+        }
         requireText(request.getTitle(), "title");
 
         String draftJson = request.getDraftContentJson();
         if (draftJson == null || draftJson.trim().isEmpty()) {
             Map<String, Object> agentDraft = agentFrameworkClient.requestInspectionPlanDraft(
                     request.getSourceRunId(),
-                    request.getPlanType(),
+                    planType,
                     request.getTitle(),
                     request.getTargetFactory(),
                     request.getTargetArea(),
@@ -94,7 +101,7 @@ public class CpsInspectionPlanService {
         CpsInspectionPlan plan;
         Optional<CpsInspectionPlan> existing = request.getSourceRunId() == null
                 ? Optional.empty()
-                : planMapper.findBySourceRunIdAndPlanType(request.getSourceRunId(), request.getPlanType());
+                : planMapper.findBySourceRunIdAndPlanType(request.getSourceRunId(), planType);
         if (existing.isPresent()) {
             plan = existing.get();
             plan.setDraftContentJson(draftJson);
@@ -121,7 +128,7 @@ public class CpsInspectionPlanService {
         plan = new CpsInspectionPlan();
         plan.setSourceRunId(request.getSourceRunId());
         plan.setReportId(request.getReportId());
-        plan.setPlanType(request.getPlanType());
+        plan.setPlanType(planType);
         plan.setTitle(request.getTitle());
         plan.setTargetFactory(request.getTargetFactory());
         plan.setTargetArea(request.getTargetArea());
@@ -146,18 +153,168 @@ public class CpsInspectionPlanService {
         return reloaded;
     }
 
+    /**
+     * B2：审批中心巡检计划快照（中文 key + 结构化任务数组 + 任务图片）。
+     * 不再输出 planType 与原始 draftContentJson；draft_content_json 三种形态均兼容：
+     * {tasks:[...]}、{tasks:{}}、agent 返回的 {draft_content_json:{tasks:[...]}}；
+     * 解析失败时「巡检任务」返回空数组，绝不抛异常阻断审批建单。
+     */
     private Map<String, Object> snapshotOf(CpsInspectionPlan plan, String draftJson) {
-        Map<String, Object> snap = new HashMap<>();
-        snap.put("planId", plan.getId());
-        snap.put("title", plan.getTitle());
-        snap.put("planType", plan.getPlanType());
-        snap.put("targetFactory", plan.getTargetFactory());
-        snap.put("targetArea", plan.getTargetArea());
-        snap.put("riskBasis", plan.getRiskBasis());
-        snap.put("draftBy", plan.getDraftBy());
-        snap.put("status", plan.getStatus() == null ? null : plan.getStatus().name());
-        snap.put("draftContentJson", draftJson);
+        Map<String, Object> snap = new LinkedHashMap<>();
+        snap.put("计划ID", plan.getId());
+        snap.put("计划标题", blankToDash(plan.getTitle()));
+        snap.put("目标工厂", blankToDash(plan.getTargetFactory()));
+        snap.put("目标区域", blankToDash(plan.getTargetArea()));
+        snap.put("风险依据", blankToDash(plan.getRiskBasis()));
+        snap.put("拟稿人", blankToDash(plan.getDraftBy()));
+        snap.put("状态", statusText(plan.getStatus()));
+        snap.put("巡检任务", snapshotTasks(draftJson));
         return snap;
+    }
+
+    /** 快照用：解析草稿任务为中文 key 的数组；失败返回空数组。 */
+    private List<Map<String, Object>> snapshotTasks(String draftJson) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (draftJson == null || draftJson.trim().isEmpty()) {
+            return result;
+        }
+        try {
+            Object tasks = tasksNode(objectMapper.readValue(draftJson, Object.class), 0);
+            if (tasks instanceof Map) {
+                for (Map.Entry<?, ?> entry : ((Map<?, ?>) tasks).entrySet()) {
+                    if (entry.getKey() instanceof String && entry.getValue() instanceof Map) {
+                        result.add(taskSnapshot((Map<?, ?>) entry.getValue(), (String) entry.getKey()));
+                    }
+                }
+            } else if (tasks instanceof List) {
+                for (Object item : (List<?>) tasks) {
+                    if (item instanceof Map) {
+                        result.add(taskSnapshot((Map<?, ?>) item, null));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse plan draft_content_json for approval snapshot: {}", e.getMessage());
+        }
+        return result;
+    }
+
+    private Map<String, Object> taskSnapshot(Map<?, ?> spec, String fallbackType) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        String typeCode = specString(spec, "inspectionTypeCode", "task_type", "taskType", "typeCode");
+        item.put("巡检类型", blankToDash(typeCode == null ? fallbackType : typeCode));
+        item.put("标题", blankToDash(specString(spec, "title")));
+        item.put("责任人", personOf(specString(spec, "targetEmpName", "target_emp_name"),
+                specString(spec, "targetEmpNo", "target_emp_no")));
+        item.put("频次", blankToDash(specString(spec, "frequency")));
+        item.put("验收标准", blankToDash(specString(spec, "acceptanceCriteria", "acceptance_criteria")));
+        item.put("证据要求", blankToDash(specString(spec, "evidenceRequirement", "evidence_requirement")));
+        item.put("覆盖区域", blankToDash(specString(spec, "coverageAreaCodes", "coverage_area_codes")));
+        List<String> images = new ArrayList<>();
+        collectImageUrls(spec, 0, images);
+        if (!images.isEmpty()) {
+            item.put("图片", images);
+        }
+        return item;
+    }
+
+    /** 从草稿任意节点递归提取图片地址（MinIO 绝对 URL 或附件代理路径）。 */
+    private static void collectImageUrls(Object node, int depth, List<String> out) {
+        if (node == null || depth > 5) {
+            return;
+        }
+        if (node instanceof String) {
+            String text = ((String) node).trim();
+            if (isImageUrl(text) && !out.contains(text)) {
+                out.add(text);
+            }
+            return;
+        }
+        if (node instanceof Map) {
+            for (Object value : ((Map<?, ?>) node).values()) {
+                collectImageUrls(value, depth + 1, out);
+            }
+        } else if (node instanceof List) {
+            for (Object value : (List<?>) node) {
+                collectImageUrls(value, depth + 1, out);
+            }
+        }
+    }
+
+    private static boolean isImageUrl(String text) {
+        if (text == null) {
+            return false;
+        }
+        String lower = text.toLowerCase();
+        boolean http = lower.startsWith("http://") || lower.startsWith("https://");
+        boolean proxy = lower.startsWith("/api/cps/attachments/");
+        if (!http && !proxy) {
+            return false;
+        }
+        return lower.contains("/api/cps/attachments/")
+                || lower.contains("image")
+                || lower.contains("photo")
+                || lower.matches(".*\\.(jpg|jpeg|png|gif|webp|bmp)(\\?.*)?$");
+    }
+
+    /** 取 tasks 节点：兼容 {tasks:...}、{draft_content_json:{tasks:...}}、嵌套字符串 JSON。 */
+    private Object tasksNode(Object node, int depth) {
+        if (node == null || depth > 4) {
+            return null;
+        }
+        if (!(node instanceof Map)) {
+            return null;
+        }
+        Map<?, ?> map = (Map<?, ?>) node;
+        Object tasks = map.get("tasks");
+        if (tasks instanceof Map || tasks instanceof List) {
+            return tasks;
+        }
+        Object wrapped = map.get("draft_content_json");
+        if (wrapped == null) {
+            wrapped = map.get("draftContentJson");
+        }
+        if (wrapped instanceof String) {
+            try {
+                wrapped = objectMapper.readValue((String) wrapped, Object.class);
+            } catch (Exception e) {
+                log.warn("Failed to parse wrapped plan draft_content_json: {}", e.getMessage());
+                return null;
+            }
+        }
+        return tasksNode(wrapped, depth + 1);
+    }
+
+    private static String statusText(CpsInspectionPlanStatus status) {
+        if (status == null) {
+            return "-";
+        }
+        switch (status) {
+            case PENDING_REVIEW:
+                return "待审批";
+            case APPROVED:
+                return "已通过";
+            case REJECTED:
+                return "已驳回";
+            default:
+                return status.name();
+        }
+    }
+
+    private static String personOf(String name, String empNo) {
+        String n = name == null ? "" : name.trim();
+        String e = empNo == null ? "" : empNo.trim();
+        if (n.isEmpty() && e.isEmpty()) {
+            return "-";
+        }
+        if (n.isEmpty()) {
+            return e;
+        }
+        return e.isEmpty() ? n : n + "(" + e + ")";
+    }
+
+    private static String blankToDash(String value) {
+        return value == null || value.trim().isEmpty() ? "-" : value.trim();
     }
 
     public CpsInspectionPlan getDetail(Long id) {
@@ -285,7 +442,20 @@ public class CpsInspectionPlanService {
             task.setPlanId(planId);
             task.setTaskType(taskType);
             task.setTitle(stringOrDefault(specString(taskSpec, "title"), defaultTaskTitle(plan, taskType)));
-            task.setTargetEmpNo(specString(taskSpec, "targetEmpNo", "target_emp_no"));
+            // B6：草稿未带责任人时回退拟稿人，避免生成「target_emp_no 为空 → 谁查都看不到」的任务。
+            // 草稿显式带 targetEmpNo 时保持原优先级（如 plan 13）。
+            String targetEmpNo = specString(taskSpec, "targetEmpNo", "target_emp_no");
+            if (targetEmpNo == null || targetEmpNo.trim().isEmpty()) {
+                targetEmpNo = plan.getDraftBy() == null ? null : plan.getDraftBy().trim();
+                if (targetEmpNo != null && !targetEmpNo.isEmpty()) {
+                    log.warn("Plan task target_emp_no missing in draft, fallback to plan.draftBy: "
+                            + "planId={} type={} draftBy={}", planId, taskType, targetEmpNo);
+                } else {
+                    log.warn("Plan task target_emp_no missing and plan.draftBy empty, task will be invisible: "
+                            + "planId={} type={}", planId, taskType);
+                }
+            }
+            task.setTargetEmpNo(targetEmpNo);
             task.setTargetEmpName(specString(taskSpec, "targetEmpName", "target_emp_name"));
             task.setScheduledAt(plan.getApprovedAt());
             task.setFrequency(specString(taskSpec, "frequency"));
@@ -317,7 +487,7 @@ public class CpsInspectionPlanService {
     }
 
     /** 从 taskSpec 里按多个候选键取字符串（新格式 camelCase 优先，旧格式 snake_case 兜底）。 */
-    private static String specString(Map<String, Object> spec, String... keys) {
+    private static String specString(Map<?, ?> spec, String... keys) {
         for (String key : keys) {
             Object v = spec.get(key);
             if (v instanceof String && !((String) v).trim().isEmpty()) return (String) v;
@@ -469,8 +639,9 @@ public class CpsInspectionPlanService {
     private Map<String, Map<String, Object>> parseDraftTasks(String draftContentJson) {
         if (draftContentJson == null || draftContentJson.trim().isEmpty()) return Collections.emptyMap();
         try {
-            Map<String, Object> root = objectMapper.readValue(draftContentJson, Map.class);
-            Object tasks = root.get("tasks");
+            Object root = objectMapper.readValue(draftContentJson, Object.class);
+            // 兼容 agent 包装形态 {draft_content_json:{tasks:[...]}}
+            Object tasks = tasksNode(root, 0);
             if (!(tasks instanceof Map) && !(tasks instanceof List)) return Collections.emptyMap();
             Map<String, Map<String, Object>> typed = new java.util.LinkedHashMap<>();
             if (tasks instanceof Map) {

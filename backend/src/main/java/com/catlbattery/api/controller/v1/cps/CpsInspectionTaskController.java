@@ -102,6 +102,12 @@ public class CpsInspectionTaskController {
         return recordService.listMyTasks(empNo);
     }
 
+    /** B6 只读诊断：某 empNo 无任务时给出计数与判定口径（不写库）。 */
+    @GetMapping("/my-tasks/diagnose")
+    public Map<String, Object> diagnoseMyTasks(@RequestParam String empNo) {
+        return recordService.diagnoseMyTasks(empNo);
+    }
+
     // ============================================================
     // 非 CPS 复核 / 整改（提交 → AI 初审 → web 人工复核 → 责任人整改 → 结束）
     // ============================================================

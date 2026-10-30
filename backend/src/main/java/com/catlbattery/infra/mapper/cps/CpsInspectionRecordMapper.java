@@ -82,11 +82,23 @@ public interface CpsInspectionRecordMapper {
     List<CpsInspectionRecord> findByStatus(@Param("recordStatus") String recordStatus,
                                            @Param("limit") int limit);
 
-    /** 按办理人+状态取（Android「我的待整改」） */
+    /** 按办理人+状态取（Android「我的待整改」；仅 current_handler_emp_no 口径，保留兼容） */
     List<CpsInspectionRecord> findByHandler(@Param("recordStatus") String recordStatus,
                                             @Param("empNo") String empNo,
                                             @Param("limit") int limit);
 
+    /**
+     * Android「我的待整改」：办理人 OR 整改责任人口径。
+     * 历史/边界数据存在 rectify_emp_no 有值而 current_handler_emp_no 为空的行，
+     * 只看 current_handler 会漏单；两种口径任一命中即返回（去重由 SQL 天然保证）。
+     */
+    List<CpsInspectionRecord> findByRectifyOrHandler(@Param("recordStatus") String recordStatus,
+                                                     @Param("empNo") String empNo,
+                                                     @Param("limit") int limit);
+
     /** Phase D：某计划任务下已判定（JUDGED）记录数——多区域任务完成度判定 */
     long countJudgedByPlanTask(@Param("planTaskId") Long planTaskId);
+
+    /** B7：区域被执行记录引用数（area_id 或 area_code 命中），删除护栏用 */
+    long countByArea(@Param("areaId") Long areaId, @Param("areaCode") String areaCode);
 }

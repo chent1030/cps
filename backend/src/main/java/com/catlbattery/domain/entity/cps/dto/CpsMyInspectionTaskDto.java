@@ -11,6 +11,9 @@ public class CpsMyInspectionTaskDto {
     private Long taskId;
     private Long planId;
     private String planTitle;
+    /** 计划目标工厂/区域（Android 任务卡片展示用，可为空） */
+    private String targetFactory;
+    private String targetArea;
     /** 任务类型 = 巡检类型编码（或历史枚举 INSPECT_*） */
     private String typeCode;
     private String typeName;
@@ -25,6 +28,8 @@ public class CpsMyInspectionTaskDto {
     private String evidenceRequirement;
     /** 覆盖区域编码（逗号分隔）；空=该类型全部启用区域 */
     private String coverageAreaCodes;
+    /** 覆盖区域名称（逗号分隔，按编码解析；解析不到回退编码） */
+    private String coverageAreaNames;
     private String taskStatus;
 
     public Long getTaskId() { return taskId; }
@@ -33,6 +38,10 @@ public class CpsMyInspectionTaskDto {
     public void setPlanId(Long planId) { this.planId = planId; }
     public String getPlanTitle() { return planTitle; }
     public void setPlanTitle(String planTitle) { this.planTitle = planTitle; }
+    public String getTargetFactory() { return targetFactory; }
+    public void setTargetFactory(String targetFactory) { this.targetFactory = targetFactory; }
+    public String getTargetArea() { return targetArea; }
+    public void setTargetArea(String targetArea) { this.targetArea = targetArea; }
     public String getTypeCode() { return typeCode; }
     public void setTypeCode(String typeCode) { this.typeCode = typeCode; }
     public String getTypeName() { return typeName; }
@@ -55,6 +64,8 @@ public class CpsMyInspectionTaskDto {
     public void setEvidenceRequirement(String evidenceRequirement) { this.evidenceRequirement = evidenceRequirement; }
     public String getCoverageAreaCodes() { return coverageAreaCodes; }
     public void setCoverageAreaCodes(String coverageAreaCodes) { this.coverageAreaCodes = coverageAreaCodes; }
+    public String getCoverageAreaNames() { return coverageAreaNames; }
+    public void setCoverageAreaNames(String coverageAreaNames) { this.coverageAreaNames = coverageAreaNames; }
     public String getTaskStatus() { return taskStatus; }
     public void setTaskStatus(String taskStatus) { this.taskStatus = taskStatus; }
 }

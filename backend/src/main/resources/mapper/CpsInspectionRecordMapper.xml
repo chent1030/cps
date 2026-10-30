@@ -147,4 +147,29 @@
         ORDER BY updated_at DESC, id DESC
         LIMIT #{limit}
     </select>
+
+    <!-- B5：整改责任人两种数据口径（current_handler 为 web 复核后写入；rectify_emp_no 为历史/边界数据） -->
+    <select id="findByRectifyOrHandler" resultType="com.catlbattery.domain.entity.cps.CpsInspectionRecord">
+        SELECT <include refid="BaseColumns" />
+        FROM cps_inspection_record
+        WHERE record_status = #{recordStatus}
+          AND (current_handler_emp_no = #{empNo} OR rectify_emp_no = #{empNo})
+        ORDER BY updated_at DESC, id DESC
+        LIMIT #{limit}
+    </select>
+    <!-- B7：区域删除护栏：执行记录按 area_id 或 area_code 引用都算 -->
+    <select id="countByArea" resultType="long">
+        SELECT COUNT(1) FROM cps_inspection_record
+        <where>
+            <choose>
+                <when test="areaId != null and areaCode != null and areaCode != ''">
+                    (area_id = #{areaId} OR area_code = #{areaCode})
+                </when>
+                <when test="areaId != null">area_id = #{areaId}</when>
+                <when test="areaCode != null and areaCode != ''">area_code = #{areaCode}</when>
+                <otherwise>1 = 0</otherwise>
+            </choose>
+        </where>
+    </select>
+
 </mapper>

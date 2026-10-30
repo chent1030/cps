@@ -31,6 +31,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -399,9 +400,12 @@ public class CpsInspectionRecordService {
         return recordMapper.findByStatus("PENDING_REVIEW", limit <= 0 ? 100 : Math.min(limit, 200));
     }
 
-    /** Android「我的待整改」：当前用户作为整改责任人的记录 */
+    /**
+     * Android「我的待整改」：整改责任人口径 = current_handler_emp_no 或 rectify_emp_no。
+     * 兼容历史/边界数据（例如 web 复核后只写了 rectify_emp_no 的行），避免整改人看不到待办。
+     */
     public List<CpsInspectionRecord> listMyRectify(String empNo) {
-        return recordMapper.findByHandler("PENDING_RECTIFY", empNo == null ? "" : empNo.trim(), 50);
+        return recordMapper.findByRectifyOrHandler("PENDING_RECTIFY", empNo == null ? "" : empNo.trim(), 50);
     }
 
     // ============================================================
@@ -528,6 +532,9 @@ public class CpsInspectionRecordService {
             dto.setPlanId(task.getPlanId());
             CpsInspectionPlan plan = task.getPlanId() == null ? null : planMapper.findById(task.getPlanId());
             dto.setPlanTitle(plan == null ? null : plan.getTitle());
+            // B6：Android 任务卡片补充计划目标工厂/区域
+            dto.setTargetFactory(plan == null ? null : plan.getTargetFactory());
+            dto.setTargetArea(plan == null ? null : plan.getTargetArea());
             String typeCode = task.getTaskType();
             dto.setTypeCode(typeCode);
             CpsInspectionType type = typeCode == null ? null : typeMapper.findByCode(typeCode);
@@ -547,10 +554,49 @@ public class CpsInspectionRecordService {
             dto.setAcceptanceCriteria(task.getAcceptanceCriteria());
             dto.setEvidenceRequirement(task.getEvidenceRequirement());
             dto.setCoverageAreaCodes(task.getCoverageAreaCodes());
+            // B6：覆盖区域编码 → 名称（Android 直接展示中文区域名）
+            dto.setCoverageAreaNames(coverageAreaNamesOf(task.getCoverageAreaCodes()));
             dto.setTaskStatus(task.getTaskStatus());
             result.add(dto);
         }
         return result;
+    }
+
+    /**
+     * B6 只读诊断：解释「某 empNo 为什么没有 my-tasks」。
+     * 判定口径与 {@link #listMyTasks(String)} 完全一致，仅做计数，不写库。
+     */
+    public Map<String, Object> diagnoseMyTasks(String empNo) {
+        requireText(empNo, "empNo");
+        String trimmed = empNo.trim();
+        List<CpsInspectionPlanTask> assigned = planTaskMapper.findAssignedTasks(trimmed);
+        Map<String, Object> diag = new LinkedHashMap<>();
+        diag.put("empNo", trimmed);
+        diag.put("assignedTaskCount", assigned.size());
+        diag.put("totalTaskCount", planTaskMapper.countAllTasks());
+        diag.put("tasksWithoutTargetCount", planTaskMapper.countTasksWithoutTarget());
+        diag.put("criteria", "target_emp_no = '" + trimmed + "' AND task_status IN ('PENDING','IN_PROGRESS')");
+        if (assigned.isEmpty()) {
+            diag.put("hint", "未查到任务，请依次确认：1) 计划已审批通过并建单（APPROVED）；"
+                    + "2) 任务 target_emp_no = 本人（历史 agent 草稿可能为空，新逻辑建单会回退 plan.draftBy）；"
+                    + "3) 任务是否已完成（COMPLETED 不返回）；4) 以上都不满足则确实无待办，不是查询故障。");
+        }
+        return diag;
+    }
+
+    /** 覆盖区域编码 → 中文区域名（逗号分隔；编码不存在时回退编码本身）。 */
+    private String coverageAreaNamesOf(String coverageAreaCodes) {
+        if (coverageAreaCodes == null || coverageAreaCodes.trim().isEmpty()) {
+            return null;
+        }
+        List<String> names = new ArrayList<>();
+        for (String part : coverageAreaCodes.split(",")) {
+            String code = part.trim();
+            if (code.isEmpty()) continue;
+            CpsInspectionArea area = areaMapper.findByCode(code);
+            names.add(area != null && area.getAreaName() != null ? area.getAreaName() : code);
+        }
+        return names.isEmpty() ? null : String.join(",", names);
     }
 
     // ============================================================

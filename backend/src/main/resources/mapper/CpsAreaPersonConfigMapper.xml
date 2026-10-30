@@ -183,7 +183,7 @@
     </select>
 
     <select id="findProcessOptions" resultType="com.catlbattery.domain.entity.cps.dto.CpsOptionResponse">
-        SELECT process AS value,
+        SELECT DISTINCT process AS value,
                process AS label
         FROM cps_area_person_config
         WHERE enabled = 1
@@ -193,7 +193,6 @@
         <if test="line != null and line != ''">
           AND line = #{line}
         </if>
-        GROUP BY factory, area, line, process
         ORDER BY process ASC
     </select>
 

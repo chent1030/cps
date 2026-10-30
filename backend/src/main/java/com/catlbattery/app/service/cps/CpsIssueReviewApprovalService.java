@@ -1,13 +1,17 @@
 package com.catlbattery.app.service.cps;
 
 import com.catlbattery.domain.entity.cps.CpsIssue;
+import com.catlbattery.domain.entity.cps.CpsIssueAttachment;
 import com.catlbattery.domain.entity.cps.CpsIssueStatus;
 import com.catlbattery.domain.entity.cps.CpsRectificationSubmission;
+import com.catlbattery.infra.mapper.cps.CpsIssueAttachmentMapper;
 import com.catlbattery.infra.mapper.cps.CpsIssueMapper;
 import com.catlbattery.infra.mapper.cps.CpsRectificationSubmissionMapper;
 import com.catlbattery.common.util.CpsStrings;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +46,8 @@ public class CpsIssueReviewApprovalService {
     private final CpsApprovalService approvalService;
     private final CpsRectificationSubmissionMapper submissionMapper;
     private final CpsIssueMapper issueMapper;
+    private final CpsIssueAttachmentMapper attachmentMapper;
+    private final ObjectMapper objectMapper;
 
     /**
      * 问题裁决服务。用 @Lazy setter 可选注入：CpsIssueService 构造链上依赖 CpsInitialReviewService，
@@ -54,10 +60,14 @@ public class CpsIssueReviewApprovalService {
 
     public CpsIssueReviewApprovalService(CpsApprovalService approvalService,
                                         CpsRectificationSubmissionMapper submissionMapper,
-                                        CpsIssueMapper issueMapper) {
+                                        CpsIssueMapper issueMapper,
+                                        CpsIssueAttachmentMapper attachmentMapper,
+                                        ObjectMapper objectMapper) {
         this.approvalService = approvalService;
         this.submissionMapper = submissionMapper;
         this.issueMapper = issueMapper;
+        this.attachmentMapper = attachmentMapper;
+        this.objectMapper = objectMapper;
     }
 
     @Autowired(required = false)
@@ -231,6 +241,8 @@ public class CpsIssueReviewApprovalService {
         snapshot.put("长期措施", valueOrDash(submission.getLongTermMeasure()));
         snapshot.put("责任员工", personOf(submission.getResponsibleEmpName(), submission.getResponsibleEmpNo()));
         snapshot.put("整改照片", attachmentCountOf(submission.getAttachmentIds()));
+        // B1：整改图片列表（前端可直接渲染 img）；无附件或历史单无 attachmentIds 时为空数组
+        snapshot.put("整改图片", rectificationImages(submission.getAttachmentIds()));
         snapshot.put("AI 初审意见", valueOrDash(aiOpinion));
         snapshot.put("整改提交人", personOf(submission.getSubmittedName(), submission.getSubmittedBy()));
         snapshot.put("提交时间", submission.getSubmittedAt() == null ? "-" : TIME_FORMAT.format(submission.getSubmittedAt()));
@@ -263,14 +275,82 @@ public class CpsIssueReviewApprovalService {
     }
 
     private String attachmentCountOf(String attachmentIds) {
-        if (attachmentIds == null || CpsStrings.isBlank(attachmentIds)) {
-            return "0 张";
+        return attachmentIdsOf(attachmentIds).size() + " 张";
+    }
+
+    /**
+     * B1：整改图片（id + 可直接访问的 url）。
+     * url 优先用附件行的 MinIO 公开绝对地址；缺失时回退附件代理路径
+     * /api/cps/attachments/{id}/content（安卓真机访问不到 127.0.0.1 时使用）。
+     */
+    private List<Map<String, Object>> rectificationImages(String attachmentIds) {
+        List<Map<String, Object>> images = new ArrayList<>();
+        for (Long id : attachmentIdsOf(attachmentIds)) {
+            Map<String, Object> image = new LinkedHashMap<>();
+            image.put("id", id);
+            CpsIssueAttachment attachment = attachmentMapper.findById(id).orElse(null);
+            String url = attachment == null ? null : attachment.getFileUrl();
+            if (url == null || CpsStrings.isBlank(url)) {
+                url = "/api/cps/attachments/" + id + "/content";
+            } else {
+                url = url.trim();
+            }
+            image.put("url", url);
+            images.add(image);
         }
-        long count = java.util.Arrays.stream(attachmentIds.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .count();
-        return count + " 张";
+        return images;
+    }
+
+    /**
+     * 解析整改附件 id：新数据是 JSON {"before":[...],"after":[...]}（CpsIssueService 写入），
+     * 历史数据是逗号分隔 id。两种都兼容，非法 JSON 回退逗号解析，绝不抛异常。
+     */
+    private List<Long> attachmentIdsOf(String attachmentIds) {
+        List<Long> ids = new ArrayList<>();
+        if (attachmentIds == null || CpsStrings.isBlank(attachmentIds)) {
+            return ids;
+        }
+        String text = attachmentIds.trim();
+        if (text.startsWith("{")) {
+            try {
+                Map<?, ?> json = objectMapper.readValue(text, Map.class);
+                for (Object value : json.values()) {
+                    if (value instanceof List) {
+                        for (Object item : (List<?>) value) {
+                            addAttachmentId(ids, item);
+                        }
+                    } else {
+                        addAttachmentId(ids, value);
+                    }
+                }
+                return ids;
+            } catch (Exception e) {
+                log.warn("Failed to parse rectify attachmentIds as JSON, fallback to comma split: {}",
+                        e.getMessage());
+            }
+        }
+        for (String part : text.split(",")) {
+            addAttachmentId(ids, part);
+        }
+        return ids;
+    }
+
+    private static void addAttachmentId(List<Long> ids, Object raw) {
+        Long id = null;
+        if (raw instanceof Number) {
+            id = ((Number) raw).longValue();
+        } else if (raw instanceof String) {
+            String text = ((String) raw).trim();
+            if (text.isEmpty()) return;
+            try {
+                id = Long.valueOf(text);
+            } catch (NumberFormatException ignore) {
+                return;
+            }
+        }
+        if (id != null && id > 0 && !ids.contains(id)) {
+            ids.add(id);
+        }
     }
 
     private String valueOrDash(String value) {

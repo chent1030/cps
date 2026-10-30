@@ -6,6 +6,7 @@ import com.catlbattery.domain.entity.cps.CpsInspectionType;
 import com.catlbattery.domain.entity.cps.dto.CpsInspectionAreaRequest;
 import com.catlbattery.infra.mapper.cps.CpsCheckItemMapper;
 import com.catlbattery.infra.mapper.cps.CpsInspectionAreaMapper;
+import com.catlbattery.infra.mapper.cps.CpsInspectionRecordMapper;
 import com.catlbattery.infra.mapper.cps.CpsInspectionTypeMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,9 @@ public class CpsInspectionAreaService {
 
     @Autowired
     private CpsCheckItemMapper checkItemMapper;
+
+    @Autowired
+    private CpsInspectionRecordMapper recordMapper;
 
     public Map<String, Object> page(String typeCode, String factory, String keyword, Boolean enabled, int page, int pageSize) {
         if (page < 1) page = 1;
@@ -127,7 +131,11 @@ public class CpsInspectionAreaService {
     @Transactional
     public void delete(Long id) {
         CpsInspectionArea area = getById(id);
-        // 有执行记录引用时禁删（记录表 area_id 引用）
+        // B7：有执行记录引用时禁删（此前注释存在但未实现，删除会留下悬空 area_id 的脏记录）。
+        long used = recordMapper.countByArea(area.getId(), area.getAreaCode());
+        if (used > 0) {
+            throw new IllegalStateException("该区域已有 " + used + " 条执行记录，不能删除，请先停用该区域");
+        }
         areaMapper.deleteById(id);
     }
 

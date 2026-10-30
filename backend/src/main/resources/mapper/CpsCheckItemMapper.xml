@@ -72,4 +72,32 @@
         SET enabled = #{enabled}, updated_by = #{updatedBy}
         WHERE id = #{id}
     </update>
+    <!-- B8：删除前引用统计。check_item_ids 历史上存的是逗号分隔 item_code，
+         兼容 JSON/逗号形式的 id；其余按 check_item_id 或 item_code 统计。
+         用 INSTR 而非 FIND_IN_SET：避免 MySQL 8 中列/字面量 collation 不一致报 1267。 -->
+    <select id="countReferences" resultType="long">
+        SELECT
+            (SELECT COUNT(*) FROM cps_inspection_area WHERE
+                INSTR(CONCAT(',', REPLACE(check_item_ids, ' ', ''), ','), CONCAT(',', #{itemCode}, ',')) &gt; 0
+                OR INSTR(CONCAT(',', REPLACE(REPLACE(REPLACE(REPLACE(check_item_ids, ' ', ''), '[', ''), ']', ''), '"', ''), ','),
+                         CONCAT(',', #{id}, ',')) &gt; 0)
+          + (SELECT COUNT(*) FROM cps_room WHERE
+                INSTR(CONCAT(',', REPLACE(check_item_ids, ' ', ''), ','), CONCAT(',', #{itemCode}, ',')) &gt; 0
+                OR INSTR(CONCAT(',', REPLACE(REPLACE(REPLACE(REPLACE(check_item_ids, ' ', ''), '[', ''), ']', ''), '"', ''), ','),
+                         CONCAT(',', #{id}, ',')) &gt; 0)
+          + (SELECT COUNT(*) FROM cps_inspection_type WHERE
+                INSTR(CONCAT(',', REPLACE(check_item_ids, ' ', ''), ','), CONCAT(',', #{itemCode}, ',')) &gt; 0)
+          + (SELECT COUNT(*) FROM cps_inspection_item WHERE item_code = #{itemCode})
+          + (SELECT COUNT(*) FROM cps_inspection_record_item
+                WHERE check_item_id = #{id} OR item_code = #{itemCode})
+          + (SELECT COUNT(*) FROM cps_room_check_record_item
+                WHERE check_item_id = #{id} OR item_code = #{itemCode})
+          + (SELECT COUNT(*) FROM cps_vision_check_record WHERE check_item_id = #{id})
+          <!-- 周报快照是历史副本（自带 item_code 与内容），删除点检项不会破坏它；
+               且其 check_item_id 与新点检项自增 id 撞号时会误报“被引用”，故不计入。 -->
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM cps_check_item WHERE id = #{id}
+    </delete>
 </mapper>

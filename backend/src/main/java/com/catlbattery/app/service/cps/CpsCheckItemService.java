@@ -111,6 +111,24 @@ public class CpsCheckItemService {
         return getDetail(item.getId());
     }
 
+    /**
+     * B8：删除点检项。被区域/房型/类型配置或历史执行记录引用时禁止删除（提示改为停用），
+     * 避免配置删除后历史记录/覆盖率统计出现悬空 check_item_id。
+     */
+    @Transactional
+    public void delete(Long id) {
+        CpsCheckItem item = checkItemMapper.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Check item not found: " + id));
+        long refs = checkItemMapper.countReferences(item.getId(), item.getItemCode());
+        if (refs > 0) {
+            throw new IllegalStateException("该点检项已被 " + refs + " 个巡检区域/历史记录引用，不能删除，请改为停用");
+        }
+        int rows = checkItemMapper.deleteById(id);
+        if (rows != 1) {
+            throw new IllegalStateException("Check item not found or not deleted: " + id);
+        }
+    }
+
     @Transactional
     public void setEnabled(Long id, Boolean enabled, String operatorEmpNo) {
         int rows = checkItemMapper.setEnabled(id, enabled, operatorEmpNo);

@@ -15,6 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -99,5 +101,44 @@ class CpsCheckItemServiceTest {
         when(dictService.valueExists(CpsDictService.DICT_ROOM_TYPE, "配电房")).thenReturn(true);
         request.setApplicableRoomTypes("配电房, 未知房型");
         assertThrows(IllegalArgumentException.class, () -> service.save(null, request, "admin"));
+    }
+
+    // B8：删除护栏——被引用拒绝（409 由 controller 映射）、无引用真删、不存在 400。
+    @Test
+    void deleteRejectsWhenReferencedByAreaOrHistory() {
+        CpsCheckItem item = checkItem(4L, "J-C1");
+        when(checkItemMapper.findById(4L)).thenReturn(Optional.of(item));
+        when(checkItemMapper.countReferences(4L, "J-C1")).thenReturn(29L);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> service.delete(4L));
+
+        assertEquals("该点检项已被 29 个巡检区域/历史记录引用，不能删除，请改为停用", ex.getMessage());
+        verify(checkItemMapper, never()).deleteById(anyLong());
+    }
+
+    @Test
+    void deleteRemovesWhenNoReference() {
+        CpsCheckItem item = checkItem(99L, "CI-NEW");
+        when(checkItemMapper.findById(99L)).thenReturn(Optional.of(item));
+        when(checkItemMapper.countReferences(99L, "CI-NEW")).thenReturn(0L);
+        when(checkItemMapper.deleteById(99L)).thenReturn(1);
+
+        assertDoesNotThrow(() -> service.delete(99L));
+
+        verify(checkItemMapper).deleteById(99L);
+    }
+
+    @Test
+    void deleteMissingThrowsBadRequest() {
+        when(checkItemMapper.findById(404L)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> service.delete(404L));
+        verify(checkItemMapper, never()).deleteById(anyLong());
+    }
+
+    private static CpsCheckItem checkItem(Long id, String code) {
+        CpsCheckItem item = new CpsCheckItem();
+        item.setId(id);
+        item.setItemCode(code);
+        return item;
     }
 }
