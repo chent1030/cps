@@ -2,6 +2,7 @@ import { Button, Empty, Table, Tag, Typography } from '@arco-design/web-react'
 import type { TableColumnProps } from '@arco-design/web-react'
 import { AttachmentThumbs } from './AttachmentImages'
 import { splitAttachmentUrls } from '../lib/attachmentUrl'
+import { StructuredValue } from './StructuredValue'
 import { formatDate, statusLabel } from '../lib/presentation'
 import type { Issue, IssueStatus } from '../types'
 
@@ -14,11 +15,11 @@ const columns: TableColumnProps<Issue>[] = [
   { title: '提交时间', dataIndex: 'submitTime', width: 170, render: (value, record) => <>{formatDate(value)}{record.overdue && <Tag color="red" style={{ marginLeft: 8 }}>超期</Tag>}</> },
   { title: 'AI分类一', dataIndex: 'aiCategoryL1Name', width: 120, render: (v) => v || '-' }, { title: 'AI分类二', dataIndex: 'aiCategoryL2Name', width: 130, render: (v) => v || '-' },
   { title: '分类一', dataIndex: 'categoryL1Name', width: 120, render: (v) => v || '-' }, { title: '分类二', dataIndex: 'categoryL2Name', width: 130, render: (v) => v || '-' },
-  { title: '描述', dataIndex: 'description', width: 240, ellipsis: true, render: (value) => <Typography.Text ellipsis={{ showTooltip: true }}>{value || '-'}</Typography.Text> },
+  { title: '描述', dataIndex: 'description', width: 240, render: (value) => <StructuredValue value={value} textRows={2} /> },
   { title: '创建人', width: 130, render: (_, record) => record.creatorEmpNo ? `${record.creatorEmpNo}（${record.creatorEmpName || '-'}）` : '-' },
   { title: '反馈人', width: 130, render: (_, record) => record.feedbackEmpNo ? `${record.feedbackEmpNo}（${record.feedbackEmpName || '-'}）` : '-' },
-  { title: '流程节点人', dataIndex: 'allFlowHandlers', width: 230, ellipsis: true, render: (v) => v || '-' },
-  { title: '原因', dataIndex: 'reasonAnalysis', width: 220, ellipsis: true, render: (v) => v || '-' }, { title: '措施', dataIndex: 'correctiveMeasure', width: 220, ellipsis: true, render: (v) => v || '-' }, { title: '整改说明', dataIndex: 'rectifyRemark', width: 220, ellipsis: true, render: (v) => v || '-' }, { title: '审核意见', dataIndex: 'reviewOpinion', width: 220, ellipsis: true, render: (v) => v || '-' },
+  { title: '流程节点人', dataIndex: 'allFlowHandlers', width: 230, render: (v) => <StructuredValue value={v} textRows={2} /> },
+  { title: '原因', dataIndex: 'reasonAnalysis', width: 220, render: (v) => <StructuredValue value={v} textRows={2} /> }, { title: '措施', dataIndex: 'correctiveMeasure', width: 220, render: (v) => <StructuredValue value={v} textRows={2} /> }, { title: '整改说明', dataIndex: 'rectifyRemark', width: 220, render: (v) => <StructuredValue value={v} textRows={2} /> }, { title: '审核意见', dataIndex: 'reviewOpinion', width: 220, render: (v) => <StructuredValue value={v} textRows={2} /> },
   { title: '更新时间', dataIndex: 'updatedAt', width: 170, render: (v) => formatDate(v) },
   { title: '问题图片', width: 150, render: (_, record) => <Thumbs ids={record.issueImageIds} /> }, { title: '整改图片', width: 150, render: (_, record) => <Thumbs ids={record.proofImageIds} /> },
 ]

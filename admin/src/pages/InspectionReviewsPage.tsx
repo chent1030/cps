@@ -12,6 +12,7 @@ import { IconCheckCircle, IconRefresh, IconReply } from '@arco-design/web-react/
 import { useState } from 'react'
 import { api, getAdminOperator } from '../api'
 import { AttachmentThumb, InspectionItemPhotos } from '../components/AttachmentImages'
+import { StructuredValue } from '../components/StructuredValue'
 import { PageHead, StatePanel } from '../components/PageParts'
 import { useRemote } from '../hooks/useRemote'
 import { attachmentDisplayUrl } from '../lib/attachmentUrl'
@@ -71,7 +72,7 @@ function LogTimeline({ logs }: { logs: InspectionRecordLog[] }) {
           </Typography.Text>}
         </Typography.Text>
       </Space>
-      {log.comment && <div style={{ marginTop: 4, fontSize: 12, color: 'var(--color-text-2)', whiteSpace: 'pre-wrap' }}>{log.comment}</div>}
+      {log.comment && <div style={{ marginTop: 4 }}><StructuredValue value={log.comment} textRows={4} /></div>}
     </Timeline.Item>)}
   </Timeline>
 }
@@ -148,25 +149,28 @@ function ReviewDetailDrawer({ recordId, onClose, onReviewed }: { recordId: numbe
           {
             label: 'AI 初审意见',
             value: record.aiReason
-              ? <Typography.Text style={{ fontSize: 12, whiteSpace: 'pre-wrap' }}>{record.aiReason}</Typography.Text>
+              ? <StructuredValue value={record.aiReason} textRows={6} />
               : <Typography.Text type="secondary" style={{ fontSize: 12 }}>AI 初审无结论（人工复核）</Typography.Text>,
             span: 3,
           },
           ...(record.reviewEmpNo ? [
             { label: '最近复核人', value: person(record.reviewEmpNo, record.reviewEmpName) },
             { label: '最近复核时间', value: formatTime(record.reviewedAt) },
-            { label: '最近复核意见', value: record.reviewOpinion || '-', span: 2 },
+            { label: '最近复核意见', value: <StructuredValue value={record.reviewOpinion} textRows={4} />, span: 2 },
           ] : []),
           ...(record.rectifyEmpNo ? [
             { label: '整改责任人', value: person(record.rectifyEmpNo, record.rectifyEmpName) },
             { label: '整改提交时间', value: formatTime(record.rectifySubmittedAt) },
           ] : []),
-          ...(record.rectifyReason ? [{ label: '整改原因', value: record.rectifyReason, span: 3 }] : []),
-          ...(record.rectifyShortTerm ? [{ label: '短期措施', value: record.rectifyShortTerm, span: 3 }] : []),
-          ...(record.rectifyLongTerm ? [{ label: '长期措施', value: record.rectifyLongTerm, span: 3 }] : []),
+          ...(record.rectifyReason ? [{ label: '整改原因', value: <StructuredValue value={record.rectifyReason} textRows={4} />, span: 3 }] : []),
+          ...(record.rectifyShortTerm ? [{ label: '短期措施', value: <StructuredValue value={record.rectifyShortTerm} textRows={4} />, span: 3 }] : []),
+          ...(record.rectifyLongTerm ? [{ label: '长期措施', value: <StructuredValue value={record.rectifyLongTerm} textRows={4} />, span: 3 }] : []),
           ...(record.rectifyAiOverall ? [{
             label: '整改 AI 结论',
-            value: `${aiOverallLabel[record.rectifyAiOverall] ?? record.rectifyAiOverall}${record.rectifyAiReason ? `：${record.rectifyAiReason}` : ''}`,
+            value: <div>
+              <Tag color={aiOverallColor[record.rectifyAiOverall] ?? 'gray'}>{aiOverallLabel[record.rectifyAiOverall] ?? record.rectifyAiOverall}</Tag>
+              {record.rectifyAiReason && <div style={{ marginTop: 4 }}><StructuredValue value={record.rectifyAiReason} textRows={4} /></div>}
+            </div>,
             span: 3,
           }] : []),
         ]}
@@ -203,7 +207,7 @@ function ReviewDetailDrawer({ recordId, onClose, onReviewed }: { recordId: numbe
               {item.judgeResult
                 ? <Tag color={resultColor[item.judgeResult] ?? 'gray'}>{resultLabel[item.judgeResult] ?? item.judgeResult}</Tag>
                 : <Typography.Text type="secondary" style={{ fontSize: 12 }}>无 AI 判定</Typography.Text>}
-              {item.judgeReason && <Typography.Text type="secondary" style={{ fontSize: 11 }}>{item.judgeReason}</Typography.Text>}
+              {item.judgeReason && <StructuredValue value={item.judgeReason} textRows={3} />}
             </Space>,
           },
           {
@@ -220,7 +224,7 @@ function ReviewDetailDrawer({ recordId, onClose, onReviewed }: { recordId: numbe
               {item.passResult
                 ? <Tag color={resultColor[item.passResult] ?? 'gray'}>{resultLabel[item.passResult] ?? item.passResult}</Tag>
                 : <Typography.Text type="secondary" style={{ fontSize: 12 }}>-</Typography.Text>}
-              {item.textValue && <Typography.Text type="secondary" style={{ fontSize: 11, whiteSpace: 'pre-wrap' }}>{item.textValue}</Typography.Text>}
+              {item.textValue && <StructuredValue value={item.textValue} textRows={3} />}
             </Space>,
           },
           {
@@ -318,10 +322,9 @@ export function InspectionReviewsPage() {
             <Tag color={aiOverallColor[overall] ?? 'gray'}>{aiOverallLabel[overall] ?? overall}</Tag>
             {record.aiScore != null && <Typography.Text type="secondary" style={{ fontSize: 12 }}>{record.aiScore} 分</Typography.Text>}
           </Space>
-          {record.aiReason && <div style={{
-            fontSize: 11, color: 'var(--color-text-3)', overflow: 'hidden', display: '-webkit-box',
-            WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-          }}>{record.aiReason}</div>}
+          {record.aiReason && <div style={{ fontSize: 11, color: 'var(--color-text-3)' }}>
+            <StructuredValue value={record.aiReason} textRows={2} />
+          </div>}
         </Space>
       },
     },

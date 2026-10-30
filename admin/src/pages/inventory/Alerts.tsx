@@ -10,6 +10,7 @@ import { useState } from 'react'
 import { handleAlert, listAlerts } from '../../api/inventory'
 import { useRemote } from '../../hooks/useRemote'
 import { PageHead, StatePanel } from '../../components/PageParts'
+import { StructuredValue } from '../../components/StructuredValue'
 import { errorMessage } from '../../lib/presentation'
 import type { InventoryAlertEvent, InventoryAlertStatus } from '../../types'
 
@@ -57,7 +58,7 @@ export function InventoryAlertsPage() {
     { title: '首触时间', width: 170, dataIndex: 'firstTriggeredAt' },
     { title: '最近评估', width: 170, dataIndex: 'lastEvalAt' },
     { title: '评估库存/阈值', width: 160, render: (_, row) => `${row.lastEvalQty} / ${row.thresholdSnapshot}` },
-    { title: '关闭信息', render: (_, row) => row.closedAt ? `${row.closedBy || '-'}：${row.closeReason || '-'}` : '-' },
+    { title: '关闭信息', render: (_, row) => row.closedAt ? <div>{row.closedBy || '-'}：<StructuredValue value={row.closeReason} textRows={2} /></div> : '-' },
     {
       title: '操作', width: 180, align: 'right',
       render: (_, row) => row.status === 'OPEN' ? <div style={{ display: 'inline-flex', gap: 4 }}>

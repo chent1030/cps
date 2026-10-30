@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { api, getAdminOperator } from '../api'
 import { Enabled, PageHead, StatePanel, Toggle } from '../components/PageParts'
 import { useRemote } from '../hooks/useRemote'
+import { StructuredValue } from '../components/StructuredValue'
 import { errorMessage } from '../lib/presentation'
 import type { InventoryAlertEvent, InventoryAlertStatus, InventoryItem, InventoryTxn } from '../types'
 
@@ -172,7 +173,7 @@ export function InventoryPage() {
     },
     { title: '变更前 → 后', width: 130, render: (_, row) => `${row.beforeQty} → ${row.afterQty}` },
     { title: '操作人', width: 150, render: (_, row) => row.operatorEmpNo ? `${row.operatorName || '-'}（${row.operatorEmpNo}）` : '-' },
-    { title: '备注', render: (_, row) => row.remark || '-' },
+    { title: '备注', render: (_, row) => <StructuredValue value={row.remark} textRows={2} /> },
   ]
 
   const alertColumns: TableColumnProps<InventoryAlertEvent>[] = [
@@ -181,7 +182,7 @@ export function InventoryPage() {
     { title: '首触时间', width: 170, dataIndex: 'firstTriggeredAt' },
     { title: '最近评估', width: 170, dataIndex: 'lastEvalAt' },
     { title: '评估库存 / 阈值', width: 140, render: (_, row) => `${row.lastEvalQty} / ${row.thresholdSnapshot}` },
-    { title: '关闭信息', render: (_, row) => row.closedAt ? `${row.closedBy || '-'}：${row.closeReason || '-'}` : '-' },
+    { title: '关闭信息', render: (_, row) => row.closedAt ? <div>{row.closedBy || '-'}：<StructuredValue value={row.closeReason} textRows={2} /></div> : '-' },
     {
       title: '操作', width: 160, align: 'right',
       render: (_, row) => row.status === 'OPEN' ? (

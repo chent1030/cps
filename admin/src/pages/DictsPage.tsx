@@ -12,6 +12,7 @@ import { IconPlus, IconRefresh } from '@arco-design/web-react/icon'
 import { useState } from 'react'
 import { api } from '../api'
 import { useRemote } from '../hooks/useRemote'
+import { StructuredValue } from '../components/StructuredValue'
 import { Enabled, FilterBar, PageHead, StatePanel, Toggle } from '../components/PageParts'
 import { errorMessage } from '../lib/presentation'
 import type { DictEntry, DictType } from '../types'
@@ -109,7 +110,7 @@ export function DictsPage() {
     { title: '选项值（存库）', dataIndex: 'itemValue', width: 160 },
     { title: '显示名', dataIndex: 'itemLabel', width: 160 },
     { title: '排序', dataIndex: 'sortNo', width: 70, render: (v: number) => v ?? 0 },
-    { title: '备注', dataIndex: 'remark', ellipsis: true, render: (v: string) => v || '-' },
+    { title: '备注', dataIndex: 'remark', render: (v: string) => <StructuredValue value={v} textRows={2} /> },
     { title: '状态', width: 88, dataIndex: 'enabled', render: (v: boolean) => <Enabled value={v} /> },
     {
       title: '操作', width: 140, align: 'right',

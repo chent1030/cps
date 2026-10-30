@@ -10,6 +10,7 @@ import { IconDelete, IconFilter, IconPlus, IconRefresh } from '@arco-design/web-
 import { useState } from 'react'
 import { api } from '../api'
 import { useRemote } from '../hooks/useRemote'
+import { StructuredValue } from '../components/StructuredValue'
 import { Enabled, PageHead, StatePanel, Toggle } from '../components/PageParts'
 import { errorMessage } from '../lib/presentation'
 import type { CheckItem, DictEntry, InspectionArea, InspectionType } from '../types'
@@ -235,6 +236,21 @@ function CheckItemsSection({ roomTypeOptions, photoCategoryOptions }: { roomType
     } catch (error) { Message.error(errorMessage(error)) }
   }
 
+  async function remove(item: CheckItem) {
+    Modal.confirm({
+      title: `确认删除点检项「${item.content || item.itemCode}」？`,
+      content: '已被巡检记录引用的点检项不可删除（后端会返回具体原因），可先停用。',
+      okButtonProps: { status: 'danger' },
+      onOk: async () => {
+        try {
+          await api.deleteCheckItem(item.id)
+          Message.success(`已删除点检项 ${item.itemCode}`)
+          await remote.refresh()
+        } catch (error) { Message.error(errorMessage(error)) }
+      },
+    })
+  }
+
   async function save() {
     if (!editing) return
     const body = { ...editing }
@@ -265,7 +281,7 @@ function CheckItemsSection({ roomTypeOptions, photoCategoryOptions }: { roomType
 
   const columns: TableColumnProps<CheckItem>[] = [
     { title: '编码', dataIndex: 'itemCode', width: 110 },
-    { title: '点检内容', ellipsis: true, render: (_, r) => r.content || '-' },
+    { title: '点检内容', render: (_, r) => <StructuredValue value={r.content} textRows={2} /> },
     {
       title: '点检类型', dataIndex: 'checkTypes', width: 170,
       render: (v: string) => (v ?? 'PASS_FAIL').split(',').filter(Boolean).map((t) => <Tag key={t} color={t === 'PHOTO' ? 'orange' : t === 'TEXT' ? 'arcoblue' : 'green'} style={{ marginRight: 4 }}>{checkTypeLabel[t] ?? t}</Tag>),
@@ -278,12 +294,12 @@ function CheckItemsSection({ roomTypeOptions, photoCategoryOptions }: { roomType
     },
     { title: '扣分', dataIndex: 'deductScore', width: 70, render: (v: number) => v ?? 0 },
     { title: '适用状态', dataIndex: 'status', width: 90, render: (v: string) => <Tag color={v === 'NOT_APPLICABLE' ? 'gray' : 'green'}>{itemStatusLabel[v ?? 'APPLICABLE'] ?? v}</Tag> },
-    { title: '适用房型', dataIndex: 'applicableRoomTypes', width: 130, ellipsis: true, render: (v: string) => v || '全部房型' },
+    { title: '适用房型', dataIndex: 'applicableRoomTypes', width: 130, render: (v: string) => v ? <StructuredValue value={v} textRows={2} /> : '全部房型' },
     { title: '版本', dataIndex: 'configVersion', width: 70, render: (v: number) => `v${v ?? '-'}` },
     { title: '状态', width: 88, dataIndex: 'enabled', render: (v: boolean) => <Enabled value={v} /> },
     {
-      title: '操作', width: 130, align: 'right', fixed: 'right',
-      render: (_, r) => <><Button type="text" size="small" onClick={() => setEditing({ ...r })}>编辑</Button><Toggle value={r.enabled} onClick={() => void toggle(r)} /></>,
+      title: '操作', width: 180, align: 'right', fixed: 'right',
+      render: (_, r) => <><Button type="text" size="small" onClick={() => setEditing({ ...r })}>编辑</Button><Toggle value={r.enabled} onClick={() => void toggle(r)} /><Button type="text" size="small" status="danger" icon={<IconDelete />} onClick={() => remove(r)} /></>,
     },
   ]
 

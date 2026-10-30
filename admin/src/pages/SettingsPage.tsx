@@ -3,6 +3,7 @@ import { IconLock, IconRefresh, IconRobot, IconSettings } from '@arco-design/web
 import { useState } from 'react'
 import { api, getAdminOperator } from '../api'
 import { PageHead, StatePanel } from '../components/PageParts'
+import { StructuredValue } from '../components/StructuredValue'
 import { useRemote } from '../hooks/useRemote'
 import { errorMessage } from '../lib/presentation'
 
@@ -26,7 +27,8 @@ export function SettingsPage() {
                     { label: '接入状态', value: <Tag color={runtime.data.state === 'ONLINE' ? 'green' : runtime.data.state === 'DISABLED' ? 'orange' : 'red'}>{runtime.data.state}</Tag> },
                     { label: '租户标识', value: runtime.data.tenantId },
                     { label: '运行时地址', value: runtime.data.baseUrl },
-                    { label: '检查结果', value: runtime.data.message },
+                    { label: '检查结果', value: <StructuredValue value={runtime.data.message} textRows={6} /> },
+                    ...(runtime.data.metrics ? [{ label: '运行指标', value: <StructuredValue value={runtime.data.metrics} /> }] : []),
                   ]}
                 />
               </Card>

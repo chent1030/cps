@@ -5,6 +5,7 @@ import { Button } from '@arco-design/web-react'
 import { useState } from 'react'
 import { api } from '../api'
 import { DataCard, FilterBar, PageHead, StatePanel } from '../components/PageParts'
+import { StructuredValue } from '../components/StructuredValue'
 import { useRemote } from '../hooks/useRemote'
 import type { AdminAuditLog } from '../types'
 
@@ -51,14 +52,14 @@ export function AuditLogPage() {
     },
     { title: '对象', dataIndex: 'targetType', width: 100, render: (v) => v ? <Tag>{v}</Tag> : '-' },
     { title: '对象ID', dataIndex: 'targetId', width: 140, render: (v) => v ?? '-' },
-    { title: '详情', dataIndex: 'detail', width: 280, render: (v) => v ? <Typography.Text style={{ wordBreak: 'break-all' }}>{v}</Typography.Text> : '-' },
+    { title: '详情', dataIndex: 'detail', width: 280, render: (v) => <StructuredValue value={v} textRows={3} /> },
     {
       title: '结果',
       dataIndex: 'status',
       width: 90,
       render: (v) => v === 'SUCCESS' ? <Tag color="green">成功</Tag> : <Tag color="red">失败</Tag>,
     },
-    { title: '错误信息', dataIndex: 'errorMessage', width: 220, render: (v) => v ? <Typography.Text type="error">{v}</Typography.Text> : '-' },
+    { title: '错误信息', dataIndex: 'errorMessage', width: 220, render: (v) => <StructuredValue value={v} textRows={3} /> },
     { title: '时间', dataIndex: 'createdAt', width: 170, render: (v) => v ? new Date(v).toLocaleString('zh-CN') : '-' },
   ]
 

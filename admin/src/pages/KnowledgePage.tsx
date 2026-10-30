@@ -4,6 +4,7 @@ import { IconDownload, IconFilter, IconPlus, IconSync, IconUpload } from '@arco-
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { AttachmentThumbs } from '../components/AttachmentImages'
+import { StructuredValue } from '../components/StructuredValue'
 import { Enabled, PageHead, StatePanel, Toggle } from '../components/PageParts'
 import { useRemote } from '../hooks/useRemote'
 import { errorMessage } from '../lib/presentation'
@@ -22,8 +23,8 @@ export function KnowledgePage() {
     { title: '问题分类', width: 220, render: (_, item) => <><Typography.Text bold>{item.categoryL1Name || '-'}</Typography.Text><div><Typography.Text type="secondary">{item.categoryL2Name || '-'}</Typography.Text></div></> },
     { title: '状态', width: 90, render: (_, item) => <Enabled value={item.enabled} /> },
     { title: '素材', width: 220, render: (_, item) => <AttachmentThumbs values={(materials[item.id] || []).map((material) => material.fileUrl)} width={58} height={44} alt="素材" /> },
-    { title: '原因', width: 260, render: (_, item) => <div>{(materials[item.id] || []).map((material) => <Typography.Paragraph key={material.id} ellipsis={{ rows: 2 }} style={{ marginBottom: 4 }}>{material.reason || '-'}</Typography.Paragraph>)}</div> },
-    { title: '措施', width: 260, render: (_, item) => <div>{(materials[item.id] || []).map((material) => <Typography.Paragraph key={material.id} ellipsis={{ rows: 2 }} style={{ marginBottom: 4 }}>{material.measure || '-'}</Typography.Paragraph>)}</div> },
+    { title: '原因', width: 260, render: (_, item) => <div>{(materials[item.id] || []).map((material) => <div key={material.id} style={{ marginBottom: 4 }}><StructuredValue value={material.reason} textRows={2} /></div>)}</div> },
+    { title: '措施', width: 260, render: (_, item) => <div>{(materials[item.id] || []).map((material) => <div key={material.id} style={{ marginBottom: 4 }}><StructuredValue value={material.measure} textRows={2} /></div>)}</div> },
     { title: '向量 ID', width: 220, render: (_, item) => <MaterialValues values={(materials[item.id] || []).map((material) => material.milvusVectorId || '-')} /> },
     { title: '失败重试次数', width: 130, render: (_, item) => <MaterialValues values={(materials[item.id] || []).map((material) => String(material.vectorRetryCount || 0))} /> },
     { title: '同步时间', width: 180, render: (_, item) => <MaterialValues values={(materials[item.id] || []).map((material) => material.vectorUpdatedAt || '-')} /> },
@@ -35,7 +36,7 @@ export function KnowledgePage() {
 }
 
 function MaterialValues({ values, error = false }: { values: string[]; error?: boolean }) {
-  return <div>{values.length ? values.map((value, index) => <Typography.Paragraph key={`${value}-${index}`} type={error && value !== '-' ? 'error' : undefined} ellipsis={{ rows: 2 }} style={{ marginBottom: 4 }}>{value}</Typography.Paragraph>) : '-'}</div>
+  return <div>{values.length ? values.map((value, index) => <div key={index} style={{ marginBottom: 4, color: error && value !== '-' ? 'rgb(var(--danger-6))' : undefined }}><StructuredValue value={value} textRows={2} /></div>) : <Typography.Text type="secondary">—</Typography.Text>}</div>
 }
 
 function CreateMaterialModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => Promise<void> }) {

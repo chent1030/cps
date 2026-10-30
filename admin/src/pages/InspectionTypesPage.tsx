@@ -4,6 +4,7 @@ import { IconDelete, IconEdit, IconPlus } from '@arco-design/web-react/icon'
 import { useState } from 'react'
 import { api } from '../api'
 import { useRemote } from '../hooks/useRemote'
+import { StructuredValue } from '../components/StructuredValue'
 import { errorMessage } from '../lib/presentation'
 import type { InspectionType } from '../types'
 
@@ -148,7 +149,7 @@ export function InspectionTypesPage() {
       render: (v, r) => <>{<Tag color="arcoblue">{v}</Tag>}{r.builtin === 1 ? <Tag color="purple" style={{ marginLeft: 4 }}>内置</Tag> : null}</>,
     },
     { title: '巡检名称', dataIndex: 'name', width: 140 },
-    { title: '巡检内容', dataIndex: 'content', ellipsis: true, render: (v) => v || <Typography.Text type="secondary">-</Typography.Text> },
+    { title: '巡检内容', dataIndex: 'content', render: (v) => <StructuredValue value={v} textRows={2} /> },
     {
       title: '是否分区域', dataIndex: 'zoneFlag', width: 110,
       render: (v: number) => v === 1 ? <Tag color="green">分区域</Tag> : <Tag color="orange">不分区域</Tag>,

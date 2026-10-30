@@ -11,6 +11,7 @@ import { api } from '../../api'
 import { listTxns } from '../../api/inventory'
 import { useRemote } from '../../hooks/useRemote'
 import { PageHead, StatePanel } from '../../components/PageParts'
+import { StructuredValue } from '../../components/StructuredValue'
 import { errorMessage } from '../../lib/presentation'
 import type { InventoryTxn } from '../../types'
 
@@ -50,7 +51,7 @@ export function InventoryTransactionsPage() {
     { title: '数量', width: 120, render: (_, row) => <Typography.Text bold style={{ color: row.qty > 0 ? '#00b42a' : '#f53f3f' }}>{row.qty > 0 ? `+${row.qty}` : row.qty}</Typography.Text> },
     { title: '变更前 → 后', width: 160, render: (_, row) => `${row.beforeQty} → ${row.afterQty}` },
     { title: '操作人', width: 160, render: (_, row) => row.operatorEmpNo ? `${row.operatorName || '-'}（${row.operatorEmpNo}）` : '-' },
-    { title: '备注', render: (_, row) => row.remark || '-' },
+    { title: '备注', render: (_, row) => <StructuredValue value={row.remark} textRows={2} /> },
   ]
 
   async function submitTxn() {

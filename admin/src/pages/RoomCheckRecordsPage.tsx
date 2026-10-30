@@ -10,6 +10,7 @@ import { IconDownload, IconFilter, IconRefresh } from '@arco-design/web-react/ic
 import { useState } from 'react'
 import { api } from '../api'
 import { InspectionItemPhotos } from '../components/AttachmentImages'
+import { StructuredValue } from '../components/StructuredValue'
 import { useRemote } from '../hooks/useRemote'
 import { PageHead, StatePanel } from '../components/PageParts'
 import { errorMessage } from '../lib/presentation'
@@ -61,7 +62,7 @@ function RecordDetailDrawer({ recordId, onClose }: { recordId: number; onClose: 
             title: '执行结果', width: 220,
             render: (_, r) => <Space direction="vertical" size={2}>
               {r.passResult && <Tag color={resultColor[r.passResult] ?? 'gray'}>{resultLabel[r.passResult] ?? r.passResult}</Tag>}
-              {r.textValue && <Typography.Text type="secondary" style={{ fontSize: 12, whiteSpace: 'pre-wrap' }}>文本：{r.textValue}</Typography.Text>}
+              {r.textValue && <div style={{ fontSize: 12, color: 'var(--color-text-2)' }}>文本：<StructuredValue value={r.textValue} textRows={3} /></div>}
               {(r.checkTypes ?? '').includes('PHOTO') && (
                 <InspectionItemPhotos item={r} width={56} height={42} />
               )}
@@ -79,12 +80,12 @@ function RecordDetailDrawer({ recordId, onClose }: { recordId: number; onClose: 
           },
           {
             title: '判定/修正留痕', render: (_, r) => r.finalModifiedBy
-              ? <Typography.Text style={{ fontSize: 12, whiteSpace: 'pre-wrap' }}>
-                  {r.finalModifiedBy} · {r.finalModifiedAt?.replace('T', ' ').slice(0, 19) ?? '-'}
-                  {r.finalModifyReason ? `\n原因：${r.finalModifyReason}` : ''}
-                </Typography.Text>
+              ? <div style={{ fontSize: 12, color: 'var(--color-text-2)' }}>
+                  <div>{r.finalModifiedBy} · {r.finalModifiedAt?.replace('T', ' ').slice(0, 19) ?? '-'}</div>
+                  {r.finalModifyReason && <div style={{ marginTop: 2 }}>原因：<StructuredValue value={r.finalModifyReason} textRows={3} /></div>}
+                </div>
               : r.judgeReason
-                ? <Typography.Text type="secondary" style={{ fontSize: 12, whiteSpace: 'pre-wrap' }}>AI：{r.judgeReason}</Typography.Text>
+                ? <div style={{ fontSize: 12, color: 'var(--color-text-2)' }}>AI：<StructuredValue value={r.judgeReason} textRows={3} /></div>
                 : <Typography.Text type="secondary" style={{ fontSize: 12 }}>-</Typography.Text>,
           },
         ]}

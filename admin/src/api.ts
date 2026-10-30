@@ -229,6 +229,8 @@ export const api = {
     const operator = getAdminOperator()
     return request<void>(`/cps/admin/check-items/${id}/enabled`, { method: 'PATCH', body: JSON.stringify({ enabled, empNo: operator?.empNo }) })
   },
+  /** 删除点检项：被巡检记录引用时后端返回 409 + message。 */
+  deleteCheckItem: (id: number) => request<{ ok: boolean }>(`/cps/admin/check-items/${id}`, { method: 'DELETE' }),
   // ---- 通用字典（双表：类型 /api/cps/admin/dict-types + 条目 /api/cps/admin/dicts）----
   dictTypes: (params?: { enabled?: boolean }) => request<DictType[]>(`/cps/admin/dict-types${query(params ?? {})}`),
   saveDictType: (body: Partial<DictType>) => {

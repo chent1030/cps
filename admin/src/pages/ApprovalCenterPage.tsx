@@ -5,6 +5,8 @@ import { useState } from 'react'
 import { approvals, getAdminOperator } from '../api'
 import { errorMessage } from '../lib/presentation'
 import { DataCard, FilterBar, PageHead, StatePanel } from '../components/PageParts'
+import { ApprovalSnapshot } from '../components/ApprovalSnapshot'
+import { StructuredValue } from '../components/StructuredValue'
 import { useRemote } from '../hooks/useRemote'
 import {
   APPROVAL_ACTION_COLORS,
@@ -295,7 +297,7 @@ export function ApprovalCenterPage() {
 
       {/* 详情 Drawer */}
       <Drawer
-        width={720}
+        width={860}
         title={detail.data ? `审批详情 #${detail.data.instance.id}` : '审批详情'}
         visible={detail.open}
         onCancel={closeDetail}
@@ -428,27 +430,15 @@ function DetailBody({ data, canOperate, operatorEmpNo, onApprove, onReject, onWi
           { label: '创建', value: ins.createdAt ? new Date(ins.createdAt).toLocaleString('zh-CN') : '-' },
           ...(ins.approvedAt ? [{ label: '批准时间', value: new Date(ins.approvedAt).toLocaleString('zh-CN') }] : []),
           ...(ins.rejectedAt ? [{ label: '驳回时间', value: new Date(ins.rejectedAt).toLocaleString('zh-CN') }] : []),
-          ...(ins.rejectReason ? [{ label: '驳回原因', value: <Typography.Text type="error">{ins.rejectReason}</Typography.Text> }] : []),
+          ...(ins.rejectReason ? [{ label: '驳回原因', value: <div style={{ color: 'rgb(var(--danger-6))' }}><StructuredValue value={ins.rejectReason} textRows={4} /></div> }] : []),
         ]}
       />
 
       {ins.bizSnapshot && (
-        <Descriptions
-          title="业务快照（提交时）"
-          column={1}
-          size="small"
-          data={(() => {
-            try {
-              const obj = JSON.parse(ins.bizSnapshot) as Record<string, unknown>
-              return Object.entries(obj).map(([k, v]) => ({
-                label: k,
-                value: <Typography.Text style={{ wordBreak: 'break-all' }}>{typeof v === 'string' ? v : JSON.stringify(v)}</Typography.Text>,
-              }))
-            } catch {
-              return [{ label: '内容', value: <Typography.Text style={{ wordBreak: 'break-all' }}>{ins.bizSnapshot}</Typography.Text> }]
-            }
-          })()}
-        />
+        <div>
+          <Typography.Title heading={6} style={{ marginTop: 8 }}>业务快照（提交时）</Typography.Title>
+          <ApprovalSnapshot snapshot={ins.bizSnapshot} />
+        </div>
       )}
 
       <div>
@@ -476,7 +466,7 @@ function DetailBody({ data, canOperate, operatorEmpNo, onApprove, onReject, onWi
                     {s.fromStatus && s.toStatus ? <Typography.Text type="secondary"> · {APPROVAL_INSTANCE_STATUS_LABELS[s.fromStatus]} → {APPROVAL_INSTANCE_STATUS_LABELS[s.toStatus]}</Typography.Text> : null}
                   </Typography.Text>
                 </Space>
-                {s.comment ? <div style={{ marginTop: 4, color: 'var(--color-text-2)' }}>{s.comment}</div> : null}
+                {s.comment ? <div style={{ marginTop: 4 }}><StructuredValue value={s.comment} textRows={4} /></div> : null}
               </Timeline.Item>
             ))}
           </Timeline>
